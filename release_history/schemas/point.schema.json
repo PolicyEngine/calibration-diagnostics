@@ -1,0 +1,682 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/PolicyEngine/calibration-diagnostics/release_history/schemas/point.schema.json",
+  "title": "Release history point",
+  "description": "One data file measured on one panel (`release_history/document.py`): immutable once written. Version 1: every key listed here is required and no other key is allowed. A key added later is declared here with the version that added it, and is not required, so the points already stored stay valid and no format version moves.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "kind",
+    "country",
+    "panel_id",
+    "measurement_id",
+    "status",
+    "reason",
+    "fetched_from",
+    "file",
+    "data",
+    "periods",
+    "baseline",
+    "reforms",
+    "cells",
+    "disclosure",
+    "engine_bundle",
+    "environment",
+    "producer",
+    "runtime"
+  ],
+  "properties": {
+    "format_version": {
+      "const": 1
+    },
+    "kind": {
+      "const": "release_history.measurement"
+    },
+    "country": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "panel_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "measurement_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "sha256 of the canonical JSON of {h5_sha256, panel_id}."
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "partial",
+        "refused"
+      ]
+    },
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Why a refused point is a gap: a refusal the file itself causes."
+    },
+    "fetched_from": {
+      "description": "Where the file was read from: an audit trail, never a listing fact.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "build_id",
+        "hf_repo",
+        "hf_commit",
+        "release_manifest",
+        "build_manifest",
+        "dataset",
+        "declared"
+      ],
+      "properties": {
+        "build_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        },
+        "hf_repo": {
+          "type": "string"
+        },
+        "hf_commit": {
+          "type": "string"
+        },
+        "release_manifest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "json_sha256"
+          ],
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "json_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "build_manifest": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path",
+                "sha256"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            }
+          ]
+        },
+        "dataset": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "path"
+          ],
+          "properties": {
+            "key": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          }
+        },
+        "declared": {
+          "description": "What the build the point was fetched through declares about its file.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "build",
+            "cut_tag",
+            "migrated_from",
+            "built_at",
+            "built_with_model",
+            "built_with_core",
+            "compatible_models",
+            "reference_model_compatibility",
+            "description",
+            "build_provenance"
+          ],
+          "properties": {
+            "build": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "cut_tag": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "migrated_from": {
+              "description": "Copied as the upstream document holds it; its shape is that document's."
+            },
+            "built_at": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "built_with_model": {
+              "description": "Copied as the upstream document holds it; its shape is that document's."
+            },
+            "built_with_core": {
+              "description": "Copied as the upstream document holds it; its shape is that document's."
+            },
+            "compatible_models": {
+              "description": "Copied as the upstream document holds it; its shape is that document's."
+            },
+            "reference_model_compatibility": {
+              "enum": [
+                "inside",
+                "outside",
+                "undeclared",
+                "unreadable"
+              ]
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "build_provenance": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "code_repository",
+                    "code_commit",
+                    "attempt_id",
+                    "target_surface_sha256",
+                    "n_targets",
+                    "target_registry_version",
+                    "household_weight_year",
+                    "runtime"
+                  ],
+                  "properties": {
+                    "code_repository": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "code_commit": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "attempt_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "target_surface_sha256": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "n_targets": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "target_registry_version": {
+                      "description": "Copied as the upstream document holds it; its shape is that document's."
+                    },
+                    "household_weight_year": {
+                      "description": "Copied as the upstream document holds it; its shape is that document's."
+                    },
+                    "runtime": {
+                      "description": "Copied as the upstream document holds it; its shape is that document's."
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sha256",
+        "bytes"
+      ],
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      }
+    },
+    "data": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns_sha256",
+            "column_count",
+            "unknown_columns",
+            "warnings"
+          ],
+          "properties": {
+            "columns_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "column_count": {
+              "type": "integer"
+            },
+            "unknown_columns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "periods": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "period",
+          "label"
+        ],
+        "properties": {
+          "period": {
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "baseline": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "reforms": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "description": "Keyed by the spec's reform ids.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "definition_sha256",
+              "applied",
+              "error"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "ok",
+                  "error"
+                ]
+              },
+              "definition_sha256": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                ]
+              },
+              "applied": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "description": "Parameter path -> period -> value, as applied."
+                  }
+                ]
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "stage",
+                      "class",
+                      "name",
+                      "where"
+                    ],
+                    "properties": {
+                      "stage": {
+                        "type": "string"
+                      },
+                      "class": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "where": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "cells": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "output",
+          "period",
+          "unit",
+          "value",
+          "status",
+          "reason"
+        ],
+        "properties": {
+          "output": {
+            "type": "string"
+          },
+          "period": {
+            "type": "integer"
+          },
+          "unit": {
+            "enum": [
+              "currency",
+              "count",
+              "rate",
+              "ratio"
+            ]
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "withheld"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "disclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy",
+        "min_source_households",
+        "withheld_cells"
+      ],
+      "properties": {
+        "policy": {
+          "enum": [
+            "none",
+            "source_household_small_cells"
+          ]
+        },
+        "min_source_households": {
+          "type": "integer"
+        },
+        "withheld_cells": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      }
+    },
+    "engine_bundle": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bundle_id",
+            "capital_gains_responses"
+          ],
+          "properties": {
+            "bundle_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "capital_gains_responses": {
+              "description": "Copied as the upstream document holds it; its shape is that document's."
+            }
+          }
+        }
+      ]
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "python",
+        "platform",
+        "packages",
+        "packages_sha256",
+        "uv_lock_sha256"
+      ],
+      "properties": {
+        "python": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "packages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "packages_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "uv_lock_sha256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        }
+      }
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "commit"
+      ],
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "started_at",
+        "finished_at",
+        "seconds",
+        "runner",
+        "simulations"
+      ],
+      "properties": {
+        "started_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "finished_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "seconds": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "runner": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "simulations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "label",
+              "seconds",
+              "peak_rss_bytes"
+            ],
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "seconds": {
+                "type": "number"
+              },
+              "peak_rss_bytes": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

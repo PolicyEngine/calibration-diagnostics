@@ -1,0 +1,333 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/PolicyEngine/calibration-diagnostics/release_history/schemas/timeline.schema.json",
+  "title": "Release history timeline",
+  "description": "A panel's numbers on its country's series axis, as `buildTimeline` in frontend/lib/microcosm/release-history-store.ts writes them (camelCase). Rebuilt by every finalize. Version 1: every key listed here is required and no other key is allowed. A key added later is declared here with the version that added it, and is not required, so the points already stored stay valid and no format version moves.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "formatVersion",
+    "kind",
+    "country",
+    "panelId",
+    "builtAt",
+    "listing",
+    "labels",
+    "builds",
+    "outputs",
+    "chronicle"
+  ],
+  "properties": {
+    "formatVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "release_history.timeline"
+    },
+    "country": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "panelId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "builtAt": {
+      "type": "string"
+    },
+    "listing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "listedAt",
+        "rule"
+      ],
+      "properties": {
+        "commit": {
+          "type": "string"
+        },
+        "listedAt": {
+          "type": "string"
+        },
+        "rule": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "releases",
+            "since"
+          ],
+          "properties": {
+            "releases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "since": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "labels": {
+      "type": "object",
+      "description": "Keyed by the spec's reform ids.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "source"
+        ],
+        "properties": {
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "description": "Copied as the upstream document holds it; its shape is that document's."
+          }
+        }
+      }
+    },
+    "builds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "buildId",
+          "release",
+          "build",
+          "publishedAt",
+          "current",
+          "withdrawn",
+          "digest",
+          "sameFileAs",
+          "state",
+          "measurementId",
+          "status",
+          "reason"
+        ],
+        "properties": {
+          "buildId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+          },
+          "release": {
+            "type": "string"
+          },
+          "build": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": "string"
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "withdrawn": {
+            "type": "boolean"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "sameFileAs": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "measured",
+              "gap",
+              "retrying",
+              "failed",
+              "missing"
+            ]
+          },
+          "measurementId": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              null,
+              "ok",
+              "partial",
+              "refused"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "output",
+          "period",
+          "unit",
+          "reference",
+          "values"
+        ],
+        "properties": {
+          "output": {
+            "type": "string"
+          },
+          "period": {
+            "type": "integer"
+          },
+          "unit": {
+            "enum": [
+              "currency",
+              "count",
+              "rate",
+              "ratio"
+            ]
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "description": "The country's references.json entry, as its own format holds it, with modelSignValue.",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "resolved",
+                      "citation",
+                      "none"
+                    ]
+                  },
+                  "modelSignValue": {
+                    "type": "number"
+                  }
+                }
+              }
+            ]
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "description": "One build's value. A withheld value carries its status and no reason.",
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "buildId",
+                "value",
+                "status",
+                "comparedWith",
+                "change",
+                "relativeChange",
+                "changePoints",
+                "changeStatus"
+              ],
+              "properties": {
+                "buildId": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+                },
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "ok",
+                    "withheld",
+                    "missing",
+                    "unmeasured"
+                  ]
+                },
+                "comparedWith": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+                    }
+                  ]
+                },
+                "change": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "relativeChange": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "changePoints": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "changeStatus": {
+                  "enum": [
+                    "ok",
+                    "withheld",
+                    "none"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "chronicle": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "description": "The references' Chronicle pin."
+        }
+      ]
+    }
+  }
+}

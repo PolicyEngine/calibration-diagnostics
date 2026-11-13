@@ -1,0 +1,81 @@
+{
+  "baseline": null,
+  "cells": [],
+  "country": "uk",
+  "data": null,
+  "disclosure": {
+    "min_source_households": 3,
+    "policy": "source_household_small_cells",
+    "withheld_cells": null
+  },
+  "engine_bundle": null,
+  "environment": {
+    "packages": [
+      "policyengine-core==3.33.3"
+    ],
+    "packages_sha256": "3851dfa142e329c2e312e29de8924d71aa5d19f9a7453e7a834625db057da915",
+    "platform": "synthetic",
+    "python": "3.12.0",
+    "uv_lock_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "fetched_from": {
+    "build_id": "microcosm-uk-2024-25-national/synthetic-build-5",
+    "build_manifest": null,
+    "dataset": {
+      "key": "national",
+      "path": "releases/microcosm-uk-2024-25-national/synthetic-build-5/national.h5"
+    },
+    "declared": {
+      "build": null,
+      "build_provenance": null,
+      "built_at": "2026-11-01T00:00:00+00:00",
+      "built_with_core": null,
+      "built_with_model": null,
+      "compatible_models": [
+        {
+          "name": "policyengine-uk",
+          "specifier": ">=1"
+        }
+      ],
+      "cut_tag": null,
+      "description": null,
+      "migrated_from": null,
+      "reference_model_compatibility": "inside"
+    },
+    "hf_commit": "cccccccccccccccccccccccccccccccccccccccc",
+    "hf_repo": "policyengine/populace-uk-private",
+    "release_manifest": {
+      "json_sha256": "14e0c6f64d18accc3c6b0828a3228d86c11696bdead9ca458484f74fb6001855",
+      "path": "releases/microcosm-uk-2024-25-national/synthetic-build-5/release_manifest.json",
+      "sha256": "f53e66fb12635db7acf9e0965131305b1cea3c600908b95da8a8092b6e42d7a8"
+    }
+  },
+  "file": {
+    "bytes": 25,
+    "sha256": "b827e52a4ab9fa84946b7d653c29e1faaac510d3e045e06c5854ef553f62e2c4"
+  },
+  "format_version": 1,
+  "kind": "release_history.measurement",
+  "measurement_id": "3edec4e2154305a433ad570a35fd41db18c82a995433311d54ef497665474300",
+  "panel_id": "af35ceddec5f1c3724605fdf2c5301f8c1e0953d4a166a1436cced4f787e4a65",
+  "periods": [
+    {
+      "label": "2026-27",
+      "period": 2026
+    }
+  ],
+  "producer": {
+    "commit": "0000000000000000000000000000000000000000",
+    "version": "1"
+  },
+  "reason": "disclosure_source_ids_missing",
+  "reforms": null,
+  "runtime": {
+    "finished_at": "2026-11-12T00:10:00Z",
+    "runner": "synthetic",
+    "seconds": 600.0,
+    "simulations": [],
+    "started_at": "2026-11-12T00:00:00Z"
+  },
+  "status": "refused"
+}

@@ -1,0 +1,36 @@
+# Official references for the US trial spec. The reforms cite the scores
+# Microcosm's US reform-validation registry pairs them with; the baseline
+# references are left for the US data owners to choose.
+schema_version: 1
+country: us
+baseline:
+  income_tax: {none: US baseline references are for the US data owners to choose (trial spec).}
+  eitc: {none: US baseline references are for the US data owners to choose (trial spec).}
+  refundable_ctc: {none: US baseline references are for the US data owners to choose (trial spec).}
+  snap: {none: US baseline references are for the US data owners to choose (trial spec).}
+  ssi: {none: US baseline references are for the US data owners to choose (trial spec).}
+  households: {none: US baseline references are for the US data owners to choose (trial spec).}
+reforms:
+  cbo_rates_plus_1pt:
+    output: target/income_tax
+    sign: 1
+    basis: approximation
+    citation:
+      publisher: Congressional Budget Office (Joint Committee on Taxation staff estimate)
+      document: "Options for Reducing the Deficit: 2025 to 2034"
+      edition: December 2024
+      row: Increase Individual Income Tax Rates on Ordinary Income, alternative 1
+      period: FY2026
+      note: Scored on a pre-OBBBA baseline with TCJA rates in effect.
+    registry: {repo: PolicyEngine/microcosm, path: packages/microcosm-build/src/microcosm/build/us/state_reforms.json, commit: 1d174fc7c9, id: federal.cbo_rates_plus_1pt}
+  arpa_ctc_2021:
+    output: target/income_tax
+    sign: 1
+    basis: approximation
+    citation:
+      publisher: Joint Committee on Taxation
+      document: JCX-14-21, H.R. 1319 as amended
+      edition: 9 March 2021
+      row: Child Tax Credit improvements for 2021
+      period: FY2021 and FY2022 (tax year 2021)
+    registry: {repo: PolicyEngine/microcosm, path: packages/microcosm-build/src/microcosm/build/us/state_reforms.json, commit: 1d174fc7c9, id: federal.arpa_ctc_2021}

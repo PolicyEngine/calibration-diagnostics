@@ -1,0 +1,198 @@
+name: Release history
+
+# Measures each data file a country's release repository publishes, as its
+# releases.json lists the builds, on that country's pinned reference engine
+# (calibration-diagnostics#224). See docs/release-history.md.
+#
+# - Weekly (Sundays, 05:00 UTC): a top-up run for each country listed in the repository
+#   variable RELEASE_HISTORY_WEEKLY (country codes, space- or comma-separated;
+#   unset or empty runs nothing). It measures the files no pinned engine has
+#   measured yet and, after an engine move, the last build the previous
+#   engine measured, so the first new build has a step. A country's first
+#   panel waits for its backfill.
+# - Manual: `topup`, `backfill` (every file a panel lacks, as after an engine,
+#   spec or producer bump), `release` (one build) or `retry` (the files that
+#   ran out of attempts, or one build's, with fresh attempts). A failure a run
+#   causes stores no point: the leg uploads the file's attempt report, and
+#   finalize keeps the file as retrying (failed after three attempts, or at
+#   once when it is over the runner's budget). Only runs of the default
+#   branch's engine pin: they move the pinned and served panels, replace the
+#   country's series record, references and labels, and rebuild every panel's
+#   timeline. A run dispatched from another ref measures into its own engine's
+#   panel with `backfill` or `release` and rebuilds only that panel's timeline.
+#
+# The repository is public and the UK data are licensed: logs carry ids,
+# statuses and timings only, library output goes to a private file that is
+# never printed or uploaded, and nothing is stored as an Actions artifact or
+# cache. Points go straight to private Blob.
+
+on:
+  workflow_dispatch:
+    inputs:
+      country:
+        description: Country with a release_history/countries/<code>/ folder
+        required: true
+        type: string
+      mode:
+        description: topup (new builds), backfill (every file a panel lacks), release (one build) or retry (failed files)
+        required: true
+        default: topup
+        type: choice
+        options: [topup, backfill, release, retry]
+      build_id:
+        description: For mode release (or retry of one build), the build as releases.json names it, <release>/<build>
+        required: false
+        type: string
+  schedule:
+    - cron: "0 5 * * 0"
+
+permissions:
+  contents: read
+
+# One run at a time per country; the weekly dispatcher has its own slot.
+concurrency:
+  group: release-history-${{ inputs.country || 'weekly' }}
+  cancel-in-progress: false
+
+jobs:
+  weekly:
+    if: ${{ github.event_name == 'schedule' && vars.RELEASE_HISTORY_ENABLED != 'FALSE' && vars.RELEASE_HISTORY_WEEKLY != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dispatch a top-up for each country switched on
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WEEKLY: ${{ vars.RELEASE_HISTORY_WEEKLY }}
+        run: |
+          set -euo pipefail
+          for country in $(printf '%s' "$WEEKLY" | tr ',' ' '); do
+            case "$country" in
+              *[!a-z]*) echo "Skipped '$country': not a country code." >> "$GITHUB_STEP_SUMMARY"; continue ;;
+            esac
+            if [ ! -f "release_history/countries/$country/spec.yaml" ]; then
+              echo "Skipped $country: no release_history/countries/$country folder." >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            gh workflow run release-history.yml --ref "$GITHUB_REF_NAME" -f country="$country" -f mode=topup
+            echo "Dispatched a top-up for $country." >> "$GITHUB_STEP_SUMMARY"
+          done
+
+  plan:
+    if: ${{ github.event_name == 'workflow_dispatch' && vars.RELEASE_HISTORY_ENABLED != 'FALSE' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      action: ${{ steps.plan.outputs.action }}
+      count: ${{ steps.plan.outputs.count }}
+      panel_id: ${{ steps.plan.outputs.panel_id }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      plan: ${{ steps.plan.outputs.plan }}
+    env:
+      COUNTRY: ${{ inputs.country }}
+      MODE: ${{ inputs.mode }}
+      BUILD_ID: ${{ inputs.build_id }}
+      # Only the default branch's engine pins.
+      PIN: ${{ github.ref_name == github.event.repository.default_branch && '--pin' || '' }}
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: oven-sh/setup-bun@v2
+      - name: Install the country's reference engine
+        run: uv sync --frozen --project "release_history/countries/$COUNTRY"
+      - name: Validate the spec, name the pinned panel and list the series
+        run: |
+          set -euo pipefail
+          project="release_history/countries/$COUNTRY"
+          uv run --frozen --project "$project" release-history validate-spec --country "$COUNTRY"
+          uv run --frozen --project "$project" release-history identity --country "$COUNTRY" --out "$RUNNER_TEMP/out"
+          # releases.json and each build's release manifest at one commit of main; any
+          # failure to read them fails the run.
+          uv run --frozen --project "$project" release-history series --country "$COUNTRY" --out "$RUNNER_TEMP/out"
+      - run: bun install --frozen-lockfile
+        working-directory: frontend
+      - name: Publish the panel (and, when pinning, the country's files), then plan
+        id: plan
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          bun run scripts/release-history.ts upload --root "$RUNNER_TEMP/out" $PIN
+          bun run scripts/release-history.ts plan --country "$COUNTRY" --root "$RUNNER_TEMP/out" \
+            --mode "$MODE" --build-id "$BUILD_ID" $PIN
+
+  measure:
+    needs: plan
+    if: ${{ needs.plan.outputs.action == 'measure' }}
+    runs-on: ubuntu-latest
+    # One point is about 25 minutes for the UK on a standard runner.
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    env:
+      COUNTRY: ${{ inputs.country }}
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_HUB_DISABLE_XET: "1"
+      HDF5_USE_FILE_LOCKING: "FALSE"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: oven-sh/setup-bun@v2
+      - name: Install the country's reference engine
+        run: uv sync --frozen --project "release_history/countries/$COUNTRY"
+      # Before the measurement, so the upload below can run after a failed one.
+      - run: bun install --frozen-lockfile
+        working-directory: frontend
+      - name: Measure one data file
+        # Below the job's limit, so a slow file fails this step and its report still goes up.
+        timeout-minutes: 110
+        env:
+          POINT: ${{ toJson(matrix.point) }}
+        run: |
+          set -euo pipefail
+          uv run --frozen --project "release_history/countries/$COUNTRY" release-history measure \
+            --country "$COUNTRY" --point "$POINT" --out "$RUNNER_TEMP/out" \
+            --log "$RUNNER_TEMP/private/measure.log"
+      - name: Upload the point, or the file's attempt report
+        if: ${{ !cancelled() }}
+        working-directory: frontend
+        run: bun run scripts/release-history.ts upload --root "$RUNNER_TEMP/out"
+
+  finalize:
+    needs: [plan, measure]
+    # Also after a skipped plan, so a references, labels or listing update reaches the timelines.
+    if: ${{ always() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      COUNTRY: ${{ inputs.country }}
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      PLAN: ${{ needs.plan.outputs.plan }}
+      PANEL_ID: ${{ needs.plan.outputs.panel_id }}
+      # cancelled: a planned file whose leg left no report never ran, so no attempt is charged.
+      MEASURE_RESULT: ${{ needs.measure.result }}
+      # Only the default branch's engine pins.
+      PIN: ${{ github.ref_name == github.event.repository.default_branch && '--pin' || '' }}
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Update the manifest and rebuild the timelines
+        run: |
+          set -euo pipefail
+          printf '%s' "$PLAN" > "$RUNNER_TEMP/plan.json"
+          bun run scripts/release-history.ts finalize --country "$COUNTRY" \
+            --panel-id "$PANEL_ID" --plan "$RUNNER_TEMP/plan.json" \
+            --measure-result "$MEASURE_RESULT" $PIN

@@ -27,6 +27,30 @@ jobs:
       - run: uv run --no-sync python frontend/scripts/verify_hosted_runtime.py
       - run: uv run --no-sync python -m pytest frontend/tests -q
 
+  release-history:
+    name: release history · producer tests · country specs
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: release_history
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      # The shared producer pins no engine; its tests run on a fake model.
+      - run: uv sync --frozen
+      - run: uv run --frozen pytest -q
+      - run: uv run --frozen ruff check src tests
+      - run: uv run --frozen ruff format --check src tests
+      # Each country's spec and references against its own pinned engine; no data.
+      - name: Validate each country's spec on its engine
+        run: |
+          set -euo pipefail
+          for dir in countries/*/; do
+            country="$(basename "$dir")"
+            uv sync --frozen --project "$dir"
+            uv run --frozen --project "$dir" release-history validate-spec --country "$country"
+          done
+
   frontend-tests:
     name: frontend · tests
     runs-on: ubuntu-latest

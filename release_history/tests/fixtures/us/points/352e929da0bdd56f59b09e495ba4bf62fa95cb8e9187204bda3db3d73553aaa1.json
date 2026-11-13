@@ -1,0 +1,220 @@
+{
+  "baseline": {
+    "status": "ok"
+  },
+  "cells": [
+    {
+      "output": "baseline/income_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 31384548.967782933
+    },
+    {
+      "output": "baseline/eitc",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 39550396.17676331
+    },
+    {
+      "output": "baseline/refundable_ctc",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 31503833.90658127
+    },
+    {
+      "output": "baseline/snap",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 38387765.66401107
+    },
+    {
+      "output": "baseline/ssi",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 40270647.52357505
+    },
+    {
+      "output": "baseline/households",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 6097.11198624267
+    },
+    {
+      "output": "reform/cbo_rates_plus_1pt/target/income_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 221242.1203655357
+    },
+    {
+      "output": "reform/arpa_ctc_2021/target/income_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 273682.9829933081
+    }
+  ],
+  "country": "us",
+  "data": {
+    "column_count": 2,
+    "columns_sha256": "ec081f4b6929a82c7a86808bcdbf80e29aaababffa04b5e95945a31f4d43bee2",
+    "unknown_columns": [],
+    "warnings": []
+  },
+  "disclosure": {
+    "min_source_households": 3,
+    "policy": "none",
+    "withheld_cells": 0
+  },
+  "engine_bundle": {
+    "bundle_id": "synthetic",
+    "capital_gains_responses": null
+  },
+  "environment": {
+    "packages": [
+      "policyengine-core==3.33.3"
+    ],
+    "packages_sha256": "3851dfa142e329c2e312e29de8924d71aa5d19f9a7453e7a834625db057da915",
+    "platform": "synthetic",
+    "python": "3.12.0",
+    "uv_lock_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "fetched_from": {
+    "build_id": "microcosm-us-2024-national/synthetic-build-3",
+    "build_manifest": null,
+    "dataset": {
+      "key": "national",
+      "path": "releases/microcosm-us-2024-national/synthetic-build-3/national.h5"
+    },
+    "declared": {
+      "build": null,
+      "build_provenance": null,
+      "built_at": "2026-11-01T00:00:00+00:00",
+      "built_with_core": null,
+      "built_with_model": null,
+      "compatible_models": [
+        {
+          "name": "policyengine-us",
+          "specifier": ">=1"
+        }
+      ],
+      "cut_tag": null,
+      "description": null,
+      "migrated_from": null,
+      "reference_model_compatibility": "inside"
+    },
+    "hf_commit": "cccccccccccccccccccccccccccccccccccccccc",
+    "hf_repo": "policyengine/populace-us",
+    "release_manifest": {
+      "json_sha256": "6961e18973be04c75f8a6e0631b2015ae1d933152a66c210124ba43e8328027d",
+      "path": "releases/microcosm-us-2024-national/synthetic-build-3/release_manifest.json",
+      "sha256": "9068b647c18ac98bd02d7dc308da127514ece071353e0702b8d52a48ea13cfb7"
+    }
+  },
+  "file": {
+    "bytes": 25,
+    "sha256": "6ab60e9c12413574e8cd93d12a4c1d69c253fd5cd6ae98dd4202e585acaeda5e"
+  },
+  "format_version": 1,
+  "kind": "release_history.measurement",
+  "measurement_id": "352e929da0bdd56f59b09e495ba4bf62fa95cb8e9187204bda3db3d73553aaa1",
+  "panel_id": "af711588eb3ec1f0bde0fdb0e3383b0b3680b3bf9bf21ce667466b9341dbea16",
+  "periods": [
+    {
+      "label": "2026",
+      "period": 2026
+    }
+  ],
+  "producer": {
+    "commit": "0000000000000000000000000000000000000000",
+    "version": "1"
+  },
+  "reason": null,
+  "reforms": {
+    "arpa_ctc_2021": {
+      "applied": {
+        "gov.irs.credits.ctc.amount.arpa[0].amount": {
+          "2026-01-01.2026-12-31": 3600.0
+        },
+        "gov.irs.credits.ctc.amount.arpa[1].amount": {
+          "2026-01-01.2026-12-31": 3000.0
+        },
+        "gov.irs.credits.ctc.phase_out.arpa.in_effect": {
+          "2026-01-01.2026-12-31": true
+        },
+        "gov.irs.credits.ctc.refundable.fully_refundable": {
+          "2026-01-01.2026-12-31": true
+        }
+      },
+      "definition_sha256": "53bd7f3553460f817221674411a8c82460627356ab36b4e5e410661dd9c7dc6d",
+      "error": null,
+      "status": "ok"
+    },
+    "cbo_rates_plus_1pt": {
+      "applied": {
+        "gov.irs.income.bracket.rates.1": {
+          "2026-01-01.2026-12-31": 0.698
+        },
+        "gov.irs.income.bracket.rates.2": {
+          "2026-01-01.2026-12-31": 0.399
+        },
+        "gov.irs.income.bracket.rates.3": {
+          "2026-01-01.2026-12-31": 0.357
+        },
+        "gov.irs.income.bracket.rates.4": {
+          "2026-01-01.2026-12-31": 0.968
+        },
+        "gov.irs.income.bracket.rates.5": {
+          "2026-01-01.2026-12-31": 0.28500000000000003
+        },
+        "gov.irs.income.bracket.rates.6": {
+          "2026-01-01.2026-12-31": 0.495
+        },
+        "gov.irs.income.bracket.rates.7": {
+          "2026-01-01.2026-12-31": 1.008
+        }
+      },
+      "definition_sha256": "4a479a04822eb32cce474f74fa8399b6d2965832d400534dc5af8d5ec6ece7fe",
+      "error": null,
+      "status": "ok"
+    }
+  },
+  "runtime": {
+    "finished_at": "2026-11-12T00:10:00Z",
+    "runner": "synthetic",
+    "seconds": 600.0,
+    "simulations": [
+      {
+        "label": "baseline",
+        "peak_rss_bytes": 1000000000,
+        "seconds": 300.0
+      },
+      {
+        "label": "reform:cbo_rates_plus_1pt",
+        "peak_rss_bytes": 1000000000,
+        "seconds": 300.0
+      },
+      {
+        "label": "reform:arpa_ctc_2021",
+        "peak_rss_bytes": 1000000000,
+        "seconds": 300.0
+      }
+    ],
+    "started_at": "2026-11-12T00:00:00Z"
+  },
+  "status": "ok"
+}

@@ -1,0 +1,137 @@
+# What a UK release-history measurement computes. Its digest is part of the UK
+# panel id, so an edit that can change a number gives the UK a new panel (and no
+# other country). The spec's schema_version, release_repo, series, runner and
+# reform labels are outside the digest, and so are the references to official
+# figures (references.yaml). Weekly top-ups are switched on by the repository
+# variable RELEASE_HISTORY_WEEKLY, not here.
+schema_version: 1
+country: uk
+# Must equal the UK registration in @policyengine/calibration-tree's countries.ts.
+release_repo: policyengine/populace-uk-private
+series:
+  # Every build releases.json records under the national line. The June
+  # populace-uk-2023 line is left out: a different base year, and its file
+  # carries no household_source_id for the disclosure count.
+  releases: [microcosm-uk-2024-25-national]
+  # The series starts at the 19 Oct 2026 cut, compared with each build's
+  # published_at. The 2 Oct and 14 Oct cuts (published 4 and 15 Oct) number
+  # households with 14-digit ids, which overflow the engine's 32-bit integers,
+  # so the disclosure check cannot match them to their survey households.
+  since: 2026-10-19
+engine:
+  module: uk
+  model_package: policyengine-uk
+  simulation_options: {}
+household_entity: household
+periods: [2026]
+period_label: fiscal_year
+currency: GBP
+
+variables:
+  household_net_income: household_net_income
+  # gov_balance is taxes less spending, so a tax rise is a positive impact.
+  budget: {plus: [gov_balance]}
+  income_decile: household_income_decile
+  poverty:
+    absolute_bhc: in_poverty_bhc
+    absolute_ahc: in_poverty_ahc
+    relative_bhc: in_relative_poverty_bhc
+    relative_ahc: in_relative_poverty_ahc
+  groups:
+    all: null
+    children: is_hbai_dependent_child
+  # The model's default behaviour (its capital gains realisation response)
+  # applies on both sides; each measurement records the assumption it used.
+  behaviour: {}
+
+baseline:
+  # Receipts (OBR EFO October 2026).
+  - {id: income_tax, variable: income_tax, stat: sum, kind: tax}
+  - {id: national_insurance, variables: [national_insurance, ni_employer], stat: sum, kind: tax}
+  - {id: vat, variable: vat, stat: sum, kind: tax}
+  - {id: council_tax, variable: council_tax, stat: sum, kind: tax}
+  - {id: capital_gains_tax, variable: capital_gains_tax, stat: sum, kind: tax}
+  # Spending (OBR EFO October 2026).
+  - {id: universal_credit, variable: universal_credit, stat: sum, kind: benefit}
+  - {id: child_benefit, variable: child_benefit, stat: sum, kind: benefit}
+  - {id: state_pension, variable: state_pension, stat: sum, kind: benefit}
+  - {id: pension_credit, variable: pension_credit, stat: sum, kind: benefit}
+  - {id: housing_benefit, variable: housing_benefit, stat: sum, kind: benefit}
+  # Caseloads (DWP benefit expenditure and caseload tables, spring 2026).
+  - {id: universal_credit_caseload, variable: universal_credit, stat: count, entity: benunit, kind: caseload}
+  - {id: state_pension_caseload, variable: state_pension, stat: count, entity: person, kind: caseload}
+  - {id: pension_credit_caseload, variable: pension_credit, stat: count, entity: benunit, kind: caseload}
+  - {id: housing_benefit_caseload, variable: housing_benefit, stat: count, entity: benunit, kind: caseload}
+  # Population and inputs: the data-side totals a later "why did it move" view starts from.
+  - {id: households, stat: population, entity: household, kind: population}
+  - {id: people, stat: population, entity: person, kind: population}
+  - {id: children, stat: population, entity: person, where: is_hbai_dependent_child, kind: population}
+  - {id: employment_income, variable: employment_income, stat: sum, kind: input}
+  - {id: self_employment_income, variable: self_employment_income, stat: sum, kind: input}
+  - {id: private_pension_income, variable: private_pension_income, stat: sum, kind: input}
+  - {id: property_income, variable: property_income, stat: sum, kind: input}
+  - {id: savings_interest_income, variable: savings_interest_income, stat: sum, kind: input}
+  - {id: dividend_income, variable: dividend_income, stat: sum, kind: input}
+  - {id: household_net_income_total, variable: household_net_income, stat: sum, kind: income}
+  # Poverty rates, in people.
+  - {id: absolute_poverty_bhc_all, variable: in_poverty_bhc, stat: mean, entity: person, kind: rate}
+  - {id: absolute_poverty_ahc_all, variable: in_poverty_ahc, stat: mean, entity: person, kind: rate}
+  - {id: relative_poverty_bhc_all, variable: in_relative_poverty_bhc, stat: mean, entity: person, kind: rate}
+  - {id: relative_poverty_ahc_all, variable: in_relative_poverty_ahc, stat: mean, entity: person, kind: rate}
+  - {id: absolute_poverty_bhc_children, variable: in_poverty_bhc, stat: mean, entity: person, where: is_hbai_dependent_child, kind: rate}
+  - {id: absolute_poverty_ahc_children, variable: in_poverty_ahc, stat: mean, entity: person, where: is_hbai_dependent_child, kind: rate}
+  - {id: relative_poverty_bhc_children, variable: in_relative_poverty_bhc, stat: mean, entity: person, where: is_hbai_dependent_child, kind: rate}
+  - {id: relative_poverty_ahc_children, variable: in_relative_poverty_ahc, stat: mean, entity: person, where: is_hbai_dependent_child, kind: rate}
+  # Mean household net income by income decile.
+  - {id: household_net_income_mean, variable: household_net_income, stat: mean, entity: household, by: income_decile, unit: currency, kind: income}
+
+# The seven tax changes HMRC's ready reckoner costs (June 2025 edition), at its
+# own steps. Paths and deltas come from policyengine-scorecard's
+# data/uk/hmrc_reckoner_reforms.json at 1a93ec236736; VAT, which that registry
+# leaves unmapped, takes policyengine-uk's own path from
+# utils/aggregate_impact/standard_reforms.yaml. `add` puts the delta on the
+# model's own baseline value for each period, as the reckoner does.
+reforms:
+  - id: basic_rate_plus_1p
+    label: Basic rate +1p
+    add: {"gov.hmrc.income_tax.rates.uk[0].rate": 0.01}
+    targets: [income_tax]
+    source: {repo: PolicyEngine/policyengine-scorecard, path: data/uk/hmrc_reckoner_reforms.json, commit: 1a93ec236736, id: reckoner_202506__income_tax__change_basic_rate_by_1p}
+  - id: higher_rate_plus_1p
+    label: Higher rate +1p
+    add: {"gov.hmrc.income_tax.rates.uk[1].rate": 0.01}
+    targets: [income_tax]
+    source: {repo: PolicyEngine/policyengine-scorecard, path: data/uk/hmrc_reckoner_reforms.json, commit: 1a93ec236736, id: reckoner_202506__income_tax__change_higher_rate_by_1p}
+  - id: additional_rate_plus_1p
+    label: Additional rate +1p
+    add: {"gov.hmrc.income_tax.rates.uk[2].rate": 0.01}
+    targets: [income_tax]
+    source: {repo: PolicyEngine/policyengine-scorecard, path: data/uk/hmrc_reckoner_reforms.json, commit: 1a93ec236736, id: reckoner_202506__income_tax__increase_additional_rate_by_1p_yield}
+  - id: personal_allowance_plus_100
+    label: Personal allowance +£100
+    add: {gov.hmrc.income_tax.allowances.personal_allowance.amount: 100}
+    targets: [income_tax]
+    source: {repo: PolicyEngine/policyengine-scorecard, path: data/uk/hmrc_reckoner_reforms.json, commit: 1a93ec236736, id: reckoner_202506__income_tax__change_personal_allowance_by_100}
+  - id: employee_nics_main_rate_plus_1pp
+    label: Class 1 employee main NICs rate +1pp
+    add: {gov.hmrc.national_insurance.class_1.rates.employee.main: 0.01}
+    targets: [national_insurance]
+    source: {repo: PolicyEngine/policyengine-scorecard, path: data/uk/hmrc_reckoner_reforms.json, commit: 1a93ec236736, id: reckoner_202506__national_insurance__change_class_1_employee_main_rate_by_1_percentage_point}
+  - id: child_benefit_subsequent_child_plus_1
+    label: Child Benefit subsequent child +£1 a week
+    add: {gov.hmrc.child_benefit.amount.additional: 1}
+    targets: [child_benefit]
+    source: {repo: PolicyEngine/policyengine-scorecard, path: data/uk/hmrc_reckoner_reforms.json, commit: 1a93ec236736, id: reckoner_202506__child_benefit__increase_subsequent_child_rate_by_1_per_week_cost}
+  - id: vat_standard_rate_plus_1pp
+    label: VAT standard rate +1pp
+    add: {gov.hmrc.vat.standard_rate: 0.01}
+    targets: [vat]
+    source: {repo: PolicyEngine/policyengine-uk, path: policyengine_uk/utils/aggregate_impact/standard_reforms.yaml, id: vat_standard_plus_2pp, note: same path at a 1pp step}
+
+outputs: [targets, budget, distribution, poverty]
+disclosure:
+  policy: source_household_small_cells
+  min_source_households: 3
+  source_id_columns: [household_source_id, source_household_id, source_household_key]
+runner:
+  max_dataset_bytes: 2000000000

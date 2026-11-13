@@ -1,0 +1,575 @@
+{
+  "baseline": {
+    "absolute_poverty_ahc_all": {
+      "basis": null,
+      "output": null,
+      "reason": "HBAI has no 2026-27 figure yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "absolute_poverty_ahc_children": {
+      "basis": null,
+      "output": null,
+      "reason": "HBAI has no 2026-27 figure yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "absolute_poverty_bhc_all": {
+      "basis": null,
+      "output": null,
+      "reason": "HBAI has no 2026-27 figure yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "absolute_poverty_bhc_children": {
+      "basis": null,
+      "output": null,
+      "reason": "HBAI has no 2026-27 figure yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "capital_gains_tax": {
+      "basis": "forecast",
+      "facts": [
+        {
+          "assertion": "source_projection",
+          "label": "United Kingdom 2026 fiscal year projected sum obr capital gains tax for person [obr EFO October 2026 detailed forecast tables: receipts efo_receipts.xlsx efo_october_2026]",
+          "period": {
+            "type": "fiscal_year",
+            "value": 2026
+          },
+          "semantic_fact_key": "ledger.semantic_fact.v2:24ea75fa279fa0243737f7fe",
+          "source_record_id": "obr.efo_2026_10.receipts.capital_gains_tax.fy2026.capital_gains_tax.amount",
+          "value": 25589726500.00894
+        }
+      ],
+      "note": null,
+      "output": null,
+      "sign": 1,
+      "status": "resolved",
+      "value": 25589726500.00894
+    },
+    "child_benefit": {
+      "basis": "forecast",
+      "facts": [
+        {
+          "assertion": "source_projection",
+          "label": "United Kingdom 2026 fiscal year projected sum obr child benefit for person [obr EFO October 2026 detailed forecast tables: expenditure efo_expenditure.xlsx efo_october_2026]",
+          "period": {
+            "type": "fiscal_year",
+            "value": 2026
+          },
+          "semantic_fact_key": "ledger.semantic_fact.v2:bd2541f965d0c921b09c07d7",
+          "source_record_id": "obr.efo_2026_10.expenditure.child_benefit.fy2026.child_benefit.amount",
+          "value": 13713166959.785244
+        }
+      ],
+      "note": null,
+      "output": null,
+      "sign": 1,
+      "status": "resolved",
+      "value": 13713166959.785244
+    },
+    "children": {
+      "basis": null,
+      "output": null,
+      "reason": "No official count of HBAI dependent children is selected yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "council_tax": {
+      "basis": "forecast",
+      "facts": [
+        {
+          "assertion": "source_projection",
+          "label": "United Kingdom 2026 fiscal year projected sum obr cash receipts council tax for person (accounting basis=cash) [obr EFO October 2026 detailed forecast tables: receipts efo_receipts.xlsx efo_october_2026]",
+          "period": {
+            "type": "fiscal_year",
+            "value": 2026
+          },
+          "semantic_fact_key": "ledger.semantic_fact.v2:8954880605c0e334521ea615",
+          "source_record_id": "obr.efo_2026_10.receipts.cash_receipts.council_tax.fy2026.cash_receipts_council_tax.amount",
+          "value": 53091322715.16142
+        }
+      ],
+      "note": null,
+      "output": null,
+      "sign": 1,
+      "status": "resolved",
+      "value": 53091322715.16142
+    },
+    "dividend_income": {
+      "basis": null,
+      "output": null,
+      "reason": "An input; no official 2026-27 total is selected yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "employment_income": {
+      "basis": null,
+      "output": null,
+      "reason": "An input; no official 2026-27 total is selected yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "household_net_income_mean": {
+      "basis": null,
+      "output": null,
+      "reason": "HBAI has no 2026-27 figure yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "household_net_income_total": {
+      "basis": null,
+      "output": null,
+      "reason": "No official total of household net income.",
+      "sign": 1,
+      "status": "none"
+    },
+    "households": {
+      "basis": null,
+      "output": null,
+      "reason": "No official household count is selected yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "housing_benefit": {
+      "basis": "forecast",
+      "facts": [
+        {
+          "assertion": "source_projection",
+          "label": "Great Britain 2026 fiscal year projected sum obr housing benefit for person [obr EFO October 2026 detailed forecast tables: expenditure efo_expenditure.xlsx efo_october_2026]",
+          "period": {
+            "type": "fiscal_year",
+            "value": 2026
+          },
+          "semantic_fact_key": "ledger.semantic_fact.v2:4cb0c1009585a3f8fefcfbaa",
+          "source_record_id": "obr.efo_2026_10.expenditure.housing_benefit.fy2026.housing_benefit.amount",
+          "value": 12137579852.992321
+        }
+      ],
+      "note": null,
+      "output": null,
+      "sign": 1,
+      "status": "resolved",
+      "value": 12137579852.992321
+    },
+    "housing_benefit_caseload": {
+      "basis": null,
+      "output": null,
+      "reason": "DWP's housing lines mix legacy Housing Benefit and the UC housing element; no single line matches the model's housing_benefit yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "income_tax": {
+      "basis": "forecast",
+      "facts": [
+        {
+          "assertion": "source_projection",
+          "label": "United Kingdom 2026 fiscal year projected sum obr income tax for person [obr EFO October 2026 detailed forecast tables: receipts efo_receipts.xlsx efo_october_2026]",
+          "period": {
+            "type": "fiscal_year",
+            "value": 2026
+          },
+          "semantic_fact_key": "ledger.semantic_fact.v2:df5dc0138e783a18b9640877",
+          "source_record_id": "obr.efo_2026_10.receipts.income_tax.fy2026.income_tax.amount",
+          "value": 365436467116.8896
+        }
+      ],
+      "note": "OBR EFO October 2026, table 4.4, income tax gross of tax credits.",
+      "output": null,
+      "sign": 1,
+      "status": "resolved",
+      "value": 365436467116.8896
+    },
+    "national_insurance": {
+      "basis": "forecast",
+      "facts": [
+        {
+          "assertion": "source_projection",
+          "label": "United Kingdom 2026 fiscal year projected sum obr income tax and nics national insurance contributions for person [obr EFO October 2026 detailed forecast tables: receipts efo_receipts.xlsx efo_october_2026]",
+          "period": {
+            "type": "fiscal_year",
+            "value": 2026
+          },
+          "semantic_fact_key": "ledger.semantic_fact.v2:66fa044664eb011bfb2c7816",
+          "source_record_id": "obr.efo_2026_10.receipts.income_tax_and_nics.national_insurance_contributions.fy2026.income_tax_and_nics_national_insurance_contributions.amount",
+          "value": 214231404589.46405
+        }
+      ],
+      "note": "All NICs; the item sums employee and self-employed (national_insurance) and employer NICs.",
+      "output": null,
+      "sign": 1,
+      "status": "resolved",
+      "value": 214231404589.46405
+    },
+    "pension_credit": {
+      "basis": "forecast",
+      "facts": [
+        {
+          "assertion": "source_projection",
+          "label": "Great Britain 2026 fiscal year projected sum obr pension credit for person [obr EFO October 2026 detailed forecast tables: expenditure efo_expenditure.xlsx efo_october_2026]",
+          "period": {
+            "type": "fiscal_year",
+            "value": 2026
+          },
+          "semantic_fact_key": "ledger.semantic_fact.v2:7fd5dc4601e0e20443d720e5",
+          "source_record_id": "obr.efo_2026_10.expenditure.pension_credit.fy2026.pension_credit.amount",
+          "value": 6372243517.852502
+        }
+      ],
+      "note": null,
+      "output": null,
+      "sign": 1,
+      "status": "resolved",
+      "value": 6372243517.852502
+    },
+    "pension_credit_caseload": {
+      "basis": "partial",
+      "facts": [
+        {
+          "assertion": "source_projection",
+          "label": "Great Britain 2026 fiscal year projected count dwp benefit caseload count for benefit unit (benefit family=pension credit, benefit forecast line=pension credit pension credit) [dwp DWP benefit expenditure and caseload tables 2026: outturn and forecast, Spring Forecast 2026 outturn-and-forecast-tables-spring-forecast-2026.ods spring_forecast_2026]",
+          "period": {
+            "type": "fiscal_year",
+            "value": 2026
+          },
+          "semantic_fact_key": "ledger.semantic_fact.v2:81dacb2ce92e7e94cdcc4cb3",
+          "source_record_id": "dwp.spring_forecast_2026.pension_credit.caseload.fy2026.pension_credit__pension_credit.caseload_2026",
+          "value": 1312000
+        }
+      ],
+      "note": "DWP spring 2026 forecast; Great Britain only.",
+      "output": null,
+      "sign": 1,
+      "status": "resolved",
+      "value": 1312000.0
+    },
+    "people": {
+      "basis": null,
+      "output": null,
+      "reason": "No official population figure is selected yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "private_pension_income": {
+      "basis": null,
+      "output": null,
+      "reason": "An input; no official 2026-27 total is selected yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "property_income": {
+      "basis": null,
+      "output": null,
+      "reason": "An input; no official 2026-27 total is selected yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "relative_poverty_ahc_all": {
+      "basis": null,
+      "output": null,
+      "reason": "HBAI has no 2026-27 figure yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "relative_poverty_ahc_children": {
+      "basis": null,
+      "output": null,
+      "reason": "HBAI has no 2026-27 figure yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "relative_poverty_bhc_all": {
+      "basis": null,
+      "output": null,
+      "reason": "HBAI has no 2026-27 figure yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "relative_poverty_bhc_children": {
+      "basis": null,
+      "output": null,
+      "reason": "HBAI has no 2026-27 figure yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "savings_interest_income": {
+      "basis": null,
+      "output": null,
+      "reason": "An input; no official 2026-27 total is selected yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "self_employment_income": {
+      "basis": null,
+      "output": null,
+      "reason": "An input; no official 2026-27 total is selected yet.",
+      "sign": 1,
+      "status": "none"
+    },
+    "state_pension": {
+      "basis": "forecast",
+      "facts": [
+        {
+          "assertion": "source_projection",
+          "label": "Great Britain 2026 fiscal year projected sum obr state pension for person [obr EFO October 2026 detailed forecast tables: expenditure efo_expenditure.xlsx efo_october_2026]",
+          "period": {
+            "type": "fiscal_year",
+            "value": 2026
+          },
+          "semantic_fact_key": "ledger.semantic_fact.v2:08f8467fc414562f96a17650",
+          "source_record_id": "obr.efo_2026_10.expenditure.state_pension.fy2026.state_pension.amount",
+          "value": 154362084797.34744
+        }
+      ],
+      "note": null,
+      "output": null,
+      "sign": 1,
+      "status": "resolved",
+      "value": 154362084797.34744
+    },
+    "state_pension_caseload": {
+      "basis": "partial",
+      "facts": [
+        {
+          "assertion": "source_projection",
+          "label": "Great Britain 2026 fiscal year projected count dwp benefit caseload count for person (benefit family=state pension, benefit forecast line=state pension total state pension caseload) [dwp DWP benefit expenditure and caseload tables 2026: outturn and forecast, Spring Forecast 2026 outturn-and-forecast-tables-spring-forecast-2026.ods spring_forecast_2026]",
+          "period": {
+            "type": "fiscal_year",
+            "value": 2026
+          },
+          "semantic_fact_key": "ledger.semantic_fact.v2:26c46ac1d2e933e33410f9e2",
+          "source_record_id": "dwp.spring_forecast_2026.state_pension.caseload.fy2026.state_pension__total_state_pension_caseload.caseload_2026",
+          "value": 13220000
+        }
+      ],
+      "note": "DWP spring 2026 forecast; Great Britain, including pensions paid abroad, which the model leaves out.",
+      "output": null,
+      "sign": 1,
+      "status": "resolved",
+      "value": 13220000.0
+    },
+    "universal_credit": {
+      "basis": "forecast",
+      "facts": [
+        {
+          "assertion": "source_projection",
+          "label": "Great Britain 2026 fiscal year projected sum obr universal credit in cap for person [obr EFO October 2026 detailed forecast tables: expenditure efo_expenditure.xlsx efo_october_2026]",
+          "period": {
+            "type": "fiscal_year",
+            "value": 2026
+          },
+          "semantic_fact_key": "ledger.semantic_fact.v2:f287fe528368d6ea3b5aed52",
+          "source_record_id": "obr.efo_2026_10.expenditure.universal_credit_in_cap.fy2026.universal_credit_in_cap.amount",
+          "value": 73107258338.2377
+        },
+        {
+          "assertion": "source_projection",
+          "label": "Great Britain 2026 fiscal year projected sum obr universal credit outside cap for person [obr EFO October 2026 detailed forecast tables: expenditure efo_expenditure.xlsx efo_october_2026]",
+          "period": {
+            "type": "fiscal_year",
+            "value": 2026
+          },
+          "semantic_fact_key": "ledger.semantic_fact.v2:40ce4251466b407e7683317a",
+          "source_record_id": "obr.efo_2026_10.expenditure.universal_credit_outside_cap.fy2026.universal_credit_outside_cap.amount",
+          "value": 13260918467.915096
+        }
+      ],
+      "note": null,
+      "output": null,
+      "sign": 1,
+      "status": "resolved",
+      "value": 86368176806.1528
+    },
+    "universal_credit_caseload": {
+      "basis": "partial",
+      "facts": [
+        {
+          "assertion": "source_projection",
+          "label": "Great Britain 2026 fiscal year projected count dwp benefit caseload count for benefit unit (benefit family=universal credit and equivalent, benefit forecast line=universal credit and equivalent universal credit) [dwp DWP benefit expenditure and caseload tables 2026: outturn and forecast, Spring Forecast 2026 outturn-and-forecast-tables-spring-forecast-2026.ods spring_forecast_2026]",
+          "period": {
+            "type": "fiscal_year",
+            "value": 2026
+          },
+          "semantic_fact_key": "ledger.semantic_fact.v2:d8a10b9109a239119dd4b0c9",
+          "source_record_id": "dwp.spring_forecast_2026.universal_credit_and_equivalent.caseload.fy2026.universal_credit_and_equivalent__universal_credit.caseload_2026",
+          "value": 6807000
+        }
+      ],
+      "note": "DWP spring 2026 forecast, Universal Credit line; Great Britain only, where the model covers the UK.",
+      "output": null,
+      "sign": 1,
+      "status": "resolved",
+      "value": 6807000.0
+    },
+    "vat": {
+      "basis": "partial",
+      "facts": [
+        {
+          "assertion": "source_projection",
+          "label": "United Kingdom 2026 fiscal year projected sum obr vat for person [obr EFO October 2026 detailed forecast tables: receipts efo_receipts.xlsx efo_october_2026]",
+          "period": {
+            "type": "fiscal_year",
+            "value": 2026
+          },
+          "semantic_fact_key": "ledger.semantic_fact.v2:b4b7a2a37863e36a31b0abe8",
+          "source_record_id": "obr.efo_2026_10.receipts.vat.fy2026.vat.amount",
+          "value": 186154081531.20996
+        }
+      ],
+      "note": "PolicyEngine models VAT on household consumption only.",
+      "output": null,
+      "sign": 1,
+      "status": "resolved",
+      "value": 186154081531.20996
+    }
+  },
+  "chronicle": {
+    "build": "build-bundle --suite uk -> build-consumer-artifact",
+    "facts_sha256": "bcb226fd07a1eba8970a69b13e87ab20c3bd90e96e02509894a65799dbd9482a",
+    "manifest_sha256": "801d3e5e9d7039f877a12fc45afdd2d6b52ddbb46eecc91d7bd5ff843ea5efb8",
+    "source_commit": "64753803f9b22944a3ee8b24ba6d1fa6c26fef50",
+    "source_repo": "PolicyEngine/chronicle"
+  },
+  "country": "uk",
+  "kind": "release_history.references_lock",
+  "references_sha256": "d3ee7ad4f183891e9d6d4c53f01240d7cd4c92cd0dbafa09f2d05a8ce005f1e7",
+  "reforms": {
+    "additional_rate_plus_1p": {
+      "basis": "post_behavioural",
+      "citation": {
+        "document": "Direct effects of illustrative tax changes (tax ready reckoner)",
+        "edition": "June 2025",
+        "period": "2026-27",
+        "publisher": "HM Revenue & Customs",
+        "row": "Increase additional rate by 1p (yield)"
+      },
+      "output": "budgetary_impact",
+      "registry": {
+        "commit": "1a93ec236736",
+        "id": "reckoner_202506__income_tax__increase_additional_rate_by_1p_yield",
+        "path": "data/uk/hmrc_reckoner_reforms.json",
+        "repo": "PolicyEngine/policyengine-scorecard"
+      },
+      "sign": 1,
+      "status": "citation"
+    },
+    "basic_rate_plus_1p": {
+      "basis": "post_behavioural",
+      "citation": {
+        "document": "Direct effects of illustrative tax changes (tax ready reckoner)",
+        "edition": "June 2025",
+        "period": "2026-27",
+        "publisher": "HM Revenue & Customs",
+        "row": "Change basic rate by 1p"
+      },
+      "output": "budgetary_impact",
+      "registry": {
+        "commit": "1a93ec236736",
+        "id": "reckoner_202506__income_tax__change_basic_rate_by_1p",
+        "path": "data/uk/hmrc_reckoner_reforms.json",
+        "repo": "PolicyEngine/policyengine-scorecard"
+      },
+      "sign": 1,
+      "status": "citation"
+    },
+    "child_benefit_subsequent_child_plus_1": {
+      "basis": null,
+      "citation": {
+        "document": "Direct effects of illustrative tax changes (tax ready reckoner)",
+        "edition": "June 2025",
+        "period": "2026-27",
+        "publisher": "HM Revenue & Customs",
+        "row": "Increase subsequent child rate by £1 per week (cost)"
+      },
+      "output": "budgetary_impact",
+      "registry": {
+        "commit": "1a93ec236736",
+        "id": "reckoner_202506__child_benefit__increase_subsequent_child_rate_by_1_per_week_cost",
+        "path": "data/uk/hmrc_reckoner_reforms.json",
+        "repo": "PolicyEngine/policyengine-scorecard"
+      },
+      "sign": -1,
+      "status": "citation"
+    },
+    "employee_nics_main_rate_plus_1pp": {
+      "basis": null,
+      "citation": {
+        "document": "Direct effects of illustrative tax changes (tax ready reckoner)",
+        "edition": "June 2025",
+        "period": "2026-27",
+        "publisher": "HM Revenue & Customs",
+        "row": "Change Class 1 employee main rate by 1 percentage point"
+      },
+      "output": "budgetary_impact",
+      "registry": {
+        "commit": "1a93ec236736",
+        "id": "reckoner_202506__national_insurance__change_class_1_employee_main_rate_by_1_percentage_point",
+        "path": "data/uk/hmrc_reckoner_reforms.json",
+        "repo": "PolicyEngine/policyengine-scorecard"
+      },
+      "sign": 1,
+      "status": "citation"
+    },
+    "higher_rate_plus_1p": {
+      "basis": "post_behavioural",
+      "citation": {
+        "document": "Direct effects of illustrative tax changes (tax ready reckoner)",
+        "edition": "June 2025",
+        "period": "2026-27",
+        "publisher": "HM Revenue & Customs",
+        "row": "Change higher rate by 1p"
+      },
+      "output": "budgetary_impact",
+      "registry": {
+        "commit": "1a93ec236736",
+        "id": "reckoner_202506__income_tax__change_higher_rate_by_1p",
+        "path": "data/uk/hmrc_reckoner_reforms.json",
+        "repo": "PolicyEngine/policyengine-scorecard"
+      },
+      "sign": 1,
+      "status": "citation"
+    },
+    "personal_allowance_plus_100": {
+      "basis": null,
+      "citation": {
+        "document": "Direct effects of illustrative tax changes (tax ready reckoner)",
+        "edition": "June 2025",
+        "period": "2026-27",
+        "publisher": "HM Revenue & Customs",
+        "row": "Change personal allowance by £100"
+      },
+      "output": "budgetary_impact",
+      "registry": {
+        "commit": "1a93ec236736",
+        "id": "reckoner_202506__income_tax__change_personal_allowance_by_100",
+        "path": "data/uk/hmrc_reckoner_reforms.json",
+        "repo": "PolicyEngine/policyengine-scorecard"
+      },
+      "sign": -1,
+      "status": "citation"
+    },
+    "vat_standard_rate_plus_1pp": {
+      "basis": "partial",
+      "citation": {
+        "document": "Direct effects of illustrative tax changes (tax ready reckoner)",
+        "edition": "June 2025",
+        "period": "2026-27",
+        "publisher": "HM Revenue & Customs",
+        "row": "Change standard rate by 1 percentage point (VAT)"
+      },
+      "output": "budgetary_impact",
+      "registry": {
+        "commit": "1a93ec236736",
+        "id": "reckoner_202506__vat__change_standard_rate_by_1_percentage_point",
+        "path": "data/uk/hmrc_reckoner_reforms.json",
+        "repo": "PolicyEngine/policyengine-scorecard"
+      },
+      "sign": 1,
+      "status": "citation"
+    }
+  },
+  "resolved_at": "2026-11-09T18:49:38Z",
+  "schema_version": 1
+}
