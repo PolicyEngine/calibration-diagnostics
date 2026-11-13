@@ -7,9 +7,19 @@ elsewhere in the producer branches on a country code.
 
 The spec's digest is part of the panel id, so an edit that can change a number
 gives that country (and only that country) a new panel. The digest leaves out
-what changes no number: which releases are in the series, the runner limits,
-and reform labels and sources (`measurement_definition`). References live in a
-separate file (`references.yaml`) and are not part of the digest either.
+what changes no number: the spec's own format version, the release repository,
+which builds are in the series, the runner limits, and the labels, sources,
+notes and descriptions of baseline items and reforms
+(`measurement_definition`). References live in a separate file
+(`references.yaml`) and are not part of the digest either.
+
+The spec format only grows: keys are added, an absent key means the old
+behaviour, and the digest hashes the spec as written, so no default is ever
+written into the hashed form.
+
+The series is every build the release repository's `releases.json` records
+under the lines `series.releases` names, published on or after
+`series.since` when it is set.
 
 When a country runs is not in the spec: weekly top-ups are switched on per
 country by the repository variable `RELEASE_HISTORY_WEEKLY`, so turning one on
@@ -18,6 +28,7 @@ or off needs no pull request.
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -26,7 +37,7 @@ from typing import Any
 
 import yaml
 
-from release_history import SCHEMA_VERSION
+from release_history import SPEC_FORMAT_VERSION
 from release_history.canonical import json_sha256
 
 OUTPUT_LEVELS = ("targets", "budget", "distribution", "poverty")
@@ -38,24 +49,27 @@ DISCLOSURE_POLICIES = ("none", "source_household_small_cells")
 # CD171's absolute floor; a spec may raise it, never lower it.
 MIN_SOURCE_HOUSEHOLD_FLOOR = 3
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
+_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _DEFAULT_UNIT = {"sum": "currency", "count": "count", "mean": "rate", "population": "count"}
 # Spec keys that change no measured number, so editing them keeps the panel (and
-# its points): which releases are in the series, and runner limits.
-_UNHASHED_KEYS = ("series", "runner")
-# Per reform: its display label and where it was taken from.
-_UNHASHED_REFORM_KEYS = ("label", "source")
+# its points): the spec's own format version, the release repository, which
+# builds are in the series, and runner limits.
+_UNHASHED_KEYS = ("schema_version", "release_repo", "series", "runner")
+# On a baseline item or a reform: what the page shows and where it was taken from.
+_DISPLAY_KEYS = ("label", "source", "note", "description")
 
 
 def measurement_definition(raw: Mapping[str, Any]) -> dict[str, Any]:
     """The part of a spec that decides the numbers; the panel id hashes this."""
     definition = {key: value for key, value in raw.items() if key not in _UNHASHED_KEYS}
-    if isinstance(definition.get("reforms"), list):
-        definition["reforms"] = [
-            {key: value for key, value in reform.items() if key not in _UNHASHED_REFORM_KEYS}
-            if isinstance(reform, Mapping)
-            else reform
-            for reform in definition["reforms"]
-        ]
+    for section in ("baseline", "reforms"):
+        if isinstance(definition.get(section), list):
+            definition[section] = [
+                {key: value for key, value in item.items() if key not in _DISPLAY_KEYS}
+                if isinstance(item, Mapping)
+                else item
+                for item in definition[section]
+            ]
     return definition
 
 
@@ -117,8 +131,10 @@ class Spec:
     raw: Mapping[str, Any]
     country: str
     release_repo: str
+    # The release lines (`releases.json` names) whose builds make the series.
     series_releases: tuple[str, ...]
-    series_exclude: tuple[str, ...]
+    # The first publish date in the series (YYYY-MM-DD), or None.
+    series_since: str | None
     engine_module: str
     model_package: str
     simulation_options: Mapping[str, Any]
@@ -155,22 +171,23 @@ class Spec:
     def household_id_variable(self) -> str:
         return f"{self.household_entity}_id"
 
-    def matches_series(self, release_directory: str, release_id: str | None = None) -> bool:
-        """Whether a release build belongs to this country's series.
-
-        An exclude pattern drops a build when it matches the build's release
-        folder or its release id, so single builds of a release can be left out.
-        """
-        names = (release_directory,) + ((release_id,) if release_id else ())
-        if any(re.search(pattern, name) for pattern in self.series_exclude for name in names):
+    def in_series(self, release: str, published_at: str) -> bool:
+        """Whether a recorded build belongs to the series: its line is named, and it was
+        published on or after `series.since` (compared by UTC date)."""
+        if release not in self.series_releases:
             return False
-        return any(
-            release_directory == name or release_directory.startswith(f"{name}/")
-            for name in self.series_releases
-        ) or any(
-            name.startswith("^") and re.search(name, release_directory)
-            for name in self.series_releases
-        )
+        return self.series_since is None or utc_date(published_at) >= self.series_since
+
+
+def utc_date(timestamp: str) -> str:
+    """The UTC date of an ISO 8601 time (one without an offset is read as UTC).
+
+    Raises ValueError for text that is not an ISO 8601 time.
+    """
+    moment = dt.datetime.fromisoformat(timestamp)
+    if moment.tzinfo is not None:
+        moment = moment.astimezone(dt.UTC)
+    return moment.date().isoformat()
 
 
 def _require(mapping: Mapping[str, Any], key: str, where: str) -> Any:
@@ -293,15 +310,27 @@ def parse_spec(raw: Mapping[str, Any], *, expected_country: str | None = None) -
     if not isinstance(raw, Mapping):
         raise SpecError("The spec must be a mapping.")
     raw = jsonable(raw)
-    if raw.get("schema_version") != SCHEMA_VERSION:
-        raise SpecError(f"schema_version must be {SCHEMA_VERSION}.")
+    if raw.get("schema_version") != SPEC_FORMAT_VERSION:
+        raise SpecError(f"schema_version must be {SPEC_FORMAT_VERSION}.")
     country = _identifier(_require(raw, "country", "spec"), "spec.country")
     if expected_country is not None and country != expected_country:
         raise SpecError(f"spec.country '{country}' does not match its folder '{expected_country}'.")
     series = raw.get("series") or {}
     series_releases = _names(series.get("releases"), "series.releases")
     if not series_releases:
-        raise SpecError("series.releases must name at least one release.")
+        raise SpecError("series.releases must name at least one release line.")
+    if any(name.startswith("^") for name in series_releases):
+        raise SpecError(
+            "series.releases names release lines as releases.json does; patterns are gone."
+        )
+    if "exclude" in series:
+        raise SpecError(
+            "series.exclude is gone: the series is every build releases.json records under "
+            "series.releases, from the date series.since if set."
+        )
+    since = series.get("since")
+    if since is not None and not (isinstance(since, str) and _DATE.match(since)):
+        raise SpecError("series.since must be a date, YYYY-MM-DD.")
     if "schedule" in raw:
         raise SpecError(
             "schedule: weekly top-ups are switched on per country by the repository variable "
@@ -367,7 +396,7 @@ def parse_spec(raw: Mapping[str, Any], *, expected_country: str | None = None) -
         country=country,
         release_repo=str(_require(raw, "release_repo", "spec")),
         series_releases=series_releases,
-        series_exclude=_names(series.get("exclude"), "series.exclude"),
+        series_since=since,
         engine_module=_identifier(_require(engine, "module", "engine"), "engine.module"),
         model_package=str(_require(engine, "model_package", "engine")),
         simulation_options=dict(engine.get("simulation_options") or {}),

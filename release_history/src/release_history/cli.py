@@ -1,4 +1,5 @@
-"""`release-history`: validate a spec, name a panel, resolve references, measure, export.
+"""`release-history`: validate a spec, list a series, name a panel, resolve references, measure,
+export.
 
 stdout carries only ids, statuses and timings, never a figure: GitHub Actions
 logs are public and the UK data are licensed. During a measurement, library
@@ -22,13 +23,19 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from release_history import PRODUCER_VERSION
+from release_history import LABELS_FORMAT_VERSION, PRODUCER_VERSION
 from release_history.canonical import document_bytes, file_sha256, write_atomic
 from release_history.disclosure import apply_policy
 from release_history.document import measurement_document, measurement_id, refused_document
 from release_history.engine import EngineMismatch, engine_identity, environment, panel_document
 from release_history.export import export_csv
-from release_history.local_store import panel_dir, write_immutable, write_once, write_replace
+from release_history.local_store import (
+    country_dir,
+    panel_dir,
+    write_immutable,
+    write_once,
+    write_replace,
+)
 from release_history.measure import MeasurementError, error_record, measure
 from release_history.references import (
     ReferenceError_,
@@ -49,10 +56,16 @@ from release_history.releases import (
     point_provenance,
     release_directory_for,
 )
+from release_history.series import SeriesError, build_series
 from release_history.simulate import PolicyEngineBackend
 from release_history.spec import Spec, countries_dir, load_spec
 
 EXIT_TRANSIENT = 75
+# A failure the run caused (not the file): nothing immutable is written, and a
+# later attempt may succeed.
+EXIT_RUN_FAILED = 3
+# The only refusals a file itself causes: stored, so the file shows as a gap.
+FILE_REFUSALS = frozenset({"disclosure_source_ids_missing", "disclosure_source_ids_misaligned"})
 
 
 def _now() -> str:
@@ -194,30 +207,37 @@ def cmd_validate_spec(args: argparse.Namespace) -> int:
     return 0 if not problems else 1
 
 
+def labels_document(spec: Spec) -> dict[str, Any]:
+    """What the page shows for each reform: replaceable, so a corrected label needs no panel."""
+    return {
+        "format_version": LABELS_FORMAT_VERSION,
+        "kind": "release_history.labels",
+        "country": spec.country,
+        "reforms": {
+            reform.id: {"label": reform.label, "source": reform.source} for reform in spec.reforms
+        },
+    }
+
+
 def cmd_identity(args: argparse.Namespace) -> int:
     spec = load_spec(args.country)
     engine = engine_identity(spec)
-    panel = panel_document(
-        spec,
-        engine,
-        environment(_lockfile(spec.country)),
-        created_at=_now(),
-        producer_commit=_producer_commit(),
-    )
+    panel = panel_document(spec, engine)
     lock = load_lock(spec.country)
     if args.out:
         root = Path(args.out)
-        folder = panel_dir(root, spec.country, panel["panel_id"])
-        write_once(folder / "panel.json", panel)
+        write_once(panel_dir(root, spec.country, panel["panel_id"]) / "panel.json", panel)
+        country = country_dir(root, spec.country)
+        write_replace(country / "labels.json", labels_document(spec))
         if lock is not None:
-            write_replace(folder / "references.json", lock)
+            write_replace(country / "references.json", lock)
     _emit(
         {
             "command": "identity",
             "country": spec.country,
             "panel_id": panel["panel_id"],
             "release_repo": spec.release_repo,
-            "series": panel["series"],
+            "series": {"releases": list(spec.series_releases), "since": spec.series_since},
             "spec_sha256": spec.digest,
             "engine": {
                 "policyengine": engine["policyengine"],
@@ -225,6 +245,45 @@ def cmd_identity(args: argparse.Namespace) -> int:
                 "core": f"{engine['core']['name']}=={engine['core']['version']}",
             },
             "producer_version": PRODUCER_VERSION,
+        }
+    )
+    return 0
+
+
+def cmd_series(args: argparse.Namespace) -> int:
+    """List the country's series from releases.json and write the series record."""
+    spec = load_spec(args.country)
+    try:
+        record = build_series(spec, HubClient(), listed_at=_now(), revision=args.revision)
+    except (SeriesError, ReleaseRefused) as error:
+        _emit(
+            {"command": "series", "country": spec.country, "status": "error", "detail": str(error)}
+        )
+        return 1
+    except TransientError as error:
+        _emit(
+            {
+                "command": "series",
+                "country": spec.country,
+                "status": "transient",
+                "class": str(error),
+            }
+        )
+        return EXIT_TRANSIENT
+    if args.out:
+        write_replace(country_dir(Path(args.out), spec.country) / "series.json", record)
+    builds = record["builds"]
+    listed = [b for b in builds if b["listing_status"] == "ok" and not b["withdrawn"]]
+    _emit(
+        {
+            "command": "series",
+            "country": spec.country,
+            "record": record["record"]["present"],
+            "commit": record["commit"],
+            "builds": len(builds),
+            "listed": len(listed),
+            "files": len({b["digest"] for b in listed}),
+            "refused": sorted({b["listing_reason"] for b in builds if b["listing_reason"]}),
         }
     )
     return 0
@@ -314,8 +373,25 @@ def _point_from_args(args: argparse.Namespace, spec: Spec, hub: HubClient) -> Po
     commit = hub.resolve_revision(repo, args.revision)
     directory = args.release_directory or release_directory_for(args.revision, spec.series_releases)
     return Point(
-        release_id=args.revision, release_directory=directory, hf_repo=repo, hf_commit=commit
+        build_id=args.revision, release_directory=directory, hf_repo=repo, hf_commit=commit
     )
+
+
+def _run_failed(stage: str, reason: str, point: Point | None, **extra: Any) -> int:
+    """A failure the run caused, not the file: nothing immutable is written, and a later
+    attempt may succeed."""
+    _emit(
+        {
+            "command": "measure",
+            "status": "run_failed",
+            "stage": stage,
+            "reason": reason,
+            "build_id": point.build_id if point else None,
+            "attempt": point.attempt if point else None,
+            **extra,
+        }
+    )
+    return EXIT_RUN_FAILED
 
 
 def cmd_measure(args: argparse.Namespace) -> int:
@@ -328,68 +404,106 @@ def cmd_measure(args: argparse.Namespace) -> int:
         _emit({"command": "measure", "status": "engine_mismatch", "detail": str(error)})
         return 1
     root = Path(args.out)
-    panel = panel_document(
-        spec,
-        engine,
-        environment(_lockfile(spec.country)),
-        created_at=started,
-        producer_commit=_producer_commit(),
-    )
+    panel = panel_document(spec, engine)
     panel_id = panel["panel_id"]
     folder = panel_dir(root, spec.country, panel_id)
     write_once(folder / "panel.json", panel)
+    env = environment(_lockfile(spec.country))
+    producer_commit = _producer_commit()
     hub = HubClient()
     workdir = Path(args.workdir) if args.workdir else Path(tempfile.mkdtemp(prefix="rh-"))
     log_path = Path(args.log) if args.log else root / ".logs" / f"{spec.country}-{int(clock)}.log"
-    provenance: dict[str, Any] = {}
+    point: Point | None = None
     h5_path: Path | None = None
+
+    def runtime() -> dict[str, Any]:
+        return {
+            "started_at": started,
+            "finished_at": _now(),
+            "seconds": round(time.monotonic() - clock, 1),
+            "runner": os.environ.get("RUNNER_NAME") or os.environ.get("RUNNER_OS") or "local",
+        }
+
     try:
         point = _point_from_args(args, spec, hub)
-        provenance = point.to_json()
-        opened = open_release(hub, point, workdir)
+        try:
+            opened = open_release(hub, point, workdir)
+        except ReleaseRefused as refusal:
+            # Before the file is known there is no digest, so there is no point to store.
+            # A plan never names such a build: the series record keeps the reason.
+            return _run_failed("open", refusal.reason, point)
+        if point.digest is not None and opened.artifact.sha256 != point.digest:
+            return _run_failed("open", "planned_file_changed", point)
         provenance = point_provenance(opened, engine["model"]["name"], engine["model"]["version"])
         h5_sha = opened.artifact.sha256
-        if spec.max_dataset_bytes and (opened.size_bytes or 0) > spec.max_dataset_bytes:
-            raise ReleaseRefused("skipped", "exceeds_runner_budget")
-        if args.h5:
-            h5_path = Path(args.h5)
-            if file_sha256(h5_path) != h5_sha:
-                raise ReleaseRefused("error", "sha256_mismatch")
-        else:
-            h5_path = download_verified(hub, opened, workdir)
-        measurement = measurement_id(panel_id, provenance, h5_sha)
+        measurement = measurement_id(panel_id, h5_sha)
         target = folder / f"{measurement}.json"
         if target.exists():
             _emit({"command": "measure", "status": "exists", "measurement_id": measurement})
             return 0
+        if spec.max_dataset_bytes and (opened.size_bytes or 0) > spec.max_dataset_bytes:
+            return _run_failed("open", "exceeds_runner_budget", point)
+        if args.h5:
+            h5_path = Path(args.h5)
+            if file_sha256(h5_path) != h5_sha:
+                return _run_failed("download", "sha256_mismatch", point)
+        else:
+            try:
+                h5_path = download_verified(hub, opened, workdir)
+            except ReleaseRefused as refusal:
+                return _run_failed("download", refusal.reason, point)
         columns = dataset_columns(h5_path)
         backend = PolicyEngineBackend(spec.engine_module, str(h5_path), spec.simulation_options)
-        with quiet(log_path):
-            result = measure(spec, backend)
-            source_ids = None
-            if spec.disclosure_policy != "none":
-                source_ids = source_ids_for(spec, h5_path, result.household_ids)
-            withheld = apply_policy(
-                spec.disclosure_policy,
-                result.cells,
-                result.tables,
-                source_ids=source_ids,
-                floor=spec.min_source_households,
+        try:
+            with quiet(log_path):
+                result = measure(spec, backend)
+                source_ids = None
+                if spec.disclosure_policy != "none":
+                    source_ids = source_ids_for(spec, h5_path, result.household_ids)
+                withheld = apply_policy(
+                    spec.disclosure_policy,
+                    result.cells,
+                    result.tables,
+                    source_ids=source_ids,
+                    floor=spec.min_source_households,
+                )
+        except ReleaseRefused as refusal:
+            if refusal.reason not in FILE_REFUSALS:
+                return _run_failed("measure", refusal.reason, point)
+            # The file's own source ids are missing or misaligned: the file causes it, so
+            # it is stored and shows as a gap.
+            document = refused_document(
+                spec=spec,
+                panel_id=panel_id,
+                provenance=provenance,
+                reason=refusal.reason,
+                env=env,
+                producer_commit=producer_commit,
+                runtime=runtime(),
             )
+            write_immutable(target, document)
+            _emit(
+                {
+                    "command": "measure",
+                    "status": "refused",
+                    "reason": refusal.reason,
+                    "measurement_id": measurement,
+                }
+            )
+            return 0
+        if result.status != "ok" and not point.last_attempt:
+            failed = sorted(k for k, v in result.reforms.items() if v.get("status") != "ok")
+            return _run_failed("reform", "reform_failed", point, reforms=failed)
         document = measurement_document(
             spec=spec,
             panel_id=panel_id,
-            measurement=measurement,
             provenance=provenance,
             result=result,
             columns=columns,
             withheld=withheld,
-            runtime={
-                "started_at": started,
-                "finished_at": _now(),
-                "seconds": round(time.monotonic() - clock, 1),
-                "runner": os.environ.get("RUNNER_NAME") or os.environ.get("RUNNER_OS") or "local",
-            },
+            env=env,
+            producer_commit=producer_commit,
+            runtime=runtime(),
         )
         write_immutable(target, document)
         _emit(
@@ -398,7 +512,7 @@ def cmd_measure(args: argparse.Namespace) -> int:
                 "status": document["status"],
                 "measurement_id": measurement,
                 "panel_id": panel_id,
-                "release_id": point.release_id,
+                "build_id": point.build_id,
                 "cells": len(result.cells),
                 "withheld": withheld,
                 "seconds": document["runtime"]["seconds"],
@@ -407,52 +521,22 @@ def cmd_measure(args: argparse.Namespace) -> int:
             }
         )
         return 0
-    except ReleaseRefused as refusal:
-        document = refused_document(
-            spec=spec,
-            panel_id=panel_id,
-            provenance=provenance,
-            status=refusal.status,
-            reason=refusal.reason,
-            h5_sha256=(provenance.get("dataset") or {}).get("sha256"),
-            runtime={"started_at": started, "finished_at": _now()},
-        )
-        write_immutable(folder / f"{document['measurement_id']}.json", document)
-        _emit(
-            {
-                "command": "measure",
-                "status": refusal.status,
-                "reason": refusal.reason,
-                "measurement_id": document["measurement_id"],
-            }
-        )
-        return 0
     except MeasurementError as failure:
         record = error_record(failure.stage, failure.error)
-        document = refused_document(
-            spec=spec,
-            panel_id=panel_id,
-            provenance=provenance,
-            status="error",
-            reason=f"{failure.stage}_failed",
-            h5_sha256=(provenance.get("dataset") or {}).get("sha256"),
-            runtime={"started_at": started, "finished_at": _now()},
-            error=record,
+        return _run_failed(
+            failure.stage, f"{failure.stage}_failed", point, error_class=record["class"]
         )
-        write_immutable(folder / f"{document['measurement_id']}.json", document)
-        _emit(
-            {
-                "command": "measure",
-                "status": "error",
-                "stage": failure.stage,
-                "class": record["class"],
-                "measurement_id": document["measurement_id"],
-            }
-        )
-        return 0
+    except ReleaseRefused as refusal:
+        return _run_failed("open", refusal.reason, point)
     except TransientError as error:
         _emit({"command": "measure", "status": "transient", "class": str(error)})
         return EXIT_TRANSIENT
+    except Exception as error:  # noqa: BLE001 - the class name only, never the message
+        # An unexpected error's message or traceback could carry a figure into the public
+        # log, so only its class is printed.
+        return _run_failed(
+            "unexpected", "unexpected_error", point, error_class=type(error).__name__
+        )
     finally:
         if h5_path is not None and not args.h5 and not args.keep_h5:
             h5_path.unlink(missing_ok=True)
@@ -478,10 +562,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-model", action="store_true", help="skip the model check (no engine)")
     p.set_defaults(func=cmd_validate_spec)
 
-    p = sub.add_parser("identity", help="print the pinned panel id; write panel.json")
+    p = sub.add_parser(
+        "identity", help="print the pinned panel id; write panel.json, references and labels"
+    )
     p.add_argument("--country", required=True)
-    p.add_argument("--out", help="store root to write panel.json and references.json into")
+    p.add_argument("--out", help="store root to write panel.json, references.json, labels.json")
     p.set_defaults(func=cmd_identity)
+
+    p = sub.add_parser("series", help="list the country's series from releases.json")
+    p.add_argument("--country", required=True)
+    p.add_argument("--out", help="store root to write the country's series.json into")
+    p.add_argument("--revision", default="main", help="the release repository's branch or commit")
+    p.set_defaults(func=cmd_series)
 
     p = sub.add_parser("resolve-references", help="write references.lock.json from Chronicle")
     p.add_argument("--country", required=True)
@@ -492,11 +584,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-digest-check", action="store_true")
     p.set_defaults(func=cmd_resolve_references)
 
-    p = sub.add_parser("measure", help="measure one release build on the pinned panel")
+    p = sub.add_parser("measure", help="measure one build's data file on the pinned panel")
     p.add_argument("--country", required=True)
     p.add_argument("--out", required=True, help="store root (same layout as Blob)")
-    p.add_argument("--point", help="point JSON, or a file holding it, from the plan step")
-    p.add_argument("--revision", help="a release tag or commit, for local runs")
+    p.add_argument("--point", help="planned point JSON, or a file holding it, from the plan step")
+    p.add_argument("--revision", help="a release tag, branch or commit, for local runs")
     p.add_argument("--repo", help="release repository (defaults to the spec's)")
     p.add_argument("--release-directory", help="folder under releases/ (derived from a cut tag)")
     p.add_argument("--h5", help="a local copy of the national H5 (still sha256-checked)")

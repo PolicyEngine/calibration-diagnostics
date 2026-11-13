@@ -1,18 +1,21 @@
 name: Release history
 
-# Measures each published national Microcosm release of one country on that
-# country's pinned reference engine (calibration-diagnostics#224). See
-# docs/release-history.md.
+# Measures each data file a country's release repository publishes, as its
+# releases.json lists the builds, on that country's pinned reference engine
+# (calibration-diagnostics#224). See docs/release-history.md.
 #
 # - Weekly (Mondays): a top-up run for each country listed in the repository
 #   variable RELEASE_HISTORY_WEEKLY (country codes, space- or comma-separated;
-#   unset or empty runs nothing). It measures only builds the country's
-#   complete panel lacks, and waits while a new panel awaits its backfill.
-# - Manual: `topup`, `backfill` (builds a new panel after an engine, spec or
-#   producer bump) or `release` (one build). Dispatched from a ref that pins
-#   another engine, a run measures into that engine's panel and leaves the
-#   pinned and served panels as they are: only runs of the default branch's
-#   engine move them.
+#   unset or empty runs nothing). It measures the files no pinned engine has
+#   measured yet and, after an engine move, the last build the previous
+#   engine measured, so the first new build has a step. A country's first
+#   panel waits for its backfill.
+# - Manual: `topup`, `backfill` (every file a panel lacks, as after an engine,
+#   spec or producer bump) or `release` (one build). Only runs of the default
+#   branch's engine pin: they move the pinned and served panels, replace the
+#   country's series record, references and labels, and rebuild every panel's
+#   timeline. A run dispatched from another ref measures into its own engine's
+#   panel with `backfill` or `release` and rebuilds only that panel's timeline.
 #
 # The repository is public and the UK data are licensed: logs carry ids,
 # statuses and timings only, library output goes to a private file that is
@@ -32,8 +35,8 @@ on:
         default: topup
         type: choice
         options: [topup, backfill, release]
-      release_id:
-        description: For mode release, the build as the release picker names it
+      build_id:
+        description: For mode release, the build as releases.json names it, <release>/<build>
         required: false
         type: string
   schedule:
@@ -87,6 +90,10 @@ jobs:
       plan: ${{ steps.plan.outputs.plan }}
     env:
       COUNTRY: ${{ inputs.country }}
+      MODE: ${{ inputs.mode }}
+      BUILD_ID: ${{ inputs.build_id }}
+      # Only the default branch's engine pins.
+      PIN: ${{ github.ref_name == github.event.repository.default_branch && '--pin' || '' }}
       BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
     steps:
@@ -95,22 +102,25 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - name: Install the country's reference engine
         run: uv sync --frozen --project "release_history/countries/$COUNTRY"
-      - name: Validate the spec and name the pinned panel
+      - name: Validate the spec, name the pinned panel and list the series
         run: |
           set -euo pipefail
           project="release_history/countries/$COUNTRY"
           uv run --frozen --project "$project" release-history validate-spec --country "$COUNTRY"
           uv run --frozen --project "$project" release-history identity --country "$COUNTRY" --out "$RUNNER_TEMP/out"
+          # releases.json and each build's release manifest at one commit of main; any
+          # failure to read them fails the run.
+          uv run --frozen --project "$project" release-history series --country "$COUNTRY" --out "$RUNNER_TEMP/out"
       - run: bun install --frozen-lockfile
         working-directory: frontend
-      - name: Publish the panel and its references, then plan
+      - name: Publish the panel (and, when pinning, the country's files), then plan
         id: plan
         working-directory: frontend
         run: |
           set -euo pipefail
-          bun run scripts/release-history.ts upload --root "$RUNNER_TEMP/out"
+          bun run scripts/release-history.ts upload --root "$RUNNER_TEMP/out" $PIN
           bun run scripts/release-history.ts plan --country "$COUNTRY" --root "$RUNNER_TEMP/out" \
-            --mode "${{ inputs.mode }}" --release-id "${{ inputs.release_id }}"
+            --mode "$MODE" --build-id "$BUILD_ID" $PIN
 
   measure:
     needs: plan
@@ -150,7 +160,7 @@ jobs:
 
   finalize:
     needs: [plan, measure]
-    # Also after a skipped plan, so a references update reaches the timeline.
+    # Also after a skipped plan, so a references, labels or listing update reaches the timelines.
     if: ${{ always() && needs.plan.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -166,7 +176,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - name: Update the manifest and rebuild the timeline
+      - name: Update the manifest and rebuild the timelines
         run: |
           set -euo pipefail
           printf '%s' "$PLAN" > "$RUNNER_TEMP/plan.json"

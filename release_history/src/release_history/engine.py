@@ -6,10 +6,15 @@ reading it has no side effects (no country import, no Hub request). This is the
 `py_bundle_manifest` approach of `frontend/scripts/hosted_release.py`, for any
 country.
 
-Every panel-id input is the country's own: its engine environment, the
-producer version and its spec. So bumping one country's lockfile or spec gives
-that country a new panel and leaves every other country's panel alone.
-References are not an input.
+Every panel-id input is the country's own: its engine pins, the producer
+version, the point format and its spec's number-changing part. So bumping one
+country's lockfile or spec gives that country a new panel and leaves every
+other country's panel alone. References are not an input.
+
+`panel.json` holds only what the id hashes, plus the engine it names. Facts
+that can change inside one panel (the resolved environment, the producer
+commit) are recorded on each point instead; labels and references are
+replaceable country files.
 """
 
 from __future__ import annotations
@@ -20,9 +25,9 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any
 
-from release_history import PRODUCER_VERSION, SCHEMA_VERSION
+from release_history import PANEL_FORMAT_VERSION, POINT_FORMAT_VERSION, PRODUCER_VERSION
 from release_history.canonical import DIGEST_ALGORITHM, file_sha256, json_sha256
-from release_history.spec import Spec
+from release_history.spec import Spec, measurement_definition
 
 BUNDLE_MANIFEST = "policyengine/data/bundle/manifest.json"
 CORE_PACKAGE = "policyengine-core"
@@ -74,12 +79,12 @@ def engine_identity(spec: Spec, bundle: dict[str, Any] | None = None) -> dict[st
 def panel_key(spec: Spec, engine: dict[str, Any]) -> dict[str, Any]:
     """Exactly the inputs the panel id hashes."""
     return {
-        "schema_version": SCHEMA_VERSION,
         "country": spec.country,
         "policyengine": engine["policyengine"],
         "model": f"{engine['model']['name']}=={engine['model']['version']}",
         "core": f"{engine['core']['name']}=={engine['core']['version']}",
         "producer_version": PRODUCER_VERSION,
+        "point_format_version": POINT_FORMAT_VERSION,
         "spec_sha256": spec.digest,
     }
 
@@ -89,7 +94,7 @@ def panel_id(spec: Spec, engine: dict[str, Any]) -> str:
 
 
 def environment(lockfile: Path | None = None) -> dict[str, Any]:
-    """The resolved environment, recorded in panel.json and not hashed into the id."""
+    """The resolved environment a point ran on; recorded on each point, not hashed."""
     packages = sorted(
         f"{dist.metadata['Name']}=={dist.version}"
         for dist in metadata.distributions()
@@ -104,27 +109,18 @@ def environment(lockfile: Path | None = None) -> dict[str, Any]:
     }
 
 
-def panel_document(
-    spec: Spec,
-    engine: dict[str, Any],
-    env: dict[str, Any],
-    *,
-    created_at: str,
-    producer_commit: str | None,
-) -> dict[str, Any]:
+def panel_document(spec: Spec, engine: dict[str, Any]) -> dict[str, Any]:
+    """Written once: the panel key, the hashed definition and the engine it names."""
     return {
-        "schema_version": SCHEMA_VERSION,
+        "format_version": PANEL_FORMAT_VERSION,
         "kind": "release_history.panel",
         "panel_id": panel_id(spec, engine),
         "panel_key": panel_key(spec, engine),
         "digest_algorithm": DIGEST_ALGORITHM,
         "country": spec.country,
-        "created_at": created_at,
         "engine": engine,
-        "environment": env,
-        "producer": {"version": PRODUCER_VERSION, "commit": producer_commit},
-        "series": {"releases": list(spec.series_releases), "exclude": list(spec.series_exclude)},
-        "release_repo": spec.release_repo,
+        "producer_version": PRODUCER_VERSION,
+        "point_format_version": POINT_FORMAT_VERSION,
         "spec_sha256": spec.digest,
-        "spec": spec.raw,
+        "definition": measurement_definition(spec.raw),
     }

@@ -1,33 +1,38 @@
 /**
  * Release history CLI (calibration-diagnostics#224): plan, upload, finalize,
- * pull and timeline. The Python producer (`release_history/`) measures; this
- * script owns everything that touches Blob or the dashboard's release
- * inventory. It prints ids, statuses and timings only, never a figure.
+ * pull and timeline. The Python producer (`release_history/`) lists the
+ * series and measures; this script owns everything that touches Blob. It
+ * prints ids, statuses and counts only, never a figure.
  *
  *   bun run scripts/release-history.ts plan --country uk --root ../out --mode topup
  *   bun run scripts/release-history.ts upload --root ../out
- *   bun run scripts/release-history.ts finalize --country uk --root ../out --plan ../plan.json
+ *   bun run scripts/release-history.ts finalize --country uk --panel-id <id> --plan ../plan.json
  *   bun run scripts/release-history.ts pull --country uk --out ./release-history-uk
- *   bun run scripts/release-history.ts timeline --country uk --root ./release-history-uk
+ *   bun run scripts/release-history.ts timeline --country uk --root ./release-history-uk --panel <id>
+ *
+ * `plan` reads what `release-history identity --out` and `release-history
+ * series --out` wrote under `--root`: the panel, and the series record listed
+ * from the release repository's releases.json.
+ *
+ * Runs of the default branch's engine pin (`--pin`, given to plan, upload and
+ * finalize alike). Only they replace the country's files (series record,
+ * references, labels) and rebuild every panel's timeline; a run from another
+ * ref uploads its own panel and points and rebuilds its own timeline only, so
+ * an unmerged spec never reaches the served page.
  */
+import { createHash } from "node:crypto";
 import { appendFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { parseArgs } from "node:util";
 
-import { readCalibrationTreeManifest } from "@policyengine/calibration-tree/calibration-tree-blob";
-import {
-  releaseDirectoryOf,
-  type CalibrationTreeManifestEntry,
-} from "@policyengine/calibration-tree/calibration-tree-manifest";
-import { isCountry } from "@policyengine/calibration-tree/countries";
-import { loadReleasesRecord } from "@policyengine/calibration-tree/latest-artifact";
-import { recordedBuilds, type ReleasesRecord } from "@policyengine/calibration-tree/release-record";
-
 import {
   buildTimeline,
+  countryFilePath,
   encodeDocument,
   finalizeCountry,
+  listedBuilds,
   panelPrefix,
+  PLAN_MODES,
   planPanel,
   putImmutable,
   putReplace,
@@ -35,29 +40,37 @@ import {
   readJson,
   RELEASE_HISTORY_MANIFEST_PATH,
   RELEASE_HISTORY_PREFIX,
-  seriesMatches,
   storedFileKind,
   updateManifestCountry,
   vercelBlobStore,
+  type LabelsDocument,
+  type ManifestPoint,
   type MeasurementDocument,
   type Plan,
   type PlanMode,
   type ReferencesLock,
-  type ReleaseBuild,
   type ReleaseHistoryManifest,
   type ReleaseHistoryStore,
+  type SeriesRecord,
 } from "../lib/microcosm/release-history-store";
 
-/** The parts of the producer's panel.json this script reads. */
+/** The producer's panel.json (`engine.panel_document`): the panel key and what it hashes. */
 export interface PanelDocument {
+  format_version: number;
+  kind: "release_history.panel";
   panel_id: string;
+  panel_key: Record<string, unknown>;
   country: string;
-  created_at: string | null;
-  release_repo: string;
-  series: { releases: string[]; exclude: string[] };
+  engine: {
+    policyengine: string;
+    bundle_sha256?: string;
+    model: { name: string; version: string };
+    core: { name: string; version: string };
+  };
+  producer_version: string;
+  point_format_version: number;
   spec_sha256: string;
-  producer: { version: string };
-  engine: { policyengine: string; model: { name: string; version: string }; core: { name: string; version: string } };
+  definition: Record<string, unknown>;
 }
 
 function now(): string {
@@ -75,6 +88,15 @@ async function walk(directory: string): Promise<string[]> {
   return files;
 }
 
+async function readLocalJson<T>(path: string): Promise<T | null> {
+  try {
+    return JSON.parse(await readFile(path, "utf8")) as T;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
+}
+
 /** The one panel folder `release-history identity --out <root>` wrote for a country. */
 export async function readLocalPanel(root: string, country: string): Promise<PanelDocument> {
   const countryDir = join(root, RELEASE_HISTORY_PREFIX, country);
@@ -88,6 +110,25 @@ export async function readLocalPanel(root: string, country: string): Promise<Pan
   return panels[0];
 }
 
+/** The series record `release-history series --out <root>` wrote for a country. */
+export async function readLocalSeries(root: string, country: string): Promise<SeriesRecord> {
+  const series = await readLocalJson<SeriesRecord>(join(root, countryFilePath(country, "series")));
+  if (!series) {
+    throw new Error(`No series.json for ${country} under ${root}: run \`release-history series --out\`.`);
+  }
+  return series;
+}
+
+/**
+ * A point's id, as the Python producer names it (`document.measurement_id`): the sha256 of the
+ * canonical JSON of the panel id and the file's sha256.
+ */
+export function measurementIdFor(panelId: string, digest: string): string {
+  return createHash("sha256").update(JSON.stringify({ h5_sha256: digest, panel_id: panelId })).digest("hex");
+}
+
+const BUILD_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
 /** A panel's panel.json as the plan job uploaded it. */
 export async function readStoredPanel(
   store: ReleaseHistoryStore,
@@ -99,94 +140,63 @@ export async function readStoredPanel(
   return panel;
 }
 
-/**
- * The panel's series, as the dashboard's release picker lists releases.
- *
- * - **A repository with releases.json** (the UK since Microcosm's build folders): every build the
- *   record lists under the series' releases, named and read by its folder (`<release>/<build>`),
- *   dated by the record's `published_at`, at the commit the dashboard's tree manifest pins for
- *   it. A recorded build with no tree entry yet waits for a later run. The tree manifest also
- *   holds the cut tags each build was moved from and the bare release folder; they are not
- *   listed, because the record is Microcosm's own list of what is published.
- * - **A repository without one** (the US): the tree manifest's release entries by name.
- */
-export function listSeries(
-  panel: PanelDocument,
-  entries: readonly CalibrationTreeManifestEntry[],
-  latestBuildArtifactId: string | null,
-  record: ReleasesRecord | null,
-): ReleaseBuild[] {
-  const repo = panel.release_repo.toLowerCase();
-  const releases = entries.filter(
-    (entry) => entry.kind === "release" && entry.releaseId && entry.hfRepo.toLowerCase() === repo,
-  );
-  if (record) {
-    const byId = new Map(releases.map((entry) => [entry.releaseId as string, entry]));
-    return recordedBuilds(record).flatMap((build): ReleaseBuild[] => {
-      const entry = byId.get(build.id);
-      if (!entry || !seriesMatches(panel.series, build.id, build.id)) return [];
-      return [{
-        releaseId: build.id,
-        releaseDirectory: build.id,
-        hfRepo: entry.hfRepo,
-        hfCommitSha: entry.hfCommitSha,
-        publishedAt: build.publishedAt,
-        current: build.current && build.inDefaultRelease,
-        withdrawn: build.withdrawn,
-      }];
-    });
-  }
-  return releases
-    .map((entry): ReleaseBuild => ({
-      releaseId: entry.releaseId as string,
-      releaseDirectory: releaseDirectoryOf(entry) ?? (entry.releaseId as string),
-      hfRepo: entry.hfRepo,
-      hfCommitSha: entry.hfCommitSha,
-      publishedAt: entry.updatedAt ?? entry.createdAt,
-      current: entry.buildArtifactId === latestBuildArtifactId,
-      withdrawn: false,
-    }))
-    .filter((build) => seriesMatches(panel.series, build.releaseDirectory, build.releaseId));
-}
-
-/** The country's published release builds in the panel's series, as the release picker lists them. */
-export async function seriesBuilds(panel: PanelDocument, options: { token?: string } = {}): Promise<ReleaseBuild[]> {
-  if (!isCountry(panel.country)) throw new Error(`${panel.country} is not a registered country.`);
-  const { manifest } = await readCalibrationTreeManifest({ token: options.token, consistent: true });
-  const country = manifest.countries[panel.country];
-  // Null only when the repository has no releases.json. A record that can't be read stops the
-  // plan: falling back to the tree manifest's names would list every moved cut twice.
-  const record = await loadReleasesRecord(0, panel.country);
-  return listSeries(panel, country?.builds ?? [], country?.latestReleaseBuildArtifactId ?? null, record);
-}
-
 export async function plan(options: {
   store: ReleaseHistoryStore;
   panel: PanelDocument;
-  builds: ReleaseBuild[];
+  series: SeriesRecord;
   mode: PlanMode;
-  releaseId?: string | null;
-}): Promise<Plan & { builds: ReleaseBuild[] }> {
-  const manifest = await readJson<ReleaseHistoryManifest>(options.store, RELEASE_HISTORY_MANIFEST_PATH);
-  const result = planPanel({
-    country: options.panel.country,
-    panelId: options.panel.panel_id,
+  pin: boolean;
+  buildId?: string | null;
+}): Promise<Plan> {
+  const { store, panel } = options;
+  if (options.mode === "release" && !BUILD_ID.test(options.buildId ?? "")) {
+    throw new Error("Mode release needs --build-id <release>/<build>, as releases.json names it.");
+  }
+  const manifest = await readJson<ReleaseHistoryManifest>(store, RELEASE_HISTORY_MANIFEST_PATH);
+  // Points already in the store, in case a run's finalize never folded them in.
+  const names = new Set(
+    (await store.list(panelPrefix(panel.country, panel.panel_id)))
+      .filter((path) => storedFileKind(path) === "measurement")
+      .map((path) => path.slice(path.lastIndexOf("/") + 1, -".json".length)),
+  );
+  const stored = new Set(
+    listedBuilds(options.series)
+      .map((build) => build.digest as string)
+      .filter((digest) => names.has(measurementIdFor(panel.panel_id, digest))),
+  );
+  return planPanel({
+    country: panel.country,
+    panelId: panel.panel_id,
     mode: options.mode,
-    releaseId: options.releaseId,
-    builds: options.builds,
-    entry: manifest?.countries[options.panel.country],
+    pin: options.pin,
+    buildId: options.buildId,
+    series: options.series,
+    entry: manifest?.countries[panel.country],
+    stored,
   });
-  return { ...result, builds: options.builds };
 }
 
-/** Upload a local store folder: points immutable, panel.json once, the rest replaced. */
-export async function uploadDirectory(store: ReleaseHistoryStore, root: string): Promise<Record<string, number>> {
+const COUNTRY_FILE_KINDS = new Set(["series", "references", "labels"]);
+
+/**
+ * Upload a local store folder: points immutable, panel.json once, the rest replaced. The
+ * country's files go up only from a run that pins (`countryFiles`).
+ */
+export async function uploadDirectory(
+  store: ReleaseHistoryStore,
+  root: string,
+  options: { countryFiles: boolean },
+): Promise<Record<string, number>> {
   const counts: Record<string, number> = {};
-  const files = (await walk(join(root, RELEASE_HISTORY_PREFIX))).filter((f) => f.endsWith(".json"));
+  const files = (await walk(join(root, RELEASE_HISTORY_PREFIX))).filter((f) => f.endsWith(".json")).sort();
   for (const file of files) {
     const path = relative(root, file).split("\\").join("/");
     const kind = storedFileKind(path);
     if (!kind) continue;
+    if (COUNTRY_FILE_KINDS.has(kind) && !options.countryFiles) {
+      counts[`${kind}:held_back`] = (counts[`${kind}:held_back`] ?? 0) + 1;
+      continue;
+    }
     const body = encodeDocument(JSON.parse(await readFile(file, "utf8")));
     let outcome: string;
     if (kind === "measurement") outcome = await putImmutable(store, path, body);
@@ -210,87 +220,136 @@ async function storedMeasurements(store: ReleaseHistoryStore, country: string, p
   return documents;
 }
 
+function panelSummary(panel: PanelDocument) {
+  return {
+    panelId: panel.panel_id,
+    engine: {
+      policyengine: panel.engine.policyengine,
+      model: `${panel.engine.model.name}==${panel.engine.model.version}`,
+      core: `${panel.engine.core.name}==${panel.engine.core.version}`,
+    },
+    specSha256: panel.spec_sha256,
+    producerVersion: panel.producer_version,
+  };
+}
+
+/**
+ * Fold a run into the manifest, then rebuild timelines on the country's stored series record: a
+ * run that pins rebuilds every panel's, any other run its own panel's only. A series that lists
+ * no file leaves the timelines as they were.
+ */
 export async function finalize(options: {
   store: ReleaseHistoryStore;
   panel: PanelDocument;
-  plan: Plan & { builds: ReleaseBuild[] };
+  plan: Plan;
   /** A run of the default branch's engine: it may move the pinned and served panels. */
   pin: boolean;
   at?: string;
 }) {
   const { store, panel } = options;
+  const country = panel.country;
   const at = options.at ?? now();
-  const stored = await storedMeasurements(store, panel.country, panel.panel_id);
-  const manifest = await updateManifestCountry(store, panel.country, (entry) =>
+  const series = await readJson<SeriesRecord>(store, countryFilePath(country, "series"));
+  const stored = await storedMeasurements(store, country, panel.panel_id);
+  const manifest = await updateManifestCountry(store, country, (entry) =>
     finalizeCountry({
       entry,
-      panel: {
-        panelId: panel.panel_id,
-        createdAt: panel.created_at,
-        engine: {
-          policyengine: panel.engine.policyengine,
-          model: `${panel.engine.model.name}==${panel.engine.model.version}`,
-          core: `${panel.engine.core.name}==${panel.engine.core.version}`,
-        },
-        specSha256: panel.spec_sha256,
-        producerVersion: panel.producer.version,
-      },
-      builds: options.plan.builds,
+      panel: panelSummary(panel),
+      series,
+      mode: options.plan.mode,
       planned: options.plan.points,
       stored,
       pin: options.pin,
+      at,
     }), at);
-  const references = await readJson<ReferencesLock>(store, `${panelPrefix(panel.country, panel.panel_id)}references.json`);
-  const timeline = buildTimeline({
-    country: panel.country, panelId: panel.panel_id, points: stored, references, builtAt: at,
-  });
-  await putReplace(store, `${panelPrefix(panel.country, panel.panel_id)}timeline.json`, encodeDocument(timeline));
-  const entry = manifest.countries[panel.country]!;
+  const entry = manifest.countries[country]!;
+  let timelines = 0;
+  if (series && listedBuilds(series).length > 0) {
+    const references = await readJson<ReferencesLock>(store, countryFilePath(country, "references"));
+    const labels = await readJson<LabelsDocument>(store, countryFilePath(country, "labels"));
+    const rebuilt = options.pin ? Object.keys(entry.panels).sort() : [panel.panel_id];
+    for (const panelId of rebuilt) {
+      const points = panelId === panel.panel_id ? stored : await storedMeasurements(store, country, panelId);
+      const timeline = buildTimeline({
+        country,
+        panelId,
+        series,
+        points,
+        states: entry.panels[panelId].points,
+        references,
+        labels,
+        builtAt: at,
+      });
+      await putReplace(store, `${panelPrefix(country, panelId)}timeline.json`, encodeDocument(timeline));
+      timelines += 1;
+    }
+  }
   const record = entry.panels[panel.panel_id];
   return {
-    country: panel.country,
+    country,
     panelId: panel.panel_id,
+    pinned: entry.pinnedPanelId === panel.panel_id,
     current: entry.currentPanelId === panel.panel_id,
     complete: record.complete,
-    points: Object.values(record.points).map((point) => ({
-      releaseId: point.releaseId,
+    coverage: record.coverage,
+    timelines,
+    points: Object.values(record.points).map((point: ManifestPoint) => ({
+      digest: point.digest,
+      buildId: point.lastBuildId,
       state: point.state,
       measurementStatus: point.measurementStatus,
       attempts: point.attempts,
-      withdrawn: point.withdrawn,
+      lastError: point.lastError,
     })),
-    series: timeline.series.length,
   };
 }
 
-/** Download a panel (the country's current one by default) into a local folder. */
+/** Download a panel (the country's current one by default) and the country's files. */
 export async function pull(options: { store: ReleaseHistoryStore; country: string; out: string; panelId?: string }) {
   const manifest = await readJson<ReleaseHistoryManifest>(options.store, RELEASE_HISTORY_MANIFEST_PATH);
   const entry = manifest?.countries[options.country];
   const panelId = options.panelId ?? entry?.currentPanelId ?? entry?.pinnedPanelId;
   if (!panelId) throw new Error(`No release history panel for ${options.country}.`);
-  const paths = [RELEASE_HISTORY_MANIFEST_PATH, ...await options.store.list(panelPrefix(options.country, panelId))];
+  const paths = [
+    RELEASE_HISTORY_MANIFEST_PATH,
+    countryFilePath(options.country, "series"),
+    countryFilePath(options.country, "references"),
+    countryFilePath(options.country, "labels"),
+    ...await options.store.list(panelPrefix(options.country, panelId)),
+  ];
+  let files = 0;
   for (const path of paths) {
     const found = await options.store.read(path);
     if (!found) continue;
     const target = join(options.out, path);
     await mkdir(dirname(target), { recursive: true });
     await writeFile(target, found.body);
+    files += 1;
   }
-  return { panelId, files: paths.length };
+  return { panelId, files };
 }
 
 /** Build timeline.json from a local folder (local runs, or a pulled panel). */
 export async function localTimeline(root: string, country: string, panelId: string): Promise<string> {
+  const series = await readLocalSeries(root, country);
   const folder = join(root, panelPrefix(country, panelId));
   const points: MeasurementDocument[] = [];
-  let references: ReferencesLock | null = null;
-  for (const name of (await readdir(folder)).sort()) {
-    const kind = storedFileKind(name);
-    if (kind === "measurement") points.push(JSON.parse(await readFile(join(folder, name), "utf8")));
-    if (kind === "references") references = JSON.parse(await readFile(join(folder, name), "utf8"));
+  for (const file of (await walk(folder)).sort()) {
+    if (storedFileKind(relative(root, file).split("\\").join("/")) === "measurement") {
+      points.push(JSON.parse(await readFile(file, "utf8")));
+    }
   }
-  const timeline = buildTimeline({ country, panelId, points, references, builtAt: now() });
+  const manifest = await readLocalJson<ReleaseHistoryManifest>(join(root, RELEASE_HISTORY_MANIFEST_PATH));
+  const timeline = buildTimeline({
+    country,
+    panelId,
+    series,
+    points,
+    states: manifest?.countries[country]?.panels[panelId]?.points,
+    references: await readLocalJson<ReferencesLock>(join(root, countryFilePath(country, "references"))),
+    labels: await readLocalJson<LabelsDocument>(join(root, countryFilePath(country, "labels"))),
+    builtAt: now(),
+  });
   const target = join(folder, "timeline.json");
   await writeFile(target, encodeDocument(timeline));
   return target;
@@ -311,6 +370,11 @@ function blobStore(): ReleaseHistoryStore {
   return vercelBlobStore(process.env.BLOB_READ_WRITE_TOKEN || undefined);
 }
 
+function planMode(value: string | undefined): PlanMode {
+  if (PLAN_MODES.includes(value as PlanMode)) return value as PlanMode;
+  throw new Error(`--mode must be one of ${PLAN_MODES.join(", ")}.`);
+}
+
 async function main(argv: string[]): Promise<void> {
   const [command, ...rest] = argv;
   const { values } = parseArgs({
@@ -320,12 +384,13 @@ async function main(argv: string[]): Promise<void> {
       root: { type: "string" },
       out: { type: "string" },
       mode: { type: "string", default: "topup" },
-      "release-id": { type: "string" },
+      // mode release: the build as releases.json names it, <release>/<build>.
+      "build-id": { type: "string" },
       plan: { type: "string" },
       panel: { type: "string" },
       "plan-out": { type: "string" },
       "panel-id": { type: "string" },
-      // finalize: set only for a run of the default branch's engine.
+      // plan, upload, finalize: set only for a run of the default branch's engine.
       pin: { type: "boolean", default: false },
     },
   });
@@ -334,9 +399,10 @@ async function main(argv: string[]): Promise<void> {
     const result = await plan({
       store: blobStore(),
       panel,
-      builds: await seriesBuilds(panel, { token: process.env.BLOB_READ_WRITE_TOKEN || undefined }),
-      mode: values.mode as PlanMode,
-      releaseId: values["release-id"] ?? null,
+      series: await readLocalSeries(values.root!, values.country!),
+      mode: planMode(values.mode),
+      pin: values.pin === true,
+      buildId: values["build-id"] || null,
     });
     if (values["plan-out"]) await writeFile(values["plan-out"], encodeDocument(result));
     await githubOutput({
@@ -348,26 +414,30 @@ async function main(argv: string[]): Promise<void> {
     });
     await stepSummary(
       `### Release history plan: ${result.country}\n\nPanel \`${result.panelId}\`, mode \`${result.mode}\`: ` +
-        `${result.action} ${result.points.length} of ${result.seriesSize} series points` +
+        `${result.action} ${result.points.length} of ${result.seriesFiles} files in the series` +
         (result.reason ? ` (${result.reason})` : "") + ".",
     );
-    console.log(JSON.stringify({ ...result, builds: result.builds.length }));
+    console.log(JSON.stringify({ ...result, points: result.points.map((p) => p.build_id) }));
   } else if (command === "upload") {
-    console.log(JSON.stringify(await uploadDirectory(blobStore(), values.root!)));
+    console.log(JSON.stringify(await uploadDirectory(blobStore(), values.root!, { countryFiles: values.pin === true })));
   } else if (command === "finalize") {
     const store = blobStore();
     const panel = values.root
       ? await readLocalPanel(values.root, values.country!)
       : await readStoredPanel(store, values.country!, values["panel-id"]!);
-    const planned = JSON.parse(await readFile(values.plan!, "utf8"));
+    const planned = JSON.parse(await readFile(values.plan!, "utf8")) as Plan;
     const summary = await finalize({ store, panel, plan: planned, pin: values.pin === true });
     const rows = summary.points
-      .map((p) => `| ${p.releaseId} | ${p.state} | ${p.measurementStatus ?? ""} | ${p.attempts} |`)
+      .map((p) => `| ${p.buildId ?? ""} | \`${p.digest.slice(0, 12)}\` | ${p.state} | ${p.measurementStatus ?? ""} | ${p.attempts} | ${p.lastError ?? ""} |`)
       .join("\n");
+    const { coverage } = summary;
     await stepSummary(
       `### Release history: ${summary.country}\n\nPanel \`${summary.panelId}\`: ` +
-        `${summary.complete ? "complete" : "incomplete"}, ${summary.current ? "current" : "not current"}.\n\n` +
-        `| Release | State | Measurement | Attempts |\n|---|---|---|---|\n${rows}`,
+        `${summary.complete ? "complete" : "incomplete"}, ${summary.pinned ? "pinned" : "not pinned"}, ` +
+        `${summary.current ? "current" : "not current"}. Series: ${coverage.builds} builds, ${coverage.files} files; ` +
+        `${coverage.measured} measured, ${coverage.gap} gaps, ${coverage.retrying} retrying, ` +
+        `${coverage.failed} failed, ${coverage.missing} never run. ${summary.timelines} timelines rebuilt.\n\n` +
+        `| Build | File | State | Measurement | Attempts | Last error |\n|---|---|---|---|---|---|\n${rows}`,
     );
     console.log(JSON.stringify(summary));
   } else if (command === "pull") {

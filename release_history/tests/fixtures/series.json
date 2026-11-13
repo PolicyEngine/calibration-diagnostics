@@ -1,0 +1,109 @@
+{
+  "builds": [
+    {
+      "build": "zz-build-20261101",
+      "build_id": "zz-national/zz-build-20261101",
+      "current": false,
+      "dataset_path": "releases/zz-national/zz-build-20261101/zz.h5",
+      "digest": "1111111111111111111111111111111111111111111111111111111111111111",
+      "in_default_release": true,
+      "listing_reason": null,
+      "listing_status": "ok",
+      "published_at": "2026-11-01T09:00:00+00:00",
+      "release": "zz-national",
+      "release_directory": "zz-national/zz-build-20261101",
+      "release_manifest_sha256": "0e02bf97716eee86ee98b6cad7863bb005cafd7634cdbdef37727332b802cb3d",
+      "role": "national",
+      "withdrawn": false
+    },
+    {
+      "build": "zz-build-20261103",
+      "build_id": "zz-national/zz-build-20261103",
+      "current": false,
+      "dataset_path": "releases/zz-national/zz-build-20261103/zz.h5",
+      "digest": "1111111111111111111111111111111111111111111111111111111111111111",
+      "in_default_release": true,
+      "listing_reason": null,
+      "listing_status": "ok",
+      "published_at": "2026-11-03T09:00:00+00:00",
+      "release": "zz-national",
+      "release_directory": "zz-national/zz-build-20261103",
+      "release_manifest_sha256": "0e02bf97716eee86ee98b6cad7863bb005cafd7634cdbdef37727332b802cb3d",
+      "role": "national",
+      "withdrawn": false
+    },
+    {
+      "build": "zz-build-20261105",
+      "build_id": "zz-national/zz-build-20261105",
+      "current": true,
+      "dataset_path": "releases/zz-national/zz-build-20261105/zz.h5",
+      "digest": "2222222222222222222222222222222222222222222222222222222222222222",
+      "in_default_release": true,
+      "listing_reason": null,
+      "listing_status": "ok",
+      "published_at": "2026-11-05T09:00:00+00:00",
+      "release": "zz-national",
+      "release_directory": "zz-national/zz-build-20261105",
+      "release_manifest_sha256": "19a985237d9082492f0182c73507403d1eecd5a7252b5e6f5b15fa14416e37e3",
+      "role": "national",
+      "withdrawn": false
+    },
+    {
+      "build": "zz-build-20261107",
+      "build_id": "zz-national/zz-build-20261107",
+      "current": false,
+      "dataset_path": "releases/zz-national/zz-build-20261107/zz.h5",
+      "digest": "3333333333333333333333333333333333333333333333333333333333333333",
+      "in_default_release": true,
+      "listing_reason": null,
+      "listing_status": "ok",
+      "published_at": "2026-11-07T09:00:00+00:00",
+      "release": "zz-national",
+      "release_directory": "zz-national/zz-build-20261107",
+      "release_manifest_sha256": "adb857d1eaaaeb3f8cf91a64f69a6a62aaacb1d501e4815e65197b2e143a6a4a",
+      "role": "national",
+      "withdrawn": true
+    },
+    {
+      "build": "zz-build-20261109",
+      "build_id": "zz-national/zz-build-20261109",
+      "current": false,
+      "dataset_path": null,
+      "digest": null,
+      "in_default_release": true,
+      "listing_reason": "release_manifest_missing",
+      "listing_status": "refused",
+      "published_at": "2026-11-09T09:00:00+00:00",
+      "release": "zz-national",
+      "release_directory": "zz-national/zz-build-20261109",
+      "release_manifest_sha256": null,
+      "role": "national",
+      "withdrawn": false
+    }
+  ],
+  "commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "country": "zz",
+  "format_version": 1,
+  "kind": "release_history.series",
+  "lines": [
+    {
+      "present": true,
+      "release": "zz-national",
+      "role": "national"
+    }
+  ],
+  "listed_at": "2026-11-12T00:00:00Z",
+  "record": {
+    "default": "zz-national",
+    "present": true,
+    "sha256": "efdecce586082d2c655acd1ee8bd6edce5e1c788d8e6896b2065f2ea5ce7f3f1"
+  },
+  "release_repo": "policyengine/zz",
+  "revision": "main",
+  "rule": {
+    "releases": [
+      "zz-national"
+    ],
+    "since": "2026-10-25"
+  }
+}

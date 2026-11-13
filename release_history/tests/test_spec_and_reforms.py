@@ -63,27 +63,42 @@ def test_specs_that_cannot_be_measured_are_refused(override, message):
         parse_spec(fake_spec_dict(**override))
 
 
-def test_series_match_names_their_build_folders_and_regexes():
-    spec = parse_spec(
-        fake_spec_dict(series={"releases": ["zz-national", "^zz-2024-"], "exclude": ["acs-local"]})
-    )
-    assert spec.matches_series("zz-national")
-    assert spec.matches_series("zz-national/uk-frs-calibration-attempt-1")
-    assert spec.matches_series("zz-2024-abc")
-    assert not spec.matches_series("zz-2024-acs-local-1")
-    assert not spec.matches_series("zz-national-dense")
+def test_the_series_is_the_named_lines_from_since():
+    spec = parse_spec(fake_spec_dict(series={"releases": ["zz-national"], "since": "2026-10-19"}))
+    assert spec.in_series("zz-national", "2026-10-19T00:00:00Z")
+    assert spec.in_series("zz-national", "2026-11-07T04:00:00+00:00")
+    assert not spec.in_series("zz-national", "2026-10-18T23:59:59Z")
+    # Compared by UTC date: 00:30 in UTC+1 on the 19th is the 18th in UTC.
+    assert not spec.in_series("zz-national", "2026-10-19T00:30:00+01:00")
+    assert not spec.in_series("zz-national-dense", "2026-11-01T00:00:00Z")
+    assert parse_spec(fake_spec_dict()).in_series("zz-national", "2020-01-01T00:00:00Z")
 
 
-def test_an_exclude_on_a_release_id_drops_that_build_alone():
-    spec = parse_spec(
-        fake_spec_dict(series={"releases": ["zz-national"], "exclude": ["-5c6b3f68$"]})
-    )
-    assert not spec.matches_series("zz-national", "zz-national-20261002T230158Z-5c6b3f68")
-    assert spec.matches_series("zz-national", "zz-national-20261019T083323Z-6cba5d71")
-    # The build-folder layout carries the same suffix in the folder.
-    assert not spec.matches_series(
-        "zz-national/uk-frs-calibration-attempt-20261002T230158Z-5c6b3f68"
-    )
+@pytest.mark.parametrize(
+    "series, message",
+    [
+        ({"releases": ["^zz-2024-"]}, "patterns are gone"),
+        ({"releases": ["zz-national"], "exclude": ["-5c6b3f68$"]}, "series.since"),
+        ({"releases": ["zz-national"], "since": "19 Oct 2026"}, "YYYY-MM-DD"),
+        ({"releases": []}, "at least one"),
+    ],
+)
+def test_series_rules_beyond_names_and_a_date_are_refused(series, message):
+    with pytest.raises(SpecError, match=message):
+        parse_spec(fake_spec_dict(series=series))
+
+
+# Each country's spec digest is part of its panel id. A change here gives the country a new panel
+# and re-measures its whole series; update the pin only when that is the intent.
+PINNED_SPEC_DIGESTS = {
+    "uk": "22ce4922f89de8f7910d9af5c627e4857d510e8fbed343b8ca2fc58d9d6db787",
+    "us": "6a7f48e198a83bf60b58c9a0634373f890272d1a305b1fbb2aff593217b26ee2",
+}
+
+
+@pytest.mark.parametrize("country", sorted(PINNED_SPEC_DIGESTS))
+def test_each_country_s_spec_digest_is_pinned(country):
+    assert load_spec(country).digest == PINNED_SPEC_DIGESTS[country]
 
 
 def test_bracket_paths_walk_into_brackets():

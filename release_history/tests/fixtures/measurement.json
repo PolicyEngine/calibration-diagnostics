@@ -6,6 +6,7 @@
     {
       "output": "baseline/income_tax",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "currency",
       "value": 4700000.0
@@ -13,6 +14,7 @@
     {
       "output": "baseline/benefit",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "currency",
       "value": 70000.0
@@ -20,6 +22,7 @@
     {
       "output": "baseline/benefit_caseload",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "count",
       "value": 700.0
@@ -27,6 +30,7 @@
     {
       "output": "baseline/households",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "count",
       "value": 1000.0
@@ -34,6 +38,7 @@
     {
       "output": "baseline/poverty_children",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "rate",
       "value": 0.0
@@ -49,6 +54,7 @@
     {
       "output": "baseline/net_income_mean/decile_2",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "currency",
       "value": null
@@ -64,6 +70,7 @@
     {
       "output": "baseline/net_income_mean/decile_4",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "currency",
       "value": null
@@ -79,6 +86,7 @@
     {
       "output": "baseline/net_income_mean/decile_6",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "currency",
       "value": null
@@ -86,6 +94,7 @@
     {
       "output": "baseline/net_income_mean/decile_7",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "currency",
       "value": null
@@ -93,6 +102,7 @@
     {
       "output": "baseline/net_income_mean/decile_8",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "currency",
       "value": null
@@ -108,6 +118,7 @@
     {
       "output": "baseline/net_income_mean/decile_10",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "currency",
       "value": null
@@ -115,6 +126,7 @@
     {
       "output": "reform/tax_up/target/income_tax",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "currency",
       "value": 2350000.000000001
@@ -122,6 +134,7 @@
     {
       "output": "reform/tax_up/budgetary_impact",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "currency",
       "value": 2350000.000000001
@@ -129,6 +142,7 @@
     {
       "output": "reform/tax_up/programme/income_tax",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "currency",
       "value": 2350000.000000001
@@ -136,6 +150,7 @@
     {
       "output": "reform/tax_up/programme/benefit",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "currency",
       "value": 0.0
@@ -143,6 +158,7 @@
     {
       "output": "reform/tax_up/households_gaining",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "count",
       "value": 0.0
@@ -150,6 +166,7 @@
     {
       "output": "reform/tax_up/people_gaining",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "count",
       "value": 0.0
@@ -157,6 +174,7 @@
     {
       "output": "reform/tax_up/households_losing",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "count",
       "value": 1000.0
@@ -164,6 +182,7 @@
     {
       "output": "reform/tax_up/people_losing",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "count",
       "value": 1800.0
@@ -171,6 +190,7 @@
     {
       "output": "reform/tax_up/net_income_change_pct",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "ratio",
       "value": -12.453630100688924
@@ -186,6 +206,7 @@
     {
       "output": "reform/tax_up/decile_relative_change/decile_2",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "ratio",
       "value": null
@@ -201,6 +222,7 @@
     {
       "output": "reform/tax_up/decile_relative_change/decile_4",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "ratio",
       "value": null
@@ -216,6 +238,7 @@
     {
       "output": "reform/tax_up/decile_relative_change/decile_6",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "ratio",
       "value": null
@@ -223,6 +246,7 @@
     {
       "output": "reform/tax_up/decile_relative_change/decile_7",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "ratio",
       "value": null
@@ -230,6 +254,7 @@
     {
       "output": "reform/tax_up/decile_relative_change/decile_8",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "ratio",
       "value": null
@@ -245,6 +270,7 @@
     {
       "output": "reform/tax_up/decile_relative_change/decile_10",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "ratio",
       "value": null
@@ -252,6 +278,7 @@
     {
       "output": "reform/tax_up/poverty/poverty/all",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "count",
       "value": 0.0
@@ -259,6 +286,7 @@
     {
       "output": "reform/tax_up/poverty/poverty/children",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "count",
       "value": 0.0
@@ -266,6 +294,7 @@
     {
       "output": "reform/benefit_up/target/benefit",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "currency",
       "value": 70000.0
@@ -273,6 +302,7 @@
     {
       "output": "reform/benefit_up/budgetary_impact",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "currency",
       "value": -70000.0
@@ -280,6 +310,7 @@
     {
       "output": "reform/benefit_up/programme/income_tax",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "currency",
       "value": 0.0
@@ -287,6 +318,7 @@
     {
       "output": "reform/benefit_up/programme/benefit",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "currency",
       "value": 70000.0
@@ -294,6 +326,7 @@
     {
       "output": "reform/benefit_up/households_gaining",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "count",
       "value": 700.0
@@ -301,6 +334,7 @@
     {
       "output": "reform/benefit_up/people_gaining",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "count",
       "value": 1500.0
@@ -308,6 +342,7 @@
     {
       "output": "reform/benefit_up/households_losing",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "count",
       "value": 0.0
@@ -315,6 +350,7 @@
     {
       "output": "reform/benefit_up/people_losing",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "count",
       "value": 0.0
@@ -322,6 +358,7 @@
     {
       "output": "reform/benefit_up/net_income_change_pct",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "ratio",
       "value": 0.37095919448860626
@@ -329,6 +366,7 @@
     {
       "output": "reform/benefit_up/decile_relative_change/decile_1",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "ratio",
       "value": 0.0
@@ -336,6 +374,7 @@
     {
       "output": "reform/benefit_up/decile_relative_change/decile_2",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "ratio",
       "value": null
@@ -351,6 +390,7 @@
     {
       "output": "reform/benefit_up/decile_relative_change/decile_4",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "ratio",
       "value": null
@@ -366,6 +406,7 @@
     {
       "output": "reform/benefit_up/decile_relative_change/decile_6",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "ratio",
       "value": null
@@ -373,6 +414,7 @@
     {
       "output": "reform/benefit_up/decile_relative_change/decile_7",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "ratio",
       "value": null
@@ -380,6 +422,7 @@
     {
       "output": "reform/benefit_up/decile_relative_change/decile_8",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "ratio",
       "value": null
@@ -395,6 +438,7 @@
     {
       "output": "reform/benefit_up/decile_relative_change/decile_10",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "ratio",
       "value": null
@@ -402,6 +446,7 @@
     {
       "output": "reform/benefit_up/poverty/poverty/all",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "count",
       "value": 0.0
@@ -409,6 +454,7 @@
     {
       "output": "reform/benefit_up/poverty/poverty/children",
       "period": 2026,
+      "reason": null,
       "status": "ok",
       "unit": "count",
       "value": 0.0
@@ -427,8 +473,55 @@
     "withheld_cells": 11
   },
   "engine_bundle": {},
+  "environment": {
+    "packages": [
+      "policyengine-core==3.33.3",
+      "policyengine-zz==1.0.0"
+    ],
+    "packages_sha256": "6e95913ead144ebc15e30dc8551cafde42cfb7707e18a758afd5316993591edb",
+    "platform": "fixture",
+    "python": "3.12.0",
+    "uv_lock_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "fetched_from": {
+    "build_id": "zz-national/zz-build-20261101",
+    "build_manifest": null,
+    "dataset": {
+      "key": "national",
+      "path": "releases/zz-national/zz-build-20261101/zz.h5"
+    },
+    "declared": {
+      "build": null,
+      "build_provenance": null,
+      "built_at": "2026-11-01T00:00:00+00:00",
+      "built_with_core": null,
+      "built_with_model": null,
+      "compatible_models": [
+        {
+          "name": "policyengine-zz",
+          "specifier": ">=1"
+        }
+      ],
+      "cut_tag": null,
+      "description": null,
+      "migrated_from": null,
+      "reference_model_compatibility": "inside"
+    },
+    "hf_commit": "cccccccccccccccccccccccccccccccccccccccc",
+    "hf_repo": "policyengine/zz",
+    "release_manifest": {
+      "json_sha256": "09177b15522b225fda200ff057f35c77b615ef3ecd0bf505326a3acb21bf291b",
+      "path": "releases/zz-national/zz-build-20261101/release_manifest.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "file": {
+    "bytes": 1024,
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "format_version": 1,
   "kind": "release_history.measurement",
-  "measurement_id": "a51b513a051fab2e80014ce5fd430ea6f181be77b9c49de45b90f94467938c6f",
+  "measurement_id": "360a44e5aee1ebb283e944c2fefe71d8ddfd23d41088bb4efd1e6ad6bc1bf3f0",
   "panel_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
   "periods": [
     {
@@ -436,15 +529,11 @@
       "period": 2026
     }
   ],
-  "point": {
-    "current": true,
-    "hf_commit": "1234567890abcdef1234567890abcdef12345678",
-    "hf_repo": "policyengine/zz",
-    "published_at": "2026-11-01T00:00:00Z",
-    "release_directory": "zz-national",
-    "release_id": "zz-national-20261101T000000Z-00000000"
+  "producer": {
+    "commit": "0000000000000000000000000000000000000000",
+    "version": "1"
   },
-  "producer_version": "1",
+  "reason": null,
   "reforms": {
     "benefit_up": {
       "applied": {
@@ -467,6 +556,8 @@
   },
   "runtime": {
     "finished_at": "2026-11-09T00:00:01Z",
+    "runner": "fixture",
+    "seconds": 1.0,
     "simulations": [
       {
         "label": "baseline",
@@ -486,6 +577,5 @@
     ],
     "started_at": "2026-11-09T00:00:00Z"
   },
-  "schema_version": 1,
   "status": "ok"
 }

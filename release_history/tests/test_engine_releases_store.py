@@ -4,8 +4,9 @@ from pathlib import Path
 import pytest
 
 from release_history import engine
-from release_history.engine import EngineMismatch, engine_identity, panel_id
-from release_history.export import TIMELINE_COLUMNS, export_csv, timeline_rows
+from release_history.canonical import json_sha256
+from release_history.engine import EngineMismatch, engine_identity, panel_document, panel_id
+from release_history.export import POINT_COLUMNS, TIMELINE_COLUMNS, export_csv, timeline_rows
 from release_history.local_store import ImmutableConflict, write_immutable, write_once
 from release_history.releases import (
     NationalArtifact,
@@ -18,7 +19,7 @@ from release_history.releases import (
     release_directory_for,
     release_role,
 )
-from release_history.spec import load_spec, parse_spec
+from release_history.spec import load_spec, measurement_definition, parse_spec
 
 from .fakes import fake_spec_dict
 
@@ -71,13 +72,17 @@ def test_edits_that_change_no_number_keep_the_panel(installed):
     kept = parse_spec(
         {
             **uk.raw,
-            "series": {**uk.raw["series"], "exclude": ["-0000000a$"]},
+            "release_repo": "policyengine/populace-uk-elsewhere",
+            "series": {"releases": ["microcosm-uk-2024-25-national", "another-line"]},
             "runner": {"max_dataset_bytes": 1},
             "reforms": reforms,
         },
         expected_country="uk",
     )
     assert panel_id(kept, engine_identity(kept, BUNDLE)) == base
+    # The spec's own format version is not hashed either (a spec of another version is refused).
+    assert "schema_version" not in measurement_definition(uk.raw)
+    assert "release_repo" not in measurement_definition(uk.raw)
     # A reform's delta does change numbers, so it moves the panel.
     first = dict(uk.raw["reforms"][0])
     first["add"] = {path: 2 * delta for path, delta in first["add"].items()}
@@ -85,6 +90,58 @@ def test_edits_that_change_no_number_keep_the_panel(installed):
         {**uk.raw, "reforms": [first, *uk.raw["reforms"][1:]]}, expected_country="uk"
     )
     assert panel_id(moved, engine_identity(moved, BUNDLE)) != base
+
+
+def test_panel_json_holds_only_what_the_id_hashes_and_the_engine_it_names(installed):
+    uk = load_spec("uk")
+    engine_ = engine_identity(uk, BUNDLE)
+    panel = panel_document(uk, engine_)
+    assert set(panel) == {
+        "format_version",
+        "kind",
+        "panel_id",
+        "panel_key",
+        "digest_algorithm",
+        "country",
+        "engine",
+        "producer_version",
+        "point_format_version",
+        "spec_sha256",
+        "definition",
+    }
+    assert panel["panel_key"] == {
+        "country": "uk",
+        "policyengine": "6.16.1",
+        "model": "policyengine-uk==2.174.1",
+        "core": "policyengine-core==3.33.3",
+        "producer_version": "1",
+        "point_format_version": 1,
+        "spec_sha256": uk.digest,
+    }
+    # Labels, sources, the series rule, the release repository, the runner and the
+    # environment live elsewhere: none of them reaches panel.json.
+    text = json.dumps(panel)
+    for unhashed in ("release_repo", "series", "runner", "label", "source", "packages"):
+        assert f'"{unhashed}"' not in text
+
+
+# Each country's panel id on the bundle above. A new id gives the country a new panel, which
+# re-measures every build of its series: change a pin only when that is the intent.
+PINNED_PANEL_IDS = {
+    "uk": "dd45f7b09bd8a635863008b05795d73b424ec1dba6d717e53621f17c83726c22",
+    "us": "301652c0057f187d72bd25cbd121e848fe5e803eaac8b0819634f87e03293993",
+}
+
+
+@pytest.mark.parametrize("country", sorted(PINNED_PANEL_IDS))
+def test_each_country_s_panel_id_is_pinned(installed, country):
+    spec = load_spec(country)
+    panel = panel_document(spec, engine_identity(spec, BUNDLE))
+    assert panel["panel_id"] == PINNED_PANEL_IDS[country], (
+        "Intended? A new panel id re-measures every build of the series."
+    )
+    assert json_sha256(panel["definition"]) == panel["panel_key"]["spec_sha256"]
+    assert json_sha256(panel["panel_key"]) == panel["panel_id"]
 
 
 def test_the_engine_must_be_the_bundle_s_own_pins(installed):
@@ -133,7 +190,7 @@ def test_national_artifact_resolves_both_layouts():
 
 def _opened(manifest: dict, build_manifest: dict | None, directory: str) -> OpenedRelease:
     point = Point(
-        release_id=directory, release_directory=directory, hf_repo="org/repo", hf_commit="c" * 40
+        build_id=directory, release_directory=directory, hf_repo="org/repo", hf_commit="c" * 40
     )
     return OpenedRelease(
         point,
@@ -178,26 +235,42 @@ def test_provenance_reads_both_manifest_layouts():
         "code": {"repository": "PolicyEngine/microcosm", "git_commit": "e" * 40},
         "calibration": {"target_surface": {"sha256": SHA, "n_targets": 1214}},
     }
-    old = point_provenance(_opened(tagged, None, "line"), "policyengine-uk", "2.174.1")
-    new = point_provenance(
+    old_point = point_provenance(_opened(tagged, None, "line"), "policyengine-uk", "2.174.1")
+    new_point = point_provenance(
         _opened(folder, build_manifest, "line/attempt-20261107T020434Z-eeb6093e"),
         "policyengine-uk",
         "2.174.1",
     )
-    assert (old["build_id"], old["cut_tag"], old["migrated_from"]) == (
+    # The file alone is the file's fact; what a build declares belongs to the build it was
+    # fetched through, so a file published twice keeps one set of file facts.
+    for point in (old_point, new_point):
+        assert point["file"] == {"sha256": SHA, "bytes": 100}
+    old, new = old_point["fetched_from"]["declared"], new_point["fetched_from"]["declared"]
+    assert new_point["fetched_from"]["build_id"] == "line/attempt-20261107T020434Z-eeb6093e"
+    assert new_point["fetched_from"]["build_manifest"]["path"] == (
+        "releases/line/attempt-20261107T020434Z-eeb6093e/build_manifest.json"
+    )
+    assert new_point["fetched_from"]["dataset"] == {
+        "key": "n",
+        "path": "releases/line/attempt-20261107T020434Z-eeb6093e/n.h5",
+    }
+    assert old_point["fetched_from"]["build_manifest"] is None
+    assert (old["build"], old["cut_tag"], old["migrated_from"]) == (
         "line",
         "line-20261107T020434Z-eeb6093e",
         None,
     )
-    assert new["build_id"] == "attempt-20261107T020434Z-eeb6093e"
+    assert new["build"] == "attempt-20261107T020434Z-eeb6093e"
     assert new["cut_tag"] == "line-20261107T020434Z-eeb6093e"
     assert new["migrated_from"]["commit"] == "d" * 40
-    for provenance in (old, new):
-        assert provenance["built_with_model"] == model
-        assert provenance["built_at"] == "2026-11-07T03:22:40+00:00"
-        assert provenance["reference_model_compatibility"] == "inside"
-    assert new["build"]["attempt_id"] == "attempt-20261107T020434Z-eeb6093e"
-    assert new["build"]["n_targets"] == 1214
+    for declared in (old, new):
+        assert declared["built_with_model"] == model
+        assert declared["built_at"] == "2026-11-07T03:22:40+00:00"
+        assert declared["reference_model_compatibility"] == "inside"
+    assert old["build_provenance"] is None
+    assert new["build_provenance"]["attempt_id"] == "attempt-20261107T020434Z-eeb6093e"
+    assert new["build_provenance"]["n_targets"] == 1214
+    assert "published_at" not in json.dumps(new_point)
 
 
 def test_compatibility_reads_the_declared_range():
@@ -228,16 +301,17 @@ def test_immutable_points_refuse_different_bytes(tmp_path):
     assert json.loads(path.read_text()) == {"a": 1}
 
 
-def test_export_flattens_stored_points(tmp_path):
+def test_export_flattens_stored_points_onto_the_series_builds(tmp_path):
     spec = parse_spec(fake_spec_dict())
-    folder = tmp_path / "release-history" / spec.country / "p1"
-    write_once(folder / "panel.json", {"panel_id": "p1"})
+    country = tmp_path / "release-history" / spec.country
+    folder = country / ("p" * 64)
+    write_once(folder / "panel.json", {"panel_id": "p" * 64})
     write_immutable(
         folder / f"{'b' * 64}.json",
         {
             "measurement_id": "b" * 64,
             "status": "ok",
-            "point": {"release_id": "zz-national-1", "published_at": "2026-11-01T00:00:00Z"},
+            "file": {"sha256": "1" * 64, "bytes": 1},
             "cells": [
                 {
                     "output": "baseline/income_tax",
@@ -245,31 +319,45 @@ def test_export_flattens_stored_points(tmp_path):
                     "unit": "currency",
                     "value": 1.5,
                     "status": "ok",
+                    "reason": None,
                 }
             ],
         },
     )
-    text = export_csv(tmp_path, spec.country)
-    assert text.splitlines()[0].startswith("release_id,published_at,measurement_id")
-    assert "zz-national-1" in text and "baseline/income_tax" in text
+    without = export_csv(tmp_path, spec.country).splitlines()
+    assert without[0] == ",".join(POINT_COLUMNS)
+    assert without[1].startswith(f",,{'b' * 64},{'1' * 64},ok,2026,baseline/income_tax")
+    # With the series record, the file's rows go to every build that publishes it.
+    builds = [
+        {
+            "build_id": f"zz-national/{name}",
+            "published_at": published,
+            "digest": "1" * 64,
+            "listing_status": "ok",
+        }
+        for name, published in (("b2", "2026-11-02T00:00:00Z"), ("b1", "2026-11-01T00:00:00Z"))
+    ]
+    write_once(country / "series.json", {"builds": builds})
+    rows = export_csv(tmp_path, spec.country).splitlines()[1:]
+    assert [row.split(",")[0] for row in rows] == ["zz-national/b1", "zz-national/b2"]
 
 
 def test_export_reads_the_timeline_the_typescript_side_writes(tmp_path):
-    # Written by frontend/scripts/release-history.test.ts from the measurement fixture.
+    # Written by frontend/scripts/release-history.test.ts from the series and point fixtures.
     timeline = json.loads((Path(__file__).parent / "fixtures" / "timeline.json").read_text())
     rows = timeline_rows(timeline)
-    points = timeline["points"]
-    assert len(rows) == len(timeline["series"]) * len(points)
-    by_id = {p["measurementId"]: p["releaseId"] for p in points}
-    assert all(row["measurement_id"] in by_id for row in rows)
-    assert all(row["release_id"] == by_id[row["measurement_id"]] for row in rows)
-    later = [row for row in rows if row["measurement_id"] == points[1]["measurementId"]]
-    assert {row["change_status"] for row in later} <= {"ok", "withheld", "none"}
-    assert any(row["change"] is not None for row in later)
+    builds = timeline["builds"]
+    assert len(rows) == len(timeline["outputs"]) * len(builds)
+    assert {row["build_id"] for row in rows} == {b["buildId"] for b in builds}
+    current = [row for row in rows if row["current"]]
+    assert current and {row["change_status"] for row in current} <= {"ok", "withheld", "none"}
+    assert any(row["change"] not in (None, 0) for row in current)
     assert all(row["value"] is None for row in rows if row["status"] == "withheld")
+    # No step reaches a withdrawn build.
+    assert all(row["compared_with"] is None for row in rows if row["withdrawn"])
     # The CLI's export reads the same document from a panel folder.
-    folder = tmp_path / "release-history" / "zz" / "p1"
-    write_once(folder / "panel.json", {"panel_id": "p1"})
+    folder = tmp_path / "release-history" / "zz" / ("p" * 64)
+    write_once(folder / "panel.json", {"panel_id": "p" * 64})
     (folder / "timeline.json").write_text(json.dumps(timeline))
     header = export_csv(tmp_path, "zz").splitlines()[0]
     assert header == ",".join(TIMELINE_COLUMNS)

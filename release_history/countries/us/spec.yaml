@@ -7,9 +7,9 @@ country: us
 # Must equal the US registration in @policyengine/calibration-tree's countries.ts.
 release_repo: policyengine/populace-us
 series:
-  # Every default national release; local-area and receipt-candidate builds are left out.
-  releases: ["^populace-us-2024-"]
-  exclude: ["acs-local", "spm-receipts"]
+  # Every build releases.json records under the national line. The local-area
+  # line, microcosm-us-2024-local, is left out.
+  releases: [microcosm-us-2024-national]
 engine:
   module: us
   model_package: policyengine-us

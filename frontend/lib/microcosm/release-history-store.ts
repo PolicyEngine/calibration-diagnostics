@@ -1,25 +1,35 @@
 /**
  * Release history store (calibration-diagnostics#224): the private Vercel Blob
- * layout, the manifest, and the pure logic that plans, finalizes and builds a
- * panel's timeline. The Python producer (`release_history/`) writes points to
- * a local folder in this layout; scripts/release-history.ts uploads them and
- * keeps the manifest. PR 2's routes read the same paths.
+ * layout, the manifest, and the pure logic that plans, finalizes and builds
+ * each panel's timeline. The Python producer (`release_history/`) writes to a
+ * local folder in this layout; scripts/release-history.ts uploads it and keeps
+ * the manifest. PR 2's routes read the same paths.
  *
  *   release-history/manifest.json                          mutable, ETag-conditional
+ *   release-history/<country>/series.json                  replaced each run
+ *   release-history/<country>/references.json              replaced each run
+ *   release-history/<country>/labels.json                  replaced each run
  *   release-history/<country>/<panel>/panel.json           written once
  *   release-history/<country>/<panel>/<measurement>.json   immutable
- *   release-history/<country>/<panel>/references.json      replaced each run
  *   release-history/<country>/<panel>/timeline.json        rebuilt by finalize
  *
- * Countries never touch each other's manifest entries, so one country's new
- * panel never moves another's.
+ * A point is one data file measured on one panel, named by a hash of the
+ * panel id and the file's sha256. The series record (the Python `series`
+ * command) lists the country's builds from its release repository's
+ * releases.json and maps each build to its file; the manifest keys each
+ * panel's points by file. Countries never touch each other's manifest
+ * entries, so one country's new panel never moves another's.
  */
 import { BlobPreconditionFailedError, get, list, put } from "@vercel/blob";
 
 export const RELEASE_HISTORY_PREFIX = "release-history";
 export const RELEASE_HISTORY_MANIFEST_PATH = `${RELEASE_HISTORY_PREFIX}/manifest.json`;
-export const RELEASE_HISTORY_SCHEMA_VERSION = 1 as const;
+// Each document kind has its own format version; an added field never moves one.
+export const MANIFEST_FORMAT_VERSION = 1 as const;
+export const TIMELINE_FORMAT_VERSION = 1 as const;
 export const MAX_ATTEMPTS = 3;
+// A run measures at most this many files (a matrix holds 256 jobs); the rest wait for the next.
+export const MAX_PLANNED_POINTS = 200;
 const IMMUTABLE_CACHE_SECONDS = 31_536_000;
 const MUTABLE_CACHE_SECONDS = 60;
 const MEASUREMENT_FILE = /^[0-9a-f]{64}\.json$/;
@@ -184,48 +194,161 @@ export async function putReplace(
   await store.write(path, body, "replace", false);
 }
 
-export function panelPrefix(country: string, panelId: string): string {
-  return `${RELEASE_HISTORY_PREFIX}/${country}/${panelId}/`;
+// ---------------------------------------------------------------------------
+// Paths
+
+const COUNTRY_CODE = /^[a-z][a-z0-9_]*$/;
+const PANEL_ID = /^[0-9a-f]{64}$/;
+
+export function countryPrefix(country: string): string {
+  return `${RELEASE_HISTORY_PREFIX}/${country}/`;
 }
 
-export type StoredFileKind = "panel" | "references" | "timeline" | "measurement";
+export function panelPrefix(country: string, panelId: string): string {
+  return `${countryPrefix(country)}${panelId}/`;
+}
 
-/** How a file in a panel folder is written, by its name. */
+/** The country's series record, references and labels: one each, shared by its panels. */
+export function countryFilePath(country: string, name: "series" | "references" | "labels"): string {
+  return `${countryPrefix(country)}${name}.json`;
+}
+
+export type StoredFileKind = "series" | "references" | "labels" | "panel" | "timeline" | "measurement";
+
+const COUNTRY_FILES = new Map<string, StoredFileKind>([
+  ["series.json", "series"],
+  ["references.json", "references"],
+  ["labels.json", "labels"],
+]);
+const PANEL_FILES = new Map<string, StoredFileKind>([
+  ["panel.json", "panel"],
+  ["timeline.json", "timeline"],
+]);
+
+/** How a stored file is written, by where it sits under `release-history/<country>/`. */
 export function storedFileKind(path: string): StoredFileKind | null {
-  const name = path.slice(path.lastIndexOf("/") + 1);
-  if (name === "panel.json") return "panel";
-  if (name === "references.json") return "references";
-  if (name === "timeline.json") return "timeline";
-  if (MEASUREMENT_FILE.test(name)) return "measurement";
+  const parts = path.split("/");
+  if (parts[0] !== RELEASE_HISTORY_PREFIX || !COUNTRY_CODE.test(parts[1] ?? "")) return null;
+  if (parts.length === 3) return COUNTRY_FILES.get(parts[2]) ?? null;
+  if (parts.length === 4 && PANEL_ID.test(parts[2])) {
+    return PANEL_FILES.get(parts[3]) ?? (MEASUREMENT_FILE.test(parts[3]) ? "measurement" : null);
+  }
   return null;
+}
+
+function own<T>(record: Record<string, T> | undefined, key: string): T | undefined {
+  return record && Object.hasOwn(record, key) ? record[key] : undefined;
+}
+
+function compareText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+// ---------------------------------------------------------------------------
+// The series record (written by the Python `series` command, snake_case)
+
+export interface SeriesBuild {
+  /** `<release>/<build>`, as releases.json names it. */
+  build_id: string;
+  release: string;
+  build: string;
+  release_directory: string;
+  published_at: string;
+  withdrawn: boolean;
+  /** The line's current build. */
+  current: boolean;
+  in_default_release: boolean;
+  role: string | null;
+  /** The sha256 of the build's national data file: a point is one file on one panel. */
+  digest: string | null;
+  dataset_path: string | null;
+  release_manifest_sha256: string | null;
+  /** `refused` when the build has no file to measure; it is never planned. */
+  listing_status: "ok" | "refused";
+  listing_reason: string | null;
+}
+
+export interface SeriesRecord {
+  format_version: number;
+  kind: "release_history.series";
+  country: string;
+  release_repo: string;
+  rule: { releases: string[]; since: string | null };
+  revision: string;
+  /** The one commit of the release repository everything was read at. */
+  commit: string;
+  listed_at: string;
+  record: { present: boolean; sha256: string | null; default: string | null };
+  lines: Array<{ release: string; present: boolean; role: string | null }>;
+  builds: SeriesBuild[];
+}
+
+function publishedTime(build: SeriesBuild): number {
+  const time = Date.parse(build.published_at);
+  return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
+}
+
+/** The series builds that have a file to measure, oldest first, withdrawn ones included. */
+export function listedBuilds(series: SeriesRecord | null): SeriesBuild[] {
+  if (!series?.record.present) return [];
+  return series.builds
+    .filter((build) => build.listing_status === "ok" && build.digest !== null)
+    .sort((left, right) =>
+      publishedTime(left) - publishedTime(right) || compareText(left.build_id, right.build_id)
+    );
+}
+
+/**
+ * The axis every panel of the country shares: listed builds with a file that are not withdrawn,
+ * oldest first. Plans, coverage and the timeline's steps follow it.
+ */
+export function seriesAxis(series: SeriesRecord | null): SeriesBuild[] {
+  return listedBuilds(series).filter((build) => !build.withdrawn);
 }
 
 // ---------------------------------------------------------------------------
 // Manifest
 
-export type PointState = "pending" | "measured" | "failed";
+/**
+ * A file's state on one panel. `measured`: a stored result (ok, or partial after the last
+ * attempt). `gap`: a stored refusal the file itself causes. `retrying`: a run failed and a later
+ * run tries again. `failed`: the attempts ran out. Never run: no entry.
+ */
+export type PointState = "measured" | "gap" | "retrying" | "failed";
 
 export interface ManifestPoint {
-  releaseId: string;
-  releaseDirectory: string;
-  hfRepo: string;
-  hfCommitSha: string;
-  publishedAt: string | null;
+  digest: string;
   state: PointState;
   measurementId: string | null;
   measurementStatus: string | null;
   attempts: number;
   lastError: string | null;
-  withdrawn: boolean;
+  /** The build the file was last planned under, when a plan named it. */
+  lastBuildId: string | null;
+}
+
+/** A panel's points against the series as last listed, counted by file. */
+export interface PanelCoverage {
+  builds: number;
+  files: number;
+  measured: number;
+  gap: number;
+  retrying: number;
+  failed: number;
+  missing: number;
 }
 
 export interface ManifestPanel {
   panelId: string;
   createdAt: string | null;
+  /** When the panel last became the pinned one; null for a panel never pinned. */
+  pinnedAt: string | null;
   engine: Record<string, unknown>;
   specSha256: string | null;
   producerVersion: string | null;
   complete: boolean;
+  coverage: PanelCoverage;
+  /** Keyed by the file's sha256. */
   points: Record<string, ManifestPoint>;
 }
 
@@ -236,13 +359,13 @@ export interface ManifestCountry {
 }
 
 export interface ReleaseHistoryManifest {
-  schemaVersion: typeof RELEASE_HISTORY_SCHEMA_VERSION;
+  formatVersion: typeof MANIFEST_FORMAT_VERSION;
   updatedAt: string | null;
   countries: Record<string, ManifestCountry>;
 }
 
 export function emptyManifest(): ReleaseHistoryManifest {
-  return { schemaVersion: RELEASE_HISTORY_SCHEMA_VERSION, updatedAt: null, countries: {} };
+  return { formatVersion: MANIFEST_FORMAT_VERSION, updatedAt: null, countries: {} };
 }
 
 export function parseManifest(value: unknown): ReleaseHistoryManifest {
@@ -250,8 +373,8 @@ export function parseManifest(value: unknown): ReleaseHistoryManifest {
     throw new Error("The release history manifest must be an object.");
   }
   const manifest = value as Partial<ReleaseHistoryManifest>;
-  if (manifest.schemaVersion !== RELEASE_HISTORY_SCHEMA_VERSION) {
-    throw new Error(`Unsupported release history manifest schema ${String(manifest.schemaVersion)}.`);
+  if (manifest.formatVersion !== MANIFEST_FORMAT_VERSION) {
+    throw new Error(`Unsupported release history manifest format ${String(manifest.formatVersion)}.`);
   }
   if (!manifest.countries || typeof manifest.countries !== "object") {
     throw new Error("The release history manifest has no countries.");
@@ -279,7 +402,7 @@ export async function updateManifestCountry(
     const updated: ReleaseHistoryManifest = {
       ...manifest,
       updatedAt: now,
-      countries: { ...manifest.countries, [country]: mutate(manifest.countries[country]) },
+      countries: { ...manifest.countries, [country]: mutate(own(manifest.countries, country)) },
     };
     try {
       await store.write(
@@ -300,101 +423,152 @@ export async function updateManifestCountry(
 // ---------------------------------------------------------------------------
 // Planning
 
-export interface SeriesSpec {
-  releases: string[];
-  exclude: string[];
-}
-
-/**
- * The Python spec's `matches_series`: a release name, its build folders, or a ^regex. An
- * exclude pattern drops a build when it matches the build's folder or its release id.
- */
-export function seriesMatches(series: SeriesSpec, releaseDirectory: string, releaseId?: string): boolean {
-  const names = releaseId ? [releaseDirectory, releaseId] : [releaseDirectory];
-  if (series.exclude.some((pattern) => names.some((name) => new RegExp(pattern).test(name)))) {
-    return false;
-  }
-  return series.releases.some((name) =>
-    name.startsWith("^")
-      ? new RegExp(name).test(releaseDirectory)
-      : releaseDirectory === name || releaseDirectory.startsWith(`${name}/`)
-  );
-}
-
-export interface ReleaseBuild {
-  releaseId: string;
-  releaseDirectory: string;
-  hfRepo: string;
-  hfCommitSha: string;
-  publishedAt: string | null;
-  current: boolean;
-  withdrawn: boolean;
-}
-
 /** The point JSON the Python producer reads (`releases.Point.from_json`). */
 export interface PlannedPoint {
-  release_id: string;
+  build_id: string;
   release_directory: string;
   hf_repo: string;
   hf_commit: string;
-  published_at: string | null;
-  current: boolean;
+  /** The file the series listed; the producer refuses a different one. */
+  digest: string;
+  attempt: number;
+  /** A partial result (a reform failed) is stored only on the last attempt. */
+  last_attempt: boolean;
 }
 
 export type PlanMode = "topup" | "backfill" | "release";
+export const PLAN_MODES: readonly PlanMode[] = ["topup", "backfill", "release"];
 
 export interface Plan {
   country: string;
   panelId: string;
   mode: PlanMode;
+  /** Whether the run is one of the default branch's engine, which may move the pinned panel. */
+  pin: boolean;
   action: "measure" | "skip";
   reason: string | null;
-  seriesSize: number;
+  /** The release repository commit the series was listed at. */
+  seriesCommit: string | null;
+  /** Distinct files on the series axis. */
+  seriesFiles: number;
   points: PlannedPoint[];
 }
 
+/** A state no plan changes: measured, a stored gap, or out of attempts. */
 function isFinal(point: ManifestPoint | undefined): boolean {
-  return point?.state === "measured" || point?.state === "failed";
+  return point?.state === "measured" || point?.state === "gap" || point?.state === "failed";
 }
 
-function planned(build: ReleaseBuild): PlannedPoint {
+function plannedPoint(
+  series: SeriesRecord,
+  build: SeriesBuild,
+  state: ManifestPoint | undefined,
+  maxAttempts: number,
+): PlannedPoint {
+  const attempt = (state?.state === "retrying" ? state.attempts : 0) + 1;
   return {
-    release_id: build.releaseId,
-    release_directory: build.releaseDirectory,
-    hf_repo: build.hfRepo,
-    hf_commit: build.hfCommitSha,
-    published_at: build.publishedAt,
-    current: build.current,
+    build_id: build.build_id,
+    release_directory: build.release_directory,
+    hf_repo: series.release_repo,
+    hf_commit: series.commit,
+    digest: build.digest as string,
+    attempt,
+    last_attempt: attempt >= maxAttempts,
   };
 }
 
-/** Which points a run measures. Backfills of a new panel start only on request. */
+/** One build per file, the earliest published: one file under two build names is one point. */
+function oneBuildPerFile(builds: SeriesBuild[]): SeriesBuild[] {
+  const seen = new Set<string>();
+  return builds.filter((build) => {
+    const digest = build.digest as string;
+    if (seen.has(digest)) return false;
+    seen.add(digest);
+    return true;
+  });
+}
+
+/**
+ * Which files a run measures on a panel.
+ *
+ * - `backfill`: every file on the axis the panel does not hold yet.
+ * - `topup` (runs that pin only): the files no panel that was ever pinned holds, and, when another
+ *   panel was pinned before, the latest build that panel measured, so the first new build has a
+ *   step. A country's first panel waits for its backfill.
+ * - `release`: one build, by its `<release>/<build>` id.
+ *
+ * `stored` names the files whose point is already in the store, as a fallback for a run whose
+ * finalize never folded them into the manifest. A run plans at most MAX_PLANNED_POINTS files.
+ */
 export function planPanel(options: {
   country: string;
   panelId: string;
   mode: PlanMode;
-  releaseId?: string | null;
-  builds: ReleaseBuild[];
+  pin: boolean;
+  buildId?: string | null;
+  series: SeriesRecord | null;
   entry: ManifestCountry | undefined;
+  stored?: ReadonlySet<string>;
+  maxAttempts?: number;
 }): Plan {
-  const { country, panelId, mode, entry } = options;
-  const series = options.builds.filter((build) => !build.withdrawn);
-  const panel = entry?.panels[panelId];
-  const missing = series.filter((build) => !isFinal(panel?.points[build.releaseId]));
-  const base = { country, panelId, mode, seriesSize: series.length };
+  const { country, panelId, mode, pin, series, entry } = options;
+  const maxAttempts = options.maxAttempts ?? MAX_ATTEMPTS;
+  const axis = seriesAxis(series);
+  const files = new Set(axis.map((build) => build.digest as string)).size;
+  const base = { country, panelId, mode, pin, seriesCommit: series?.commit ?? null, seriesFiles: files };
+  const skip = (reason: string): Plan => ({ ...base, action: "skip", reason, points: [] });
+  if (!series?.record.present) return skip("no_releases_record");
+  if (axis.length === 0) return skip("empty_series");
+  const panel = own(entry?.panels, panelId);
+  const stateOf = (build: SeriesBuild) => own(panel?.points, build.digest as string);
+  const heldHere = (build: SeriesBuild) =>
+    isFinal(stateOf(build)) || (options.stored?.has(build.digest as string) ?? false);
+  const measure = (builds: SeriesBuild[]): Plan => {
+    const points = oneBuildPerFile(builds).map((build) =>
+      plannedPoint(series, build, stateOf(build), maxAttempts)
+    );
+    if (points.length === 0) return skip("nothing_missing");
+    const truncated = points.length > MAX_PLANNED_POINTS;
+    return {
+      ...base,
+      action: "measure",
+      reason: truncated ? "truncated" : null,
+      points: points.slice(0, MAX_PLANNED_POINTS),
+    };
+  };
+
   if (mode === "release") {
-    const build = series.find((candidate) => candidate.releaseId === options.releaseId);
-    if (!build) return { ...base, action: "skip", reason: "release_not_in_series", points: [] };
-    if (isFinal(panel?.points[build.releaseId])) {
-      return { ...base, action: "skip", reason: "already_measured", points: [] };
+    const build = series.builds.find((candidate) => candidate.build_id === options.buildId);
+    if (!build) return skip("release_not_in_series");
+    if (build.withdrawn) return skip("release_withdrawn");
+    if (build.listing_status !== "ok" || build.digest === null) {
+      return skip(build.listing_reason ?? "release_not_measurable");
     }
-    return { ...base, action: "measure", reason: null, points: [planned(build)] };
+    if (stateOf(build)?.state === "failed") return skip("release_failed");
+    if (heldHere(build)) return skip("already_measured");
+    return measure([build]);
   }
-  if (mode === "topup" && entry?.currentPanelId !== panelId && !panel?.complete) {
-    return { ...base, action: "skip", reason: "pinned_panel_awaits_backfill", points: [] };
-  }
-  if (missing.length === 0) return { ...base, action: "skip", reason: "nothing_missing", points: [] };
-  return { ...base, action: "measure", reason: null, points: missing.map(planned) };
+  if (mode === "backfill") return measure(axis.filter((build) => !heldHere(build)));
+  // A top-up follows the pinned engine: a run from another ref fills its panel with a backfill or
+  // single releases instead.
+  if (!pin) return skip("topup_only_on_the_default_branch");
+  const everPinned = Object.values(entry?.panels ?? {}).filter((candidate) => candidate.pinnedAt !== null);
+  if (everPinned.length === 0) return skip("first_panel_awaits_backfill");
+  const heldAnywhere = (build: SeriesBuild) =>
+    heldHere(build) ||
+    everPinned.some((candidate) => isFinal(own(candidate.points, build.digest as string)));
+  const fresh = axis.filter((build) => !heldAnywhere(build));
+  // The panel pinned before this one: the pinned panel, or, when this is it, the one before.
+  const previous = everPinned
+    .filter((candidate) => candidate.panelId !== panelId)
+    .sort((left, right) => compareText(right.pinnedAt as string, left.pinnedAt as string))[0];
+  const overlap = previous
+    ? [...axis].reverse().find(
+      (build) => own(previous.points, build.digest as string)?.state === "measured",
+    )
+    : undefined;
+  const chosen = new Set([...fresh, ...(overlap && !heldHere(overlap) ? [overlap] : [])]);
+  return measure(axis.filter((build) => chosen.has(build)));
 }
 
 // ---------------------------------------------------------------------------
@@ -402,7 +576,6 @@ export function planPanel(options: {
 
 export interface PanelSummary {
   panelId: string;
-  createdAt: string | null;
   engine: Record<string, unknown>;
   specSha256: string | null;
   producerVersion: string | null;
@@ -414,26 +587,42 @@ export interface MeasurementCell {
   unit: string;
   value: number | null;
   status: string;
-  reason?: string;
+  reason?: string | null;
 }
 
-/** A stored point, as the Python producer writes it (snake_case). */
+/** A stored point, as the Python producer writes it (snake_case; `document.py`). */
 export interface MeasurementDocument {
+  format_version: number;
+  kind: string;
+  country: string;
+  panel_id: string;
   measurement_id: string;
+  /** ok, partial (a reform failed on the last attempt), or refused (the file's own fault). */
   status: string;
-  reason?: string;
-  point: {
-    release_id: string;
-    release_directory: string;
-    hf_repo: string;
-    hf_commit: string;
-    published_at: string | null;
-  } & Record<string, unknown>;
+  reason: string | null;
+  /** The file alone; what the build it was fetched through declares is under `fetched_from`. */
+  file: { sha256: string; bytes: number | null };
   cells: MeasurementCell[];
 }
 
+function emptyCoverage(): PanelCoverage {
+  return { builds: 0, files: 0, measured: 0, gap: 0, retrying: 0, failed: 0, missing: 0 };
+}
+
+/** A panel's coverage of the axis, by file; complete when no file is retrying or never run. */
+export function panelCoverage(
+  points: Record<string, ManifestPoint>,
+  axis: SeriesBuild[],
+): { coverage: PanelCoverage; complete: boolean } {
+  const files = [...new Set(axis.map((build) => build.digest as string))];
+  const coverage = { ...emptyCoverage(), builds: axis.length, files: files.length };
+  for (const digest of files) coverage[own(points, digest)?.state ?? "missing"] += 1;
+  return { coverage, complete: files.length > 0 && coverage.retrying === 0 && coverage.missing === 0 };
+}
+
 /**
- * The country's manifest entry after a run: points, attempts, completeness, current.
+ * The country's manifest entry after a run: the run's panel gets its points and attempts, and
+ * every panel's coverage is recomputed against the series as listed now.
  *
  * Every panel a run touches is kept, with its engine, so a page can offer each engine's
  * timeline. Only a pinning run (`pin`: one of the default branch's engine) moves the pinned
@@ -443,73 +632,80 @@ export interface MeasurementDocument {
 export function finalizeCountry(options: {
   entry: ManifestCountry | undefined;
   panel: PanelSummary;
-  builds: ReleaseBuild[];
+  series: SeriesRecord | null;
+  /** The run's plan mode: a country's first panel is pinned only by its backfill. */
+  mode: PlanMode;
   planned: PlannedPoint[];
   stored: MeasurementDocument[];
   pin: boolean;
+  at: string;
   maxAttempts?: number;
 }): ManifestCountry {
   const maxAttempts = options.maxAttempts ?? MAX_ATTEMPTS;
+  const { panelId } = options.panel;
   const entry: ManifestCountry = options.entry
     ? { ...options.entry, panels: { ...options.entry.panels } }
     : { pinnedPanelId: null, currentPanelId: null, panels: {} };
-  const previous = entry.panels[options.panel.panelId];
+  const previous = own(entry.panels, panelId);
   const points: Record<string, ManifestPoint> = { ...(previous?.points ?? {}) };
-  const withdrawn = new Set(options.builds.filter((b) => b.withdrawn).map((b) => b.releaseId));
-  const storedIds = new Set<string>();
-  for (const stored of options.stored) {
-    const id = stored.point.release_id;
-    storedIds.add(id);
-    points[id] = {
-      releaseId: id,
-      releaseDirectory: stored.point.release_directory,
-      hfRepo: stored.point.hf_repo,
-      hfCommitSha: stored.point.hf_commit,
-      publishedAt: stored.point.published_at,
-      state: "measured",
-      measurementId: stored.measurement_id,
-      measurementStatus: stored.status,
-      attempts: Math.max(points[id]?.attempts ?? 0, 1),
-      lastError: null,
-      withdrawn: withdrawn.has(id),
-    };
-  }
-  for (const plannedPoint of options.planned) {
-    const id = plannedPoint.release_id;
-    if (storedIds.has(id)) continue;
-    const attempts = (points[id]?.attempts ?? 0) + 1;
-    points[id] = {
-      releaseId: id,
-      releaseDirectory: plannedPoint.release_directory,
-      hfRepo: plannedPoint.hf_repo,
-      hfCommitSha: plannedPoint.hf_commit,
-      publishedAt: plannedPoint.published_at,
-      state: attempts >= maxAttempts ? "failed" : "pending",
+  const stored = new Map(options.stored.map((document) => [document.file.sha256, document]));
+  const planned = new Map(options.planned.map((point) => [point.digest, point]));
+  for (const point of options.planned) {
+    if (stored.has(point.digest)) continue;
+    points[point.digest] = {
+      digest: point.digest,
+      state: point.attempt >= maxAttempts ? "failed" : "retrying",
       measurementId: null,
       measurementStatus: null,
-      attempts,
+      attempts: point.attempt,
       lastError: "no_measurement_written",
-      withdrawn: withdrawn.has(id),
+      lastBuildId: point.build_id,
     };
   }
-  for (const id of Object.keys(points)) {
-    if (withdrawn.has(id)) points[id] = { ...points[id], withdrawn: true };
+  for (const [digest, document] of stored) {
+    const point = planned.get(digest);
+    const before = own(points, digest);
+    const refused = document.status === "refused";
+    points[digest] = {
+      digest,
+      state: refused ? "gap" : "measured",
+      measurementId: document.measurement_id,
+      measurementStatus: document.status,
+      attempts: point?.attempt ?? Math.max(before?.attempts ?? 0, 1),
+      lastError: refused ? document.reason : null,
+      lastBuildId: point?.build_id ?? before?.lastBuildId ?? null,
+    };
   }
-  const complete = options.builds
-    .filter((build) => !build.withdrawn)
-    .every((build) => isFinal(points[build.releaseId]));
-  entry.panels[options.panel.panelId] = {
-    panelId: options.panel.panelId,
-    createdAt: previous?.createdAt ?? options.panel.createdAt,
+  // A pinning run with nothing planned and nothing held pins nothing, and a country's first
+  // panel is pinned only by its backfill: a single release or a top-up never starts a series.
+  const pinnedBefore = Object.values(entry.panels).some((candidate) => candidate.pinnedAt !== null);
+  const pinning = options.pin &&
+    (options.planned.length > 0 || Object.keys(points).length > 0) &&
+    (pinnedBefore || options.mode === "backfill");
+  let pinnedAt = previous?.pinnedAt ?? null;
+  if (pinning && (entry.pinnedPanelId !== panelId || pinnedAt === null)) pinnedAt = options.at;
+  entry.panels[panelId] = {
+    panelId,
+    createdAt: previous?.createdAt ?? options.at,
+    pinnedAt,
     engine: options.panel.engine,
     specSha256: options.panel.specSha256,
     producerVersion: options.panel.producerVersion,
-    complete,
+    complete: previous?.complete ?? false,
+    coverage: previous?.coverage ?? emptyCoverage(),
     points,
   };
-  if (options.pin) {
-    entry.pinnedPanelId = options.panel.panelId;
-    if (complete) entry.currentPanelId = options.panel.panelId;
+  // A series that lists nothing (no record, or no build on the axis) leaves coverage as it was:
+  // a missing record says nothing about the panels.
+  const axis = seriesAxis(options.series);
+  if (axis.length > 0) {
+    for (const [id, panel] of Object.entries(entry.panels)) {
+      entry.panels[id] = { ...panel, ...panelCoverage(panel.points, axis) };
+    }
+  }
+  if (pinning) {
+    entry.pinnedPanelId = panelId;
+    if (entry.panels[panelId].complete) entry.currentPanelId = panelId;
   }
   return entry;
 }
@@ -530,18 +726,48 @@ export interface ReferenceEntry {
   facts?: Array<{ source_record_id?: string; semantic_fact_key?: string; period?: unknown }>;
 }
 
+/** The country's references.json (the Python `references.lock.json`). */
 export interface ReferencesLock {
   baseline: Record<string, ReferenceEntry>;
   reforms: Record<string, ReferenceEntry>;
   chronicle?: Record<string, unknown>;
 }
 
+/** The country's labels.json: what the page shows for each reform. Replaceable, not hashed. */
+export interface LabelsDocument {
+  format_version: number;
+  kind: "release_history.labels";
+  country: string;
+  reforms: Record<string, { label: string | null; source: Record<string, unknown> | null }>;
+}
+
+export interface TimelineBuild {
+  buildId: string;
+  release: string;
+  build: string;
+  publishedAt: string;
+  /** The current build of the record's default release. */
+  current: boolean;
+  /** Withdrawn builds are listed but never a neighbour: no step starts or ends at one. */
+  withdrawn: boolean;
+  digest: string;
+  /** The earliest earlier build that publishes the same file. */
+  sameFileAs: string | null;
+  /** The file's state on this panel; `missing` when it was never run. */
+  state: PointState | "missing";
+  measurementId: string | null;
+  /** The stored point's status: ok, partial or refused. */
+  status: string | null;
+  /** A gap's refusal reason, or the last error of a failed or retrying file. */
+  reason: string | null;
+}
+
 export interface TimelineValue {
-  measurementId: string;
+  buildId: string;
   value: number | null;
+  /** ok or withheld (the cell's own), missing (the point has no such cell), or unmeasured. */
   status: string;
-  reason?: string;
-  /** The measurement this value is compared with: the nearest earlier one that has the cell. */
+  /** The neighbour the change is from: the previous build on the axis, when both have the cell. */
   comparedWith: string | null;
   change: number | null;
   /** change / |previous|, for currency and counts. */
@@ -551,40 +777,34 @@ export interface TimelineValue {
   changeStatus: "ok" | "withheld" | "none";
 }
 
-export interface TimelineSeries {
+export interface TimelineOutput {
   output: string;
   period: number;
   unit: string;
   reference: (ReferenceEntry & { modelSignValue?: number }) | null;
+  /** One value per build, in the order of `builds`. */
   values: TimelineValue[];
 }
 
-export interface TimelinePoint {
-  measurementId: string;
-  releaseId: string;
-  releaseDirectory: string;
-  publishedAt: string | null;
-  status: string;
-  reason?: string;
-}
-
 export interface Timeline {
-  schemaVersion: typeof RELEASE_HISTORY_SCHEMA_VERSION;
+  formatVersion: typeof TIMELINE_FORMAT_VERSION;
   kind: "release_history.timeline";
   country: string;
   panelId: string;
   builtAt: string;
-  points: TimelinePoint[];
-  series: TimelineSeries[];
+  listing: { commit: string; listedAt: string; rule: { releases: string[]; since: string | null } };
+  labels: LabelsDocument["reforms"];
+  builds: TimelineBuild[];
+  outputs: TimelineOutput[];
   chronicle: Record<string, unknown> | null;
 }
 
 function referenceFor(output: string, references: ReferencesLock | null): ReferenceEntry | null {
   if (!references) return null;
   const parts = output.split("/");
-  if (parts[0] === "baseline" && parts.length === 2) return references.baseline[parts[1]] ?? null;
+  if (parts[0] === "baseline" && parts.length === 2) return own(references.baseline, parts[1]) ?? null;
   if (parts[0] === "reform" && parts.length >= 3) {
-    const entry = references.reforms[parts[1]];
+    const entry = own(references.reforms, parts[1]);
     const target = entry?.output ?? "budgetary_impact";
     return entry && parts.slice(2).join("/") === target ? entry : null;
   }
@@ -598,61 +818,97 @@ function referencePeriodMatches(entry: ReferenceEntry, period: number): boolean 
   return periods.length === 0 || periods.every((value) => value === period);
 }
 
-/** Every stored number of a panel as series in release order, with release-to-release changes. */
+function stateOfStored(document: MeasurementDocument): PointState {
+  return document.status === "refused" ? "gap" : "measured";
+}
+
+/**
+ * A panel's numbers on the country's series axis. Order, publish times, `current` and withdrawn
+ * come from the series record, joined to the points by file digest, so a corrected publish time
+ * re-orders the timeline with no re-run. A point whose file the series no longer lists never
+ * plots. A step exists only between neighbours on the axis that both hold the cell; a withheld
+ * cell carries its status and no reason (the point keeps the reason).
+ */
 export function buildTimeline(options: {
   country: string;
   panelId: string;
+  series: SeriesRecord;
   points: MeasurementDocument[];
+  /** The panel's manifest points, for retrying and failed files; stored points suffice without. */
+  states?: Record<string, ManifestPoint>;
   references: ReferencesLock | null;
+  labels: LabelsDocument | null;
   builtAt: string;
 }): Timeline {
-  const ordered = [...options.points].sort((left, right) =>
-    (left.point.published_at ?? "").localeCompare(right.point.published_at ?? "") ||
-    left.point.release_id.localeCompare(right.point.release_id)
-  );
+  const listed = listedBuilds(options.series);
+  const byDigest = new Map(options.points.map((point) => [point.file.sha256, point]));
+  const firstWithFile = new Map<string, string>();
+  const builds: TimelineBuild[] = listed.map((build) => {
+    const digest = build.digest as string;
+    const point = byDigest.get(digest);
+    const state = own(options.states, digest);
+    const sameFileAs = firstWithFile.get(digest) ?? null;
+    if (!sameFileAs) firstWithFile.set(digest, build.build_id);
+    return {
+      buildId: build.build_id,
+      release: build.release,
+      build: build.build,
+      publishedAt: build.published_at,
+      current: build.current && build.in_default_release,
+      withdrawn: build.withdrawn,
+      digest,
+      sameFileAs,
+      state: point ? stateOfStored(point) : state?.state ?? "missing",
+      measurementId: point?.measurement_id ?? null,
+      status: point?.status ?? null,
+      reason: point ? point.reason : state?.lastError ?? null,
+    };
+  });
+  const pointOf = listed.map((build) => byDigest.get(build.digest as string));
   const keys = new Map<string, { output: string; period: number; unit: string }>();
-  for (const point of ordered) {
-    for (const cell of point.cells) {
+  for (const point of pointOf) {
+    for (const cell of point?.cells ?? []) {
       const key = `${cell.output}@${cell.period}`;
       if (!keys.has(key)) keys.set(key, { output: cell.output, period: cell.period, unit: cell.unit });
     }
   }
-  const cellsByPoint = ordered.map((point) =>
-    new Map(point.cells.map((cell) => [`${cell.output}@${cell.period}`, cell]))
+  const cellsOf = pointOf.map((point) =>
+    new Map((point?.cells ?? []).map((cell) => [`${cell.output}@${cell.period}`, cell]))
   );
-  const series: TimelineSeries[] = [];
-  for (const [key, { output, period, unit }] of [...keys.entries()].sort()) {
-    const values: TimelineValue[] = [];
-    let previous: { measurementId: string; cell: MeasurementCell } | null = null;
-    ordered.forEach((point, index) => {
-      const cell = cellsByPoint[index].get(key);
+  const ordered = [...keys.entries()].sort(([, left], [, right]) =>
+    compareText(left.output, right.output) || left.period - right.period
+  );
+  const outputs: TimelineOutput[] = ordered.map(([key, { output, period, unit }]) => {
+    let previous: { buildId: string; cell: MeasurementCell | undefined } | null = null;
+    const values = builds.map((build, index): TimelineValue => {
+      const cell = cellsOf[index].get(key);
       const value: TimelineValue = {
-        measurementId: point.measurement_id,
+        buildId: build.buildId,
         value: cell?.value ?? null,
-        status: cell?.status ?? (point.status === "ok" ? "missing" : point.status),
-        ...(cell?.reason ? { reason: cell.reason } : {}),
-        comparedWith: previous?.measurementId ?? null,
+        status: cell?.status ?? (pointOf[index] && build.state === "measured" ? "missing" : "unmeasured"),
+        comparedWith: null,
         change: null,
         relativeChange: null,
         changePoints: null,
         changeStatus: "none",
       };
-      if (cell && previous) {
-        if (cell.status === "withheld" || previous.cell.status === "withheld") {
+      if (build.withdrawn) return value;
+      const before = previous?.cell;
+      if (cell && before && previous) {
+        value.comparedWith = previous.buildId;
+        if (cell.status === "withheld" || before.status === "withheld") {
           value.changeStatus = "withheld";
-        } else if (cell.value !== null && previous.cell.value !== null) {
-          const change = cell.value - previous.cell.value;
+        } else if (cell.value !== null && before.value !== null) {
+          const change = cell.value - before.value;
           value.change = change;
           value.changeStatus = "ok";
           if (unit === "rate") value.changePoints = change * 100;
           else if (unit === "ratio") value.changePoints = change;
-          else if (previous.cell.value !== 0) value.relativeChange = change / Math.abs(previous.cell.value);
+          else if (before.value !== 0) value.relativeChange = change / Math.abs(before.value);
         }
       }
-      if (cell && (cell.status === "ok" || cell.status === "withheld")) {
-        previous = { measurementId: point.measurement_id, cell };
-      }
-      values.push(value);
+      previous = { buildId: build.buildId, cell };
+      return value;
     });
     const entry = referenceFor(output, options.references);
     const reference = entry && referencePeriodMatches(entry, period)
@@ -663,23 +919,22 @@ export function buildTimeline(options: {
             : {}),
         }
       : null;
-    series.push({ output, period, unit, reference, values });
-  }
+    return { output, period, unit, reference, values };
+  });
   return {
-    schemaVersion: RELEASE_HISTORY_SCHEMA_VERSION,
+    formatVersion: TIMELINE_FORMAT_VERSION,
     kind: "release_history.timeline",
     country: options.country,
     panelId: options.panelId,
     builtAt: options.builtAt,
-    points: ordered.map((point) => ({
-      measurementId: point.measurement_id,
-      releaseId: point.point.release_id,
-      releaseDirectory: point.point.release_directory,
-      publishedAt: point.point.published_at,
-      status: point.status,
-      ...(point.reason ? { reason: point.reason } : {}),
-    })),
-    series,
+    listing: {
+      commit: options.series.commit,
+      listedAt: options.series.listed_at,
+      rule: options.series.rule,
+    },
+    labels: options.labels?.reforms ?? {},
+    builds,
+    outputs,
     chronicle: options.references?.chronicle ?? null,
   };
 }

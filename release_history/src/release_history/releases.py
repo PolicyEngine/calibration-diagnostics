@@ -1,9 +1,11 @@
 """Read a published release at its pinned commit and fetch its national H5.
 
-A point comes from the dashboard's own release inventory (the calibration-tree
-manifest's release entries, each pinned to `hfRepo` + `hfCommitSha`). This
+A planned point comes from the country's series record (`series.py`): one
+build that the release repository's `releases.json` records, read at one
+resolved commit of `main`, with the digest of the data file it lists. This
 module re-reads the release manifest at that commit and fails closed: only a
-default national release with `default_datasets.national` is measured.
+default national release with `default_datasets.national` is measured, and
+only the file the plan expects.
 
 The walk from `default_datasets.national` to `artifacts[key]` and the sha256
 check follow `frontend/scripts/hosted_release.py` (`validate_manifests`,
@@ -22,6 +24,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,6 +38,10 @@ from release_history.canonical import file_sha256, json_sha256
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
 _CUT_TAG = re.compile(r"^(?P<release>.+)-\d{8}T\d{6}Z-[0-9a-f]{8}$")
+# A network or service failure is tried again this many times in all, so one bad response
+# does not fail a weekly run.
+TRANSIENT_TRIES = 3
+TRANSIENT_BACKOFF_SECONDS = 5.0
 
 
 class TransientError(RuntimeError):
@@ -52,34 +59,42 @@ class ReleaseRefused(RuntimeError):
 
 @dataclass(frozen=True)
 class Point:
-    """One release build to measure, as the plan step names it."""
+    """One data file to measure, as the plan names it: a recorded build at one commit.
 
-    release_id: str
+    `digest` is the file's sha256 as the series listed it (None for a local
+    `--revision` run, which takes the manifest's). `attempt` and `last_attempt`
+    let the producer hold back a partial result until the last attempt.
+    """
+
+    build_id: str
     release_directory: str
     hf_repo: str
     hf_commit: str
-    published_at: str | None = None
-    current: bool | None = None
+    digest: str | None = None
+    attempt: int = 1
+    last_attempt: bool = True
 
     @classmethod
     def from_json(cls, value: Mapping[str, Any]) -> Point:
         return cls(
-            release_id=str(value["release_id"]),
+            build_id=str(value["build_id"]),
             release_directory=str(value["release_directory"]),
             hf_repo=str(value["hf_repo"]),
             hf_commit=str(value["hf_commit"]),
-            published_at=value.get("published_at"),
-            current=value.get("current"),
+            digest=value.get("digest"),
+            attempt=int(value.get("attempt", 1)),
+            last_attempt=bool(value.get("last_attempt", True)),
         )
 
     def to_json(self) -> dict[str, Any]:
         return {
-            "release_id": self.release_id,
+            "build_id": self.build_id,
             "release_directory": self.release_directory,
             "hf_repo": self.hf_repo,
             "hf_commit": self.hf_commit,
-            "published_at": self.published_at,
-            "current": self.current,
+            "digest": self.digest,
+            "attempt": self.attempt,
+            "last_attempt": self.last_attempt,
         }
 
 
@@ -134,10 +149,10 @@ def compatibility(manifest: Mapping[str, Any], package: str, version: str) -> st
     return "inside" if inside else "outside"
 
 
-def build_provenance(build_manifest: Mapping[str, Any] | None) -> dict[str, Any]:
+def build_provenance(build_manifest: Mapping[str, Any] | None) -> dict[str, Any] | None:
     """The build facts a later "why did it move" tool joins on; pointers, not copies."""
     if not build_manifest:
-        return {}
+        return None
     calibration = build_manifest.get("calibration") or {}
     code = build_manifest.get("code") or {}
     # A build folder's build manifest names its build in "build"; a tagged one has "attempt_id".
@@ -162,15 +177,19 @@ class HubClient:
         self.token = token or os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
 
     def _call(self, function, *args, **kwargs):
-        try:
-            return function(*args, **kwargs)
-        except Exception as error:  # noqa: BLE001 - classified below
-            name = type(error).__name__
-            if name in ("EntryNotFoundError", "RemoteEntryNotFoundError"):
-                raise FileNotFoundError(kwargs.get("filename") or args) from error
-            if name in ("RepositoryNotFoundError", "RevisionNotFoundError", "GatedRepoError"):
-                raise ReleaseRefused("error", "repository_or_revision_unreadable") from error
-            raise TransientError(name) from error
+        for attempt in range(TRANSIENT_TRIES):
+            try:
+                return function(*args, **kwargs)
+            except Exception as error:  # noqa: BLE001 - classified below
+                name = type(error).__name__
+                if name in ("EntryNotFoundError", "RemoteEntryNotFoundError"):
+                    raise FileNotFoundError(kwargs.get("filename") or args) from error
+                if name in ("RepositoryNotFoundError", "RevisionNotFoundError", "GatedRepoError"):
+                    raise ReleaseRefused("error", "repository_or_revision_unreadable") from error
+                if attempt + 1 == TRANSIENT_TRIES:
+                    raise TransientError(name) from error
+                time.sleep(TRANSIENT_BACKOFF_SECONDS * (attempt + 1))
+        raise AssertionError("unreachable")
 
     def resolve_revision(self, repo: str, revision: str) -> str:
         from huggingface_hub import HfApi
@@ -282,6 +301,16 @@ def download_verified(hub: HubClient, opened: OpenedRelease, workdir: Path) -> P
 
 
 def point_provenance(opened: OpenedRelease, model_package: str, model_version: str) -> dict:
+    """What a point records about its file: the file itself, and where it was fetched from.
+
+    Only facts that cannot change after the measurement. `file` is the file alone (its
+    sha256 and size), so a file published under two builds is one fact. What a build's
+    manifests declare about the file (when it was built, with what, the declared model
+    range) belongs to the build the point was fetched through, so it sits under
+    `fetched_from` with that build's id. Listing facts (publish time, `current`,
+    withdrawn) live in the series record, so a corrected publish time never needs a
+    re-run.
+    """
     manifest = opened.manifest
     # A tagged release's manifest nests its build facts in a "build" object. A build-folder
     # release (microcosm#1534, #1537) names its build there as a string, keeps the facts at the
@@ -291,33 +320,37 @@ def point_provenance(opened: OpenedRelease, model_package: str, model_version: s
     migrated = manifest.get("migrated_from")
     migrated = dict(migrated) if isinstance(migrated, Mapping) else None
     return {
-        **opened.point.to_json(),
-        "release_manifest": {
-            "path": opened.manifest_path,
-            "sha256": opened.manifest_sha256,
-            "json_sha256": json_sha256(manifest),
+        "fetched_from": {
+            "build_id": opened.point.build_id,
+            "hf_repo": opened.point.hf_repo,
+            "hf_commit": opened.point.hf_commit,
+            "release_manifest": {
+                "path": opened.manifest_path,
+                "sha256": opened.manifest_sha256,
+                "json_sha256": json_sha256(manifest),
+            },
+            "build_manifest": (
+                {"path": opened.build_manifest_path, "sha256": opened.build_manifest_sha256}
+                if opened.build_manifest_path
+                else None
+            ),
+            "dataset": {"key": opened.artifact.key, "path": opened.artifact.path},
+            "declared": {
+                "build": build.get("build_id") or (named if isinstance(named, str) else None),
+                "cut_tag": build.get("cut_tag") or (migrated or {}).get("tag"),
+                "migrated_from": migrated,
+                "built_at": build.get("built_at") or manifest.get("built_at"),
+                "built_with_model": build.get("built_with_model_package")
+                or manifest.get("built_with_model_package"),
+                "built_with_core": build.get("built_with_core_package")
+                or manifest.get("built_with_core_package"),
+                "compatible_models": manifest.get("compatible_model_packages"),
+                "reference_model_compatibility": compatibility(
+                    manifest, model_package, model_version
+                ),
+                "description": manifest.get("description"),
+                "build_provenance": build_provenance(opened.build_manifest),
+            },
         },
-        "build_manifest": (
-            {"path": opened.build_manifest_path, "sha256": opened.build_manifest_sha256}
-            if opened.build_manifest_path
-            else None
-        ),
-        "dataset": {
-            "key": opened.artifact.key,
-            "path": opened.artifact.path,
-            "sha256": opened.artifact.sha256,
-            "bytes": opened.size_bytes,
-        },
-        "build_id": build.get("build_id") or (named if isinstance(named, str) else None),
-        "cut_tag": build.get("cut_tag") or (migrated or {}).get("tag"),
-        "migrated_from": migrated,
-        "built_at": build.get("built_at") or manifest.get("built_at"),
-        "built_with_model": build.get("built_with_model_package")
-        or manifest.get("built_with_model_package"),
-        "built_with_core": build.get("built_with_core_package")
-        or manifest.get("built_with_core_package"),
-        "declared_compatible_models": manifest.get("compatible_model_packages"),
-        "reference_model_compatibility": compatibility(manifest, model_package, model_version),
-        "build": build_provenance(opened.build_manifest),
-        "description": manifest.get("description"),
+        "file": {"sha256": opened.artifact.sha256, "bytes": opened.size_bytes},
     }

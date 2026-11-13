@@ -26,7 +26,7 @@ from typing import Any
 
 import yaml
 
-from release_history import SCHEMA_VERSION
+from release_history import REFERENCES_FORMAT_VERSION
 from release_history.canonical import file_sha256, json_sha256
 from release_history.spec import Spec, countries_dir, jsonable
 
@@ -61,8 +61,8 @@ def _entry_kind(entry: Mapping[str, Any], where: str) -> str:
 def validate_references(spec: Spec, references: Mapping[str, Any]) -> list[str]:
     """Every baseline item and reform has exactly one entry, and nothing else does."""
     problems: list[str] = []
-    if references.get("schema_version") != SCHEMA_VERSION:
-        problems.append(f"references schema_version must be {SCHEMA_VERSION}")
+    if references.get("schema_version") != REFERENCES_FORMAT_VERSION:
+        problems.append(f"references schema_version must be {REFERENCES_FORMAT_VERSION}")
     if references.get("country") != spec.country:
         problems.append("references country differs from the spec's")
     for section, ids in (
@@ -150,7 +150,7 @@ def resolve(
         with facts_path.open("rb") as stream:
             found = scan_facts(stream, wanted)
     lock: dict[str, Any] = {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": REFERENCES_FORMAT_VERSION,
         "kind": "release_history.references_lock",
         "country": spec.country,
         "references_sha256": references_digest(references),

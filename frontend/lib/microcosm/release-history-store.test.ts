@@ -9,54 +9,92 @@ import {
   putImmutable,
   putWriteOnce,
   readJson,
+  MAX_PLANNED_POINTS,
   RELEASE_HISTORY_MANIFEST_PATH,
-  seriesMatches,
+  seriesAxis,
   storedFileKind,
   updateManifestCountry,
   WriteConflict,
   type ManifestCountry,
+  type MeasurementCell,
   type MeasurementDocument,
-  type ReleaseBuild,
+  type PanelSummary,
   type ReleaseHistoryManifest,
   type ReleaseHistoryStore,
+  type SeriesBuild,
+  type SeriesRecord,
 } from "./release-history-store";
 
 const COMMIT = "1234567890abcdef1234567890abcdef12345678";
-const PANEL = "p".repeat(64);
+const LINE = "zz-national";
+const PANEL = "a".repeat(64);
+const OTHER = "e".repeat(64);
+const file = (n: number) => n.toString(16).padStart(64, "0");
 
-function build(id: string, overrides: Partial<ReleaseBuild> = {}): ReleaseBuild {
+function build(name: string, digest: string | null, overrides: Partial<SeriesBuild> = {}): SeriesBuild {
+  const day = name.replace(/\D/g, "").padStart(2, "0");
   return {
-    releaseId: id,
-    releaseDirectory: "line",
-    hfRepo: "policyengine/zz",
-    hfCommitSha: COMMIT,
-    publishedAt: `2026-11-0${id.slice(-1)}T00:00:00Z`,
-    current: false,
+    build_id: `${LINE}/${name}`,
+    release: LINE,
+    build: name,
+    release_directory: `${LINE}/${name}`,
+    published_at: `2026-11-${day}T00:00:00Z`,
     withdrawn: false,
+    current: false,
+    in_default_release: true,
+    role: "national",
+    digest,
+    dataset_path: digest ? `releases/${LINE}/${name}/zz.h5` : null,
+    release_manifest_sha256: "f".repeat(64),
+    listing_status: digest ? "ok" : "refused",
+    listing_reason: digest ? null : "release_manifest_missing",
     ...overrides,
   };
 }
 
-function measurement(
-  id: string,
-  releaseId: string,
-  publishedAt: string,
-  cells: MeasurementDocument["cells"],
+function series(builds: SeriesBuild[], overrides: Partial<SeriesRecord> = {}): SeriesRecord {
+  return {
+    format_version: 1,
+    kind: "release_history.series",
+    country: "zz",
+    release_repo: "policyengine/zz",
+    rule: { releases: [LINE], since: null },
+    revision: "main",
+    commit: COMMIT,
+    listed_at: "2026-11-12T00:00:00Z",
+    record: { present: true, sha256: "d".repeat(64), default: LINE },
+    lines: [{ release: LINE, present: true, role: "national" }],
+    builds,
+    ...overrides,
+  };
+}
+
+function point(
+  digest: string,
+  cells: MeasurementCell[] = [],
   status = "ok",
+  panelId = PANEL,
 ): MeasurementDocument {
   return {
-    measurement_id: id,
+    format_version: 1,
+    kind: "release_history.measurement",
+    country: "zz",
+    panel_id: panelId,
+    measurement_id: `m${digest.slice(1)}`,
     status,
-    point: {
-      release_id: releaseId,
-      release_directory: "line",
-      hf_repo: "policyengine/zz",
-      hf_commit: COMMIT,
-      published_at: publishedAt,
-    },
+    reason: status === "refused" ? "disclosure_source_ids_missing" : null,
+    file: { sha256: digest, bytes: 1 },
     cells,
   };
 }
+
+function summary(panelId: string, model = "policyengine-zz==1.0.0"): PanelSummary {
+  return { panelId, engine: { model }, specSha256: "s".repeat(64), producerVersion: "1" };
+}
+
+const cell = (value: number | null, status = "ok", output = "baseline/tax", unit = "currency"): MeasurementCell => ({
+  output, period: 2026, unit, value, status, reason: status === "withheld" ? "small_cell" : null,
+});
 
 test("immutable documents refuse different bytes; write-once keeps the first", async () => {
   const store = memoryStore();
@@ -105,141 +143,350 @@ test("a write that keeps conflicting gives up rather than overwriting", async ()
   ).rejects.toThrow("kept changing");
 });
 
-test("series match the Python spec's rule", () => {
-  const series = { releases: ["zz-national", "^zz-2024-"], exclude: ["acs-local"] };
-  expect(seriesMatches(series, "zz-national")).toBe(true);
-  expect(seriesMatches(series, "zz-national/uk-frs-calibration-attempt-1")).toBe(true);
-  expect(seriesMatches(series, "zz-national-dense")).toBe(false);
-  expect(seriesMatches(series, "zz-2024-x")).toBe(true);
-  expect(seriesMatches(series, "zz-2024-acs-local-1")).toBe(false);
-  // A pattern on a build's release id drops that build alone.
-  const one = { releases: ["zz-national"], exclude: ["-5c6b3f68$"] };
-  expect(seriesMatches(one, "zz-national", "zz-national-20261002T230158Z-5c6b3f68")).toBe(false);
-  expect(seriesMatches(one, "zz-national", "zz-national-20261019T083323Z-6cba5d71")).toBe(true);
-  expect(seriesMatches(one, "zz-national/uk-frs-calibration-attempt-20261002T230158Z-5c6b3f68")).toBe(false);
+test("stored file kinds follow where a file sits", () => {
+  expect(storedFileKind("release-history/uk/series.json")).toBe("series");
+  expect(storedFileKind("release-history/uk/references.json")).toBe("references");
+  expect(storedFileKind("release-history/uk/labels.json")).toBe("labels");
+  expect(storedFileKind(`release-history/uk/${PANEL}/panel.json`)).toBe("panel");
+  expect(storedFileKind(`release-history/uk/${PANEL}/timeline.json`)).toBe("timeline");
+  expect(storedFileKind(`release-history/uk/${PANEL}/${"b".repeat(64)}.json`)).toBe("measurement");
+  // References and labels are the country's, never a panel's; the manifest is never uploaded.
+  expect(storedFileKind(`release-history/uk/${PANEL}/references.json`)).toBeNull();
+  expect(storedFileKind("release-history/manifest.json")).toBeNull();
+  expect(storedFileKind("release-history/uk/p/panel.json")).toBeNull();
+  expect(storedFileKind(`release-history/uk/${PANEL}/notes.json`)).toBeNull();
+  expect(storedFileKind("release-history/uk/constructor")).toBeNull();
 });
 
-test("stored file kinds follow their names", () => {
-  expect(storedFileKind("release-history/uk/p/panel.json")).toBe("panel");
-  expect(storedFileKind("release-history/uk/p/timeline.json")).toBe("timeline");
-  expect(storedFileKind(`release-history/uk/p/${"a".repeat(64)}.json`)).toBe("measurement");
-  expect(storedFileKind("release-history/uk/p/notes.json")).toBeNull();
-});
-
-test("a weekly top-up waits for a new panel's backfill; a backfill measures every missing point", () => {
-  const builds = [build("b1"), build("b2"), build("b3", { withdrawn: true })];
-  const current: ManifestCountry = { pinnedPanelId: "old", currentPanelId: "old", panels: {} };
-  const waiting = planPanel({ country: "uk", panelId: PANEL, mode: "topup", builds, entry: current });
-  expect(waiting).toMatchObject({ action: "skip", reason: "pinned_panel_awaits_backfill", seriesSize: 2 });
-  const backfill = planPanel({ country: "uk", panelId: PANEL, mode: "backfill", builds, entry: current });
-  expect(backfill.action).toBe("measure");
-  expect(backfill.points.map((p) => p.release_id)).toEqual(["b1", "b2"]);
-  expect(backfill.points[0]).toMatchObject({ hf_repo: "policyengine/zz", hf_commit: COMMIT, release_directory: "line" });
-});
-
-test("a top-up on the current panel measures only builds it lacks", () => {
+test("one file under two build names is one point; a replaced file under one name is a new one", () => {
+  const listed = series([build("b1", file(1)), build("b2", file(1)), build("b3", file(2))]);
+  const backfill = planPanel({ country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: listed, entry: undefined });
+  expect(backfill.points.map((p) => [p.build_id, p.digest])).toEqual([
+    [`${LINE}/b1`, file(1)],
+    [`${LINE}/b3`, file(2)],
+  ]);
+  expect(backfill).toMatchObject({ action: "measure", seriesFiles: 2, seriesCommit: COMMIT });
+  expect(backfill.points[0]).toEqual({
+    build_id: `${LINE}/b1`,
+    release_directory: `${LINE}/b1`,
+    hf_repo: "policyengine/zz",
+    hf_commit: COMMIT,
+    digest: file(1),
+    attempt: 1,
+    last_attempt: false,
+  });
   const entry = finalizeCountry({
-    entry: undefined,
-    panel: { panelId: PANEL, createdAt: "t", engine: {}, specSha256: "s", producerVersion: "1" },
-    builds: [build("b1")],
-    planned: [],
-    stored: [measurement("m1", "b1", "2026-11-01T00:00:00Z", [])],
-    pin: true,
+    mode: "backfill", entry: undefined, panel: summary(PANEL), series: listed, planned: backfill.points,
+    stored: [point(file(1)), point(file(2))], pin: true, at: "2026-11-12T01:00:00Z",
   });
-  expect(entry.currentPanelId).toBe(PANEL);
-  expect(entry.panels[PANEL].points.b1).toMatchObject({ measurementId: "m1", measurementStatus: "ok" });
-  const plan = planPanel({ country: "uk", panelId: PANEL, mode: "topup", builds: [build("b1"), build("b2")], entry });
-  expect(plan.points.map((p) => p.release_id)).toEqual(["b2"]);
-  const single = planPanel({ country: "uk", panelId: PANEL, mode: "release", releaseId: "b1", builds: [build("b1")], entry });
-  expect(single).toMatchObject({ action: "skip", reason: "already_measured" });
+  // b3 is republished with a new file under the same name: that file is new, so it is planned.
+  const replaced = series([build("b1", file(1)), build("b2", file(1)), build("b3", file(3))]);
+  const next = planPanel({ country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: replaced, entry });
+  expect(next.points.map((p) => [p.build_id, p.digest])).toEqual([[`${LINE}/b3`, file(3)]]);
+  // The release mode names a build; a build sharing a measured file needs no run.
+  const shared = planPanel({ country: "zz", panelId: PANEL, mode: "release", pin: true, buildId: `${LINE}/b2`, series: listed, entry });
+  expect(shared).toMatchObject({ action: "skip", reason: "already_measured" });
 });
 
-test("finalize counts attempts, fails a point after three, and switches current when complete", () => {
-  const panel = { panelId: PANEL, createdAt: "t", engine: {}, specSha256: "s", producerVersion: "1" };
-  const builds = [build("b1"), build("b2")];
-  const planned = planPanel({ country: "uk", panelId: PANEL, mode: "backfill", builds, entry: undefined }).points;
-  let entry = finalizeCountry({
-    entry: undefined, panel, builds, planned,
-    stored: [measurement("m1", "b1", "2026-11-01T00:00:00Z", [])],
-    pin: true,
-  });
-  expect(entry.panels[PANEL].points.b2).toMatchObject({ state: "pending", attempts: 1 });
-  expect(entry.currentPanelId).toBeNull();
-  for (let run = 0; run < 2; run += 1) {
-    entry = finalizeCountry({ entry, panel, builds, planned: [planned[1]], stored: [measurement("m1", "b1", "2026-11-01T00:00:00Z", [])], pin: true });
+test("a missing record and an empty series are skipped with their reasons", () => {
+  const absent = series([], { record: { present: false, sha256: null, default: null }, lines: [] });
+  expect(planPanel({ country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: absent, entry: undefined }))
+    .toMatchObject({ action: "skip", reason: "no_releases_record", points: [] });
+  expect(planPanel({ country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: null, entry: undefined }))
+    .toMatchObject({ reason: "no_releases_record" });
+  const nothing = series([build("b1", null), build("b2", file(2), { withdrawn: true })]);
+  expect(planPanel({ country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: nothing, entry: undefined }))
+    .toMatchObject({ action: "skip", reason: "empty_series", seriesFiles: 0 });
+});
+
+test("a build is planned from the record alone: no tree manifest entry is needed", () => {
+  // The newest recorded build: listed with its file, so the next backfill measures it.
+  const listed = series([build("b9", file(9), { current: true })]);
+  const plan = planPanel({ country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: listed, entry: undefined });
+  expect(plan.points.map((p) => p.build_id)).toEqual([`${LINE}/b9`]);
+});
+
+test("the release mode refuses builds it cannot or need not measure", () => {
+  const listed = series([
+    build("b1", file(1)),
+    build("b2", null),
+    build("b3", file(3), { withdrawn: true }),
+    build("b4", file(4)),
+  ]);
+  const release = (buildId: string, entry?: ManifestCountry) =>
+    planPanel({ country: "zz", panelId: PANEL, mode: "release", pin: true, buildId, series: listed, entry });
+  expect(release("elsewhere/b1")).toMatchObject({ action: "skip", reason: "release_not_in_series" });
+  expect(release(`${LINE}/b2`)).toMatchObject({ action: "skip", reason: "release_manifest_missing" });
+  expect(release(`${LINE}/b3`)).toMatchObject({ action: "skip", reason: "release_withdrawn" });
+  expect(release(`${LINE}/b4`).points.map((p) => p.digest)).toEqual([file(4)]);
+  let entry: ManifestCountry | undefined;
+  for (let run = 1; run <= 3; run += 1) {
+    const planned = release(`${LINE}/b4`, entry).points;
+    expect(planned[0]).toMatchObject({ attempt: run, last_attempt: run === 3 });
+    entry = finalizeCountry({ mode: "backfill", entry, panel: summary(PANEL), series: listed, planned, stored: [], pin: false, at: `t${run}` });
   }
-  expect(entry.panels[PANEL].points.b2).toMatchObject({ state: "failed", attempts: 3 });
-  expect(entry.panels[PANEL].complete).toBe(true);
+  expect(entry!.panels[PANEL].points[file(4)]).toMatchObject({ state: "failed", attempts: 3 });
+  expect(release(`${LINE}/b4`, entry)).toMatchObject({ action: "skip", reason: "release_failed" });
+});
+
+test("a country's first panel waits for its backfill, and only a backfill pins it", () => {
+  const listed = series([build("b1", file(1)), build("b2", file(2))]);
+  const topup = (entry?: ManifestCountry) =>
+    planPanel({ country: "zz", panelId: PANEL, mode: "topup", pin: true, series: listed, entry });
+  expect(topup()).toMatchObject({ action: "skip", reason: "first_panel_awaits_backfill" });
+  // A skipped top-up's finalize pins nothing.
+  let entry = finalizeCountry({ mode: "topup", entry: undefined, panel: summary(PANEL), series: listed, planned: [], stored: [], pin: true, at: "t1" });
+  expect(entry).toMatchObject({ pinnedPanelId: null, currentPanelId: null });
+  expect(entry.panels[PANEL].pinnedAt).toBeNull();
+  // One release measured on the default branch: held, but still no series, so still no pin.
+  const one = planPanel({ country: "zz", panelId: PANEL, mode: "release", pin: true, buildId: `${LINE}/b1`, series: listed, entry });
+  entry = finalizeCountry({ mode: "release", entry, panel: summary(PANEL), series: listed, planned: one.points, stored: [point(file(1))], pin: true, at: "t2" });
+  expect(entry.panels[PANEL].pinnedAt).toBeNull();
+  expect(topup(entry)).toMatchObject({ reason: "first_panel_awaits_backfill" });
+  // A top-up skipped while the panel holds a point pins nothing either.
+  entry = finalizeCountry({ mode: "topup", entry, panel: summary(PANEL), series: listed, planned: [], stored: [point(file(1))], pin: true, at: "t3" });
+  expect(entry.panels[PANEL].pinnedAt).toBeNull();
+  // The backfill pins it, and from then on a top-up retries what the backfill left.
+  const backfill = planPanel({ country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: listed, entry });
+  expect(backfill.points.map((p) => p.digest)).toEqual([file(2)]);
+  entry = finalizeCountry({ mode: "backfill", entry, panel: summary(PANEL), series: listed, planned: backfill.points, stored: [point(file(1))], pin: true, at: "t4" });
+  expect(entry).toMatchObject({ pinnedPanelId: PANEL, currentPanelId: null });
+  expect(entry.panels[PANEL].pinnedAt).toBe("t4");
+  expect(topup(entry).points.map((p) => [p.digest, p.attempt])).toEqual([[file(2), 2]]);
+});
+
+test("a top-up from another ref is skipped: other engines fill their panels by backfill or release", () => {
+  const listed = series([build("b1", file(1))]);
+  const entry = finalizeCountry({ mode: "backfill", entry: undefined, panel: summary(PANEL), series: listed, planned: [], stored: [point(file(1))], pin: true, at: "t" });
+  expect(planPanel({ country: "zz", panelId: OTHER, mode: "topup", pin: false, series: listed, entry }))
+    .toMatchObject({ action: "skip", reason: "topup_only_on_the_default_branch" });
+  expect(planPanel({ country: "zz", panelId: OTHER, mode: "backfill", pin: false, series: listed, entry }).points)
+    .toHaveLength(1);
+});
+
+test("a point already in the store is not measured again, though the manifest lacks it", () => {
+  const listed = series([build("b1", file(1)), build("b2", file(2))]);
+  const plan = planPanel({
+    country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: listed, entry: undefined, stored: new Set([file(1)]),
+  });
+  expect(plan.points.map((p) => p.digest)).toEqual([file(2)]);
+});
+
+test("a run plans at most MAX_PLANNED_POINTS files and says the rest wait", () => {
+  const many = series(Array.from({ length: MAX_PLANNED_POINTS + 5 }, (_, index) =>
+    build(`b${index}`, file(index + 1), { published_at: new Date(Date.UTC(2026, 0, 1) + index * 3_600_000).toISOString() })
+  ));
+  const plan = planPanel({ country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: many, entry: undefined });
+  expect(plan).toMatchObject({ action: "measure", reason: "truncated", seriesFiles: MAX_PLANNED_POINTS + 5 });
+  expect(plan.points).toHaveLength(MAX_PLANNED_POINTS);
+  expect(plan.points[0].build_id).toBe(`${LINE}/b0`);
+});
+
+test("after a new pin, a top-up measures the new builds and the last build the old engine measured", () => {
+  const old = series([build("b1", file(1)), build("b2", file(2)), build("b3", file(3))]);
+  let entry = finalizeCountry({
+    mode: "backfill", entry: undefined, panel: summary(PANEL, "policyengine-zz==1.0.0"), series: old, planned: [],
+    stored: [point(file(1)), point(file(2)), point(file(3), [], "refused")], pin: true, at: "2026-11-01T00:00:00Z",
+  });
+  expect(entry).toMatchObject({ pinnedPanelId: PANEL, currentPanelId: PANEL });
+  expect(entry.panels[PANEL]).toMatchObject({ pinnedAt: "2026-11-01T00:00:00Z", complete: true });
+  // Two new builds arrive and the default branch moves to a new engine.
+  const grown = series([...old.builds, build("b4", file(4)), build("b5", file(5))]);
+  const topup = planPanel({ country: "zz", panelId: OTHER, mode: "topup", pin: true, series: grown, entry });
+  // b3 is a stored gap on the old engine, so the overlap is b2, the last build it measured.
+  expect(topup.points.map((p) => p.build_id)).toEqual([`${LINE}/b2`, `${LINE}/b4`, `${LINE}/b5`]);
+  entry = finalizeCountry({
+    mode: "topup", entry, panel: summary(OTHER, "policyengine-zz==2.0.0"), series: grown, planned: topup.points,
+    stored: [point(file(2), [], "ok", OTHER), point(file(4), [], "ok", OTHER), point(file(5), [], "ok", OTHER)],
+    pin: true, at: "2026-11-08T00:00:00Z",
+  });
+  // The new engine is pinned at once; the served panel stays until the new one is complete.
+  expect(entry).toMatchObject({ pinnedPanelId: OTHER, currentPanelId: PANEL });
+  expect(entry.panels[OTHER]).toMatchObject({ pinnedAt: "2026-11-08T00:00:00Z", complete: false });
+  // The finalize recounted the old panel against the grown series too.
+  expect(entry.panels[PANEL]).toMatchObject({
+    complete: false,
+    coverage: { builds: 5, files: 5, measured: 2, gap: 1, retrying: 0, failed: 0, missing: 2 },
+  });
+  // Next week only a newer build is new: nothing either engine holds is measured again.
+  const later = series([...grown.builds, build("b6", file(6))]);
+  const next = planPanel({ country: "zz", panelId: OTHER, mode: "topup", pin: true, series: later, entry });
+  expect(next.points.map((p) => p.build_id)).toEqual([`${LINE}/b6`]);
+  // Re-pinning the pinned panel keeps its pinnedAt.
+  const again = finalizeCountry({
+    mode: "topup", entry, panel: summary(OTHER, "policyengine-zz==2.0.0"), series: later, planned: [], stored: [], pin: true,
+    at: "2026-11-15T00:00:00Z",
+  });
+  expect(again.panels[OTHER].pinnedAt).toBe("2026-11-08T00:00:00Z");
+});
+
+test("finalize counts attempts, fails a file after three, and serves a panel once it is complete", () => {
+  const listed = series([build("b1", file(1)), build("b2", file(2))]);
+  let entry: ManifestCountry | undefined;
+  let planned = planPanel({ country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: listed, entry }).points;
+  entry = finalizeCountry({ mode: "backfill", entry, panel: summary(PANEL), series: listed, planned, stored: [point(file(1))], pin: true, at: "t1" });
+  expect(entry.panels[PANEL].points[file(2)]).toMatchObject({
+    state: "retrying", attempts: 1, lastError: "no_measurement_written", lastBuildId: `${LINE}/b2`, measurementId: null,
+  });
+  expect(entry.panels[PANEL].points[file(1)]).toMatchObject({ state: "measured", attempts: 1, lastBuildId: `${LINE}/b1` });
+  expect(entry).toMatchObject({ pinnedPanelId: PANEL, currentPanelId: null });
+  for (const at of ["t2", "t3"]) {
+    planned = planPanel({ country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: listed, entry }).points;
+    expect(planned.map((p) => p.digest)).toEqual([file(2)]);
+    entry = finalizeCountry({ mode: "backfill", entry, panel: summary(PANEL), series: listed, planned, stored: [point(file(1))], pin: true, at });
+  }
+  expect(entry.panels[PANEL].points[file(2)]).toMatchObject({ state: "failed", attempts: 3 });
+  expect(entry.panels[PANEL]).toMatchObject({
+    complete: true,
+    coverage: { builds: 2, files: 2, measured: 1, gap: 0, retrying: 0, failed: 1, missing: 0 },
+  });
   expect(entry.currentPanelId).toBe(PANEL);
+  expect(planPanel({ country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: listed, entry }))
+    .toMatchObject({ action: "skip", reason: "nothing_missing" });
 });
 
 test("a run on another engine keeps its own panel and moves neither the pin nor the served panel", () => {
-  const builds = [build("b1"), build("b2")];
-  const pinned = { panelId: PANEL, createdAt: "t", engine: { model: "policyengine-uk==2.174.1" }, specSha256: "s", producerVersion: "1" };
-  const other = { ...pinned, panelId: "e".repeat(64), engine: { model: "policyengine-uk==2.180.0" } };
-  const both = [measurement("m1", "b1", "2026-11-01T00:00:00Z", []), measurement("m2", "b2", "2026-11-02T00:00:00Z", [])];
-  let entry = finalizeCountry({ entry: undefined, panel: pinned, builds, planned: [], stored: both, pin: true });
+  const listed = series([build("b1", file(1)), build("b2", file(2))]);
+  const both = [point(file(1)), point(file(2))];
+  let entry = finalizeCountry({ mode: "backfill", entry: undefined, panel: summary(PANEL), series: listed, planned: [], stored: both, pin: true, at: "t1" });
   expect(entry).toMatchObject({ pinnedPanelId: PANEL, currentPanelId: PANEL });
-  // One release measured on demand on another engine: a partial panel of its own.
-  entry = finalizeCountry({ entry, panel: other, builds, planned: [], stored: [both[1]], pin: false });
+  // One build measured on demand on another engine: a partial panel of its own.
+  const other = summary(OTHER, "policyengine-zz==2.0.0");
+  const otherPoints = both.map((p) => point(p.file.sha256, [], "ok", OTHER));
+  entry = finalizeCountry({ mode: "backfill", entry, panel: other, series: listed, planned: [], stored: [otherPoints[1]], pin: false, at: "t2" });
   expect(entry).toMatchObject({ pinnedPanelId: PANEL, currentPanelId: PANEL });
-  expect(Object.keys(entry.panels).sort()).toEqual([other.panelId, PANEL].sort());
-  expect(entry.panels[other.panelId]).toMatchObject({ complete: false, engine: { model: "policyengine-uk==2.180.0" } });
-  expect(Object.keys(entry.panels[other.panelId].points)).toEqual(["b2"]);
+  expect(Object.keys(entry.panels).sort()).toEqual([PANEL, OTHER].sort());
+  expect(entry.panels[OTHER]).toMatchObject({ complete: false, pinnedAt: null, engine: { model: "policyengine-zz==2.0.0" } });
+  expect(Object.keys(entry.panels[OTHER].points)).toEqual([file(2)]);
   // Completing it still leaves the served panel alone until a pinning run picks it.
-  entry = finalizeCountry({ entry, panel: other, builds, planned: [], stored: both, pin: false });
-  expect(entry.panels[other.panelId].complete).toBe(true);
+  entry = finalizeCountry({ mode: "backfill", entry, panel: other, series: listed, planned: [], stored: otherPoints, pin: false, at: "t3" });
+  expect(entry.panels[OTHER].complete).toBe(true);
   expect(entry.currentPanelId).toBe(PANEL);
 });
 
-test("the timeline orders releases, carries changes over gaps, and never computes a change beside a withheld cell", () => {
-  const cell = (value: number | null, status = "ok") => ({ output: "baseline/tax", period: 2026, unit: "currency", value, status });
-  const timeline = buildTimeline({
-    country: "uk",
-    panelId: PANEL,
-    builtAt: "2026-11-09T00:00:00Z",
+test("a series that lists nothing leaves every panel's coverage as it was", () => {
+  const listed = series([build("b1", file(1))]);
+  const entry = finalizeCountry({ mode: "backfill", entry: undefined, panel: summary(PANEL), series: listed, planned: [], stored: [point(file(1))], pin: true, at: "t1" });
+  const absent = series([], { record: { present: false, sha256: null, default: null } });
+  const after = finalizeCountry({ mode: "backfill", entry, panel: summary(PANEL), series: absent, planned: [], stored: [point(file(1))], pin: true, at: "t2" });
+  expect(after.panels[PANEL]).toMatchObject({ complete: true, coverage: entry.panels[PANEL].coverage });
+});
+
+function timelineOf(listed: SeriesRecord, points: MeasurementDocument[], extra: Partial<Parameters<typeof buildTimeline>[0]> = {}) {
+  return buildTimeline({
+    country: "zz", panelId: PANEL, series: listed, points, references: null, labels: null, builtAt: "t", ...extra,
+  });
+}
+
+test("the timeline takes its order and dates from the series record, so a corrected date needs no run", () => {
+  const points = [point(file(1), [cell(100)]), point(file(2), [cell(110)])];
+  const first = timelineOf(series([build("b1", file(1)), build("b2", file(2))]), points);
+  expect(first.builds.map((b) => b.buildId)).toEqual([`${LINE}/b1`, `${LINE}/b2`]);
+  expect(first.outputs[0].values[1]).toMatchObject({ comparedWith: `${LINE}/b1`, change: 10, relativeChange: 0.1 });
+  // b1's publish time is corrected to after b2's: the same points, re-ordered.
+  const corrected = timelineOf(
+    series([build("b1", file(1), { published_at: "2026-11-20T00:00:00Z" }), build("b2", file(2))]),
+    points,
+  );
+  expect(corrected.builds.map((b) => b.buildId)).toEqual([`${LINE}/b2`, `${LINE}/b1`]);
+  expect(corrected.builds[1].publishedAt).toBe("2026-11-20T00:00:00Z");
+  expect(corrected.outputs[0].values[1]).toMatchObject({ comparedWith: `${LINE}/b2`, change: -10 });
+});
+
+test("a step joins series neighbours only; withdrawn builds and orphan points never make one", () => {
+  const listed = series([
+    build("b1", file(1)),
+    build("b2", file(2)),
+    build("b3", file(3)),
+    build("b4", file(4), { withdrawn: true }),
+    build("b5", file(5), { current: true }),
+    build("b6", file(5)),
+  ]);
+  const points = [
+    point(file(1), [cell(100)]),
+    point(file(3), [cell(130)]),
+    point(file(4), [cell(140)]),
+    point(file(5), [cell(150)]),
+    // A file the series no longer lists: it never plots.
+    point(file(9), [cell(999), cell(1, "ok", "baseline/orphan")]),
+  ];
+  const states = {
+    [file(2)]: {
+      digest: file(2), state: "retrying" as const, measurementId: null, measurementStatus: null,
+      attempts: 1, lastError: "no_measurement_written", lastBuildId: `${LINE}/b2`,
+    },
+  };
+  const timeline = timelineOf(listed, points, { states });
+  expect(timeline.builds.map((b) => [b.buildId, b.state, b.withdrawn, b.sameFileAs])).toEqual([
+    [`${LINE}/b1`, "measured", false, null],
+    [`${LINE}/b2`, "retrying", false, null],
+    [`${LINE}/b3`, "measured", false, null],
+    [`${LINE}/b4`, "measured", true, null],
+    [`${LINE}/b5`, "measured", false, null],
+    [`${LINE}/b6`, "measured", false, `${LINE}/b5`],
+  ]);
+  expect(timeline.builds[1].reason).toBe("no_measurement_written");
+  expect(timeline.builds[4].current).toBe(true);
+  expect(timeline.outputs.map((o) => o.output)).toEqual(["baseline/tax"]);
+  const values = timeline.outputs[0].values;
+  expect(values.map((v) => v.status)).toEqual(["ok", "unmeasured", "ok", "ok", "ok", "ok"]);
+  // b3's neighbour b2 has no value: no step across it, and none back to b1.
+  expect(values[2]).toMatchObject({ comparedWith: null, change: null, changeStatus: "none" });
+  // The withdrawn b4 is shown but never a neighbour: b5 steps from b3.
+  expect(values[3]).toMatchObject({ comparedWith: null, changeStatus: "none" });
+  expect(values[4]).toMatchObject({ comparedWith: `${LINE}/b3`, change: 20 });
+  // b6 publishes b5's file again: a step of zero.
+  expect(values[5]).toMatchObject({ comparedWith: `${LINE}/b5`, change: 0, changeStatus: "ok" });
+  expect(JSON.stringify(timeline)).not.toContain(file(9));
+});
+
+test("a withheld cell carries its status and no reason, and no change touches it", () => {
+  const listed = series([build("b1", file(1)), build("b2", file(2)), build("b3", file(3))]);
+  const timeline = timelineOf(listed, [
+    point(file(1), [cell(100)]),
+    point(file(2), [cell(null, "withheld")]),
+    point(file(3), [cell(120)]),
+  ]);
+  const values = timeline.outputs[0].values;
+  expect(values.map((v) => v.status)).toEqual(["ok", "withheld", "ok"]);
+  expect(values[1]).toMatchObject({ value: null, comparedWith: `${LINE}/b1`, changeStatus: "withheld", change: null });
+  expect(values[2]).toMatchObject({ comparedWith: `${LINE}/b2`, changeStatus: "withheld", change: null });
+  for (const value of values) expect(Object.keys(value)).not.toContain("reason");
+  expect(JSON.stringify(timeline)).not.toContain("small_cell");
+});
+
+test("the timeline carries the country's labels and references, and changes are relative for money and in points for rates", () => {
+  const listed = series([build("b1", file(1)), build("b2", file(2))]);
+  const labels = {
+    format_version: 1, kind: "release_history.labels" as const, country: "zz",
+    reforms: { up: { label: "Tax up", source: null } },
+  };
+  const timeline = timelineOf(listed, [
+    point(file(1), [cell(200), cell(0.2, "ok", "baseline/poverty", "rate"), cell(-5, "ok", "reform/up/budgetary_impact")]),
+    point(file(2), [cell(210), cell(0.25, "ok", "baseline/poverty", "rate"), cell(-6, "ok", "reform/up/budgetary_impact")]),
+  ], {
+    labels,
     references: {
       baseline: { tax: { status: "resolved", value: 120, sign: 1, facts: [{ period: { value: 2026 } }] } },
       reforms: { up: { status: "citation", output: "budgetary_impact", sign: -1, citation: { row: "x" } } },
     },
-    points: [
-      measurement("m3", "b3", "2026-11-03T00:00:00Z", [cell(null, "withheld")]),
-      measurement("m1", "b1", "2026-11-01T00:00:00Z", [
-        cell(100),
-        { output: "reform/up/budgetary_impact", period: 2026, unit: "currency", value: -5, status: "ok" },
-      ]),
-      measurement("m2", "b2", "2026-11-02T00:00:00Z", [], "error"),
-      measurement("m4", "b4", "2026-11-04T00:00:00Z", [cell(110)]),
-    ],
   });
-  expect(timeline.points.map((p) => p.releaseId)).toEqual(["b1", "b2", "b3", "b4"]);
-  const tax = timeline.series.find((s) => s.output === "baseline/tax")!;
-  expect(tax.values.map((v) => v.status)).toEqual(["ok", "error", "withheld", "ok"]);
-  expect(tax.values[2]).toMatchObject({ comparedWith: "m1", changeStatus: "withheld", change: null });
-  expect(tax.values[3]).toMatchObject({ comparedWith: "m3", changeStatus: "withheld", change: null });
-  expect(tax.reference).toMatchObject({ status: "resolved", modelSignValue: 120 });
-  const reform = timeline.series.find((s) => s.output === "reform/up/budgetary_impact")!;
-  expect(reform.reference).toMatchObject({ status: "citation", sign: -1 });
+  expect(timeline.labels).toEqual(labels.reforms);
+  expect(timeline.listing).toEqual({ commit: COMMIT, listedAt: "2026-11-12T00:00:00Z", rule: { releases: [LINE], since: null } });
+  const output = (name: string) => timeline.outputs.find((o) => o.output === name)!;
+  expect(output("baseline/tax").values[1]).toMatchObject({ change: 10, relativeChange: 0.05, changePoints: null });
+  expect(output("baseline/poverty").values[1].changePoints).toBeCloseTo(5);
+  expect(output("baseline/tax").reference).toMatchObject({ status: "resolved", modelSignValue: 120 });
+  expect(output("reform/up/budgetary_impact").reference).toMatchObject({ status: "citation", sign: -1 });
+  // A changed label reaches the next timeline from the same points.
+  const renamed = timelineOf(listed, [point(file(1)), point(file(2))], {
+    labels: { ...labels, reforms: { up: { label: "Basic rate +1p", source: null } } },
+  });
+  expect(renamed.labels.up.label).toBe("Basic rate +1p");
 });
 
-test("changes are relative for money and in points for rates", () => {
-  const timeline = buildTimeline({
-    country: "uk",
-    panelId: PANEL,
-    builtAt: "t",
-    references: null,
-    points: [
-      measurement("m1", "b1", "2026-11-01T00:00:00Z", [
-        { output: "baseline/tax", period: 2026, unit: "currency", value: 200, status: "ok" },
-        { output: "baseline/poverty", period: 2026, unit: "rate", value: 0.2, status: "ok" },
-      ]),
-      measurement("m2", "b2", "2026-11-02T00:00:00Z", [
-        { output: "baseline/tax", period: 2026, unit: "currency", value: 210, status: "ok" },
-        { output: "baseline/poverty", period: 2026, unit: "rate", value: 0.25, status: "ok" },
-      ]),
-    ],
-  });
-  const value = (output: string) => timeline.series.find((s) => s.output === output)!.values[1];
-  expect(value("baseline/tax")).toMatchObject({ change: 10, relativeChange: 0.05, changePoints: null });
-  expect(value("baseline/poverty").changePoints).toBeCloseTo(5);
+test("the axis drops builds without a file and withdrawn builds", () => {
+  const listed = series([build("b1", file(1)), build("b2", null), build("b3", file(3), { withdrawn: true })]);
+  expect(seriesAxis(listed).map((b) => b.build_id)).toEqual([`${LINE}/b1`]);
+  expect(seriesAxis(null)).toEqual([]);
 });
