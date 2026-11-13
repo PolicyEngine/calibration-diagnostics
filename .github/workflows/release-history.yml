@@ -4,7 +4,7 @@ name: Release history
 # releases.json lists the builds, on that country's pinned reference engine
 # (calibration-diagnostics#224). See docs/release-history.md.
 #
-# - Weekly (Mondays): a top-up run for each country listed in the repository
+# - Weekly (Sundays, 05:00 UTC): a top-up run for each country listed in the repository
 #   variable RELEASE_HISTORY_WEEKLY (country codes, space- or comma-separated;
 #   unset or empty runs nothing). It measures the files no pinned engine has
 #   measured yet and, after an engine move, the last build the previous
@@ -44,7 +44,7 @@ on:
         required: false
         type: string
   schedule:
-    - cron: "0 5 * * 1"
+    - cron: "0 5 * * 0"
 
 permissions:
   contents: read
