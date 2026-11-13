@@ -15,7 +15,9 @@ The dashboard server also reads:
 - Hugging Face, for calibration releases and staging runs
   ([Hugging Face reads](#hugging-face-reads));
 - the hosted Microcosm telemetry collector, for build progress
-  ([Reading the telemetry collector](#reading-the-telemetry-collector));
+  ([Reading the telemetry collector](#reading-the-telemetry-collector)). The
+  Hugging Face webhook also asks the collector to queue calibration-tree builds
+  ([Calibration-tree build requests](#calibration-tree-build-requests));
 - private Vercel Blob storage, for the published calibration tree and comparison
   artifacts (see [calibration tree artifacts](../docs/calibration-tree-artifacts.md)).
   The dashboard's Blob reads pass no credential, so `@vercel/blob` uses the
@@ -207,7 +209,7 @@ present when listed on 2026-10-26; no value was read.
 | `VERCEL_TOKEN` | `Production` environment secret | `deploy-dashboard.sh deploy-frontend` and `vercel promote`. |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | `Production` environment secret | The checks of the unaliased candidate, which send it as `x-vercel-protection-bypass` because Vercel protects generated deployment URLs. |
 | `HF_RELEASE_READ_TOKEN` | Repository Actions secret | `vercel deploy --env`, as the candidate's runtime `HF_TOKEN` ([Hugging Face reads](#hugging-face-reads)). |
-| `MICROCOSM_TELEMETRY_COLLECTOR_URL` | `Production` environment variable | `vercel deploy --env`, for the candidate's collector client. |
+| `MICROCOSM_TELEMETRY_COLLECTOR_URL` | `Production` environment variable | `vercel deploy --env`, for the candidate's collector client and its Hugging Face webhook's calibration-tree build requests. |
 | `TELEMETRY_GCP_WIF_PROVIDER`, `TELEMETRY_GCP_DEPLOY_SERVICE_ACCOUNT` | `Production` environment secrets | `google-github-actions/auth`, used only by the read-secret existence check. The service account is the collector's deploy service account. |
 | `TELEMETRY_GCP_PROJECT_ID`, `TELEMETRY_READ_SECRET_NAME` | `Production` environment variables | The read-secret existence check, as `PROJECT_ID` and `READ_SECRET_NAME`. |
 | `CALIBRATION_MODAL_APP_NAME` | Output of the backend-name step: `calibration-diagnostics-<first 12 characters of the commit>` | The Modal deploy step, where `backend/modal_app.py` names the application and records the name in the image, and the URL-resolution step. |
@@ -227,7 +229,8 @@ environment, which the workflow neither supplies nor changes:
 was listed on 2026-10-26. The project also stores its own Production `HF_TOKEN` and
 `MICROCOSM_TELEMETRY_COLLECTOR_URL`, both of which the workflow also passes with
 `--env`; which of the two values a deployment uses was not verified for either. Vercel
-provides `VERCEL=1` and the deployment's OIDC token itself.
+provides `VERCEL=1` and the deployment's OIDC token itself; the Hugging Face webhook
+sends that token to the collector.
 
 ## Reading the telemetry collector
 
@@ -235,12 +238,14 @@ The Microcosm telemetry collector runs on Google Cloud Run. Its source, tests an
 deployment are in
 [PolicyEngine/microcosm-collector](https://github.com/PolicyEngine/microcosm-collector),
 which has deployed it since 2026-10-21. A merge to this repository's `main` deploys only
-the dashboard and its Modal backend, never the collector. The dashboard only reads the
-collector, from server code (`frontend/lib/server/microcosm/telemetry-collector-client.ts`),
+the dashboard and its Modal backend, never the collector. The build monitor reads the
+collector from server code (`frontend/lib/server/microcosm/telemetry-collector-client.ts`),
 with three server-only settings:
 
 - `MICROCOSM_TELEMETRY_COLLECTOR_URL`: the collector address. It must use HTTPS, except
-  on `localhost` or `127.0.0.1`. The workflow passes production deployments the GitHub
+  on `localhost` or `127.0.0.1`, and must not contain credentials, a query or a fragment
+  (`frontend/lib/server/microcosm/telemetry-collector-url.ts`, which the Hugging Face
+  webhook's build requests use too). The workflow passes production deployments the GitHub
   `Production` environment variable through `vercel deploy --env`, and the Vercel
   project also stores a Production value; which one a deployment uses was not
   verified. Previews get it from the Vercel project's Preview settings.
@@ -272,6 +277,29 @@ Google side, the provider's trust in that issuer and audience and each identity'
 access to its own read secret, was provisioned outside this repository and is not
 verified here. [docs/build-monitor.md](../docs/build-monitor.md) describes the build
 monitor that shows these runs.
+
+### Calibration-tree build requests
+
+The Hugging Face webhook route (`frontend/app/api/hf-webhook/route.ts`) asks the
+collector to queue a calibration-tree build, `POST /v1/calibration-tree-builds`, for
+each delivery that dispatches the calibration tree publisher
+([Calibration-tree builds in the collector](../docs/calibration-tree-artifacts.md#calibration-tree-builds-in-the-collector)).
+It reads two things besides its own webhook settings:
+
+- `MICROCOSM_TELEMETRY_COLLECTOR_URL`, once, when the server module starts, with the
+  same rule as the build monitor. Unset, the webhook sends no request. An invalid value
+  is reported in each delivery's answer as a failed request and never stops the GitHub
+  dispatch. The webhook needs neither `MICROCOSM_TELEMETRY_READ_SECRET_VERSION` nor
+  `MICROCOSM_TELEMETRY_GOOGLE_IDENTITY_PROVIDER`.
+- The deployment's Vercel OIDC token, read with `getVercelOidcToken()` (`@vercel/oidc`)
+  for each request and sent as `Authorization: Bearer`. Vercel adds it to each function
+  request while the project has OIDC turned on (see above); the route runs as a Node.js
+  function on every call (`runtime = "nodejs"`, `dynamic = "force-dynamic"`).
+
+The Hugging Face webhook targets only the production domain, so only production
+deployments send these requests. The collector accepts one only from a Vercel project and
+environment it lists as a tree-build caller; that list is part of the collector's
+deployment, not this repository's, and is not verified here.
 
 ## Hugging Face reads
 
