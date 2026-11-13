@@ -1,6 +1,9 @@
 import { expect, spyOn, test } from "bun:test";
 
-import type { HfWebhookConfig } from "@/lib/microcosm/hf-webhook-config";
+import {
+  resolveHfWebhookConfig,
+  type HfWebhookConfig,
+} from "@/lib/microcosm/hf-webhook-config";
 import {
   createHfWebhookHandler,
   type HfWebhookHandlerDependencies,
@@ -15,11 +18,11 @@ const REPOSITORIES = {
 } as const;
 
 const TEST_REPOSITORIES: HfWebhookConfig["repositories"] = new Map([
-  [REPOSITORIES.usRelease, { country: "us", kind: "release" }],
-  [REPOSITORIES.usStaging, { country: "us", kind: "staging" }],
-  [REPOSITORIES.ukRelease, { country: "uk", kind: "release" }],
-  [REPOSITORIES.ukStaging, { country: "uk", kind: "staging" }],
-  [REPOSITORIES.beRelease, { country: "be", kind: "release" }],
+  [REPOSITORIES.usRelease, { country: "us", kind: "release", repo: REPOSITORIES.usRelease }],
+  [REPOSITORIES.usStaging, { country: "us", kind: "staging", repo: REPOSITORIES.usStaging }],
+  [REPOSITORIES.ukRelease, { country: "uk", kind: "release", repo: REPOSITORIES.ukRelease }],
+  [REPOSITORIES.ukStaging, { country: "uk", kind: "staging", repo: REPOSITORIES.ukStaging }],
+  [REPOSITORIES.beRelease, { country: "be", kind: "release", repo: REPOSITORIES.beRelease }],
 ]);
 
 function webhookConfig(
@@ -327,6 +330,7 @@ test("webhook returns a retriable server error when GitHub rejects dispatch", as
   expect(response.status).toBe(502);
   expect(await response.json()).toEqual({
     detail: "Unable to start calibration tree publication.",
+    tree_build: { status: "not_configured" },
   });
 });
 
@@ -789,6 +793,7 @@ test("a delivery without a main update answers as before, naming no releases.jso
       { event_kind: "tag", release_id: "microcosm-uk-release", hf_commit_sha: "1".repeat(40) },
     ],
     alerted: [],
+    tree_build: { status: "not_configured" },
   });
 });
 
@@ -799,4 +804,574 @@ test("a main update's answer lists the releases.json alerts it posted", async ()
   });
 
   expect(result.release_record_alerted).toEqual([`withdrawn ${NATIONAL}/${OLDER}`]);
+});
+
+// -- Calibration-tree builds queued in the collector -------------------------
+//
+// Each delivery that dispatches the GitHub workflow also asks the telemetry
+// collector to queue a calibration-tree build of the country and kind,
+// `POST /v1/calibration-tree-builds` (microcosm-collector#66), at the same
+// time as the dispatch. All values are synthetic: the collector is a
+// placeholder address answered by a fake, and the Vercel OIDC token is a fake
+// value.
+
+const COLLECTOR_URL = "https://collector.example";
+const TREE_BUILDS_URL = `${COLLECTOR_URL}/v1/calibration-tree-builds`;
+const OIDC_TOKEN = "test-vercel-oidc-token";
+const NOT_BEFORE = "2026-11-13T12:10:00+00:00";
+// Text of a collector error answer, which must never reach the webhook's answer.
+const COLLECTOR_REFUSAL = "collector-refusal-detail";
+
+type CollectorAnswer = () => Response | Promise<Response>;
+
+interface CapturedRequest {
+  url: string;
+  init: RequestInit;
+}
+
+interface UpdatedRefPayload {
+  ref: string;
+  oldSha: string | null;
+  newSha: string | null;
+}
+
+function treeBuildTaskId(country: string, kind: string): string {
+  return `calibration-trees-${country}-${kind}-2950000`;
+}
+
+/** The collector's 202 answer for a queued request (#66's route). */
+function queuedTreeBuild(
+  outcome: "queued" | "already_queued" = "queued",
+  country = "us",
+  kind = "staging",
+): CollectorAnswer {
+  return () =>
+    Response.json(
+      {
+        status: outcome,
+        task_id: treeBuildTaskId(country, kind),
+        country,
+        kind,
+        not_before: NOT_BEFORE,
+      },
+      { status: 202 },
+    );
+}
+
+function delivery(repo: string, updatedRefs: UpdatedRefPayload[]) {
+  return { repo: { name: repo }, updatedRefs };
+}
+
+function mainUpdate(newSha: string, oldSha: string | null = testSha(30)): UpdatedRefPayload {
+  return { ref: "refs/heads/main", oldSha, newSha };
+}
+
+function newTag(name: string, newSha: string): UpdatedRefPayload {
+  return { ref: `refs/tags/${name}`, oldSha: null, newSha };
+}
+
+/**
+ * A webhook whose fetch serves the GitHub dispatch (204 unless `dispatch` is
+ * given), releases.json (Hugging Face's 404 unless `releasesRecord` is given)
+ * and the collector (a 202 "queued" unless `collector` is given), and records
+ * the dispatches and collector requests. The collector address is configured
+ * unless `config` overrides it.
+ */
+function treeBuildWebhook(options: {
+  collector?: CollectorAnswer;
+  dispatch?: () => Response | Promise<Response>;
+  releasesRecord?: () => Response;
+  config?: Partial<HfWebhookConfig>;
+  vercelOidcToken?: () => Promise<string>;
+} = {}) {
+  const collectorRequests: CapturedRequest[] = [];
+  const dispatches: CapturedRequest[] = [];
+  let tokenReads = 0;
+  const fetchImplementation: HfWebhookHandlerDependencies["fetch"] = async (input, init) => {
+    const url = String(input);
+    if (url.startsWith("https://api.github.com/")) {
+      dispatches.push({ url, init: init ?? {} });
+      return options.dispatch?.() ?? new Response(null, { status: 204 });
+    }
+    if (url.endsWith("/releases.json")) {
+      return options.releasesRecord?.() ?? missingReleasesRecord();
+    }
+    if (url.startsWith(`${COLLECTOR_URL}/`)) {
+      collectorRequests.push({ url, init: init ?? {} });
+      return (options.collector ?? queuedTreeBuild())();
+    }
+    throw new Error(`Unexpected URL ${url}`);
+  };
+  const POST = createHfWebhookHandler(
+    webhookConfig({ treeBuildCollector: { baseUrl: COLLECTOR_URL }, ...options.config }),
+    {
+      fetch: fetchImplementation,
+      postReleaseAlert: async () => false,
+      postReleaseRecordAlert: async () => false,
+      vercelOidcToken:
+        options.vercelOidcToken ??
+        (async () => {
+          tokenReads += 1;
+          return OIDC_TOKEN;
+        }),
+    },
+  );
+  return { POST, collectorRequests, dispatches, tokenReads: () => tokenReads };
+}
+
+/** One delivery to a new treeBuildWebhook, with console.error captured. */
+async function deliver(
+  payload: unknown,
+  options: Parameters<typeof treeBuildWebhook>[0] = {},
+) {
+  const webhook = treeBuildWebhook(options);
+  const logged = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const response = await webhook.POST(request(payload));
+    const text = await response.text();
+    return {
+      status: response.status,
+      text,
+      body: JSON.parse(text),
+      collectorRequests: webhook.collectorRequests,
+      dispatches: webhook.dispatches,
+      tokenReads: webhook.tokenReads(),
+      logged: logged.mock.calls.map((call) => call.map(String).join(" ")),
+    };
+  } finally {
+    logged.mockRestore();
+  }
+}
+
+function expectOneTreeBuildRequest(
+  requests: CapturedRequest[],
+  body: Record<string, unknown>,
+) {
+  expect(requests).toHaveLength(1);
+  const [sent] = requests;
+  expect(sent.url).toBe(TREE_BUILDS_URL);
+  expect(sent.init.method).toBe("POST");
+  expect(Object.fromEntries(new Headers(sent.init.headers).entries())).toEqual({
+    authorization: `Bearer ${OIDC_TOKEN}`,
+    "content-type": "application/json",
+  });
+  expect(JSON.parse(String(sent.init.body))).toEqual(body);
+}
+
+function dispatchInputs(dispatches: CapturedRequest[]) {
+  return dispatches.map((dispatch) => JSON.parse(String(dispatch.init.body)).inputs);
+}
+
+test("a staging repository's main update also asks the collector to queue a staging calibration-tree build", async () => {
+  for (const [repo, country] of [
+    [REPOSITORIES.usStaging, "us"],
+    [REPOSITORIES.ukStaging, "uk"],
+  ] as const) {
+    const commit = testSha(40);
+    const result = await deliver(delivery(repo, [mainUpdate(commit)]));
+
+    expect(result.status).toBe(200);
+    expectOneTreeBuildRequest(result.collectorRequests, {
+      country,
+      kind: "staging",
+      hf_repo: repo,
+      hf_ref: "refs/heads/main",
+      hf_commit: commit,
+    });
+    expect(dispatchInputs(result.dispatches)).toEqual([
+      { country, event_kind: "staging", release_id: "", hf_commit_sha: commit },
+    ]);
+  }
+});
+
+test("a release repository's new tag also asks the collector to queue a release calibration-tree build, naming the tag", async () => {
+  const tagCommit = testSha(41);
+  const result = await deliver(
+    delivery(REPOSITORIES.usRelease, [
+      newTag("microcosm-us-2026-11-13", tagCommit),
+      mainUpdate(testSha(42)),
+    ]),
+    { collector: queuedTreeBuild("queued", "us", "release") },
+  );
+
+  expect(result.status).toBe(200);
+  expectOneTreeBuildRequest(result.collectorRequests, {
+    country: "us",
+    kind: "release",
+    hf_repo: REPOSITORIES.usRelease,
+    hf_ref: "refs/tags/microcosm-us-2026-11-13",
+    hf_commit: tagCommit,
+  });
+  expect(dispatchInputs(result.dispatches)).toEqual([
+    {
+      country: "us",
+      event_kind: "tag",
+      release_id: "microcosm-us-2026-11-13",
+      hf_commit_sha: tagCommit,
+    },
+  ]);
+});
+
+test("a release repository's main update without a new tag also asks the collector to queue a release calibration-tree build", async () => {
+  const commit = testSha(43);
+  const result = await deliver(delivery(REPOSITORIES.ukRelease, [mainUpdate(commit)]), {
+    collector: queuedTreeBuild("queued", "uk", "release"),
+  });
+
+  expect(result.status).toBe(200);
+  expectOneTreeBuildRequest(result.collectorRequests, {
+    country: "uk",
+    kind: "release",
+    hf_repo: REPOSITORIES.ukRelease,
+    hf_ref: "refs/heads/main",
+    hf_commit: commit,
+  });
+  expect(dispatchInputs(result.dispatches)).toEqual([
+    { country: "uk", event_kind: "branch", release_id: "", hf_commit_sha: commit },
+  ]);
+});
+
+test("a Belgian release asks the collector to queue a release calibration-tree build for be", async () => {
+  const tagCommit = testSha(44);
+  const result = await deliver(
+    delivery(REPOSITORIES.beRelease, [newTag("microcosm-be-2026-11-13", tagCommit)]),
+    { collector: queuedTreeBuild("queued", "be", "release") },
+  );
+
+  expect(result.status).toBe(200);
+  expectOneTreeBuildRequest(result.collectorRequests, {
+    country: "be",
+    kind: "release",
+    hf_repo: REPOSITORIES.beRelease,
+    hf_ref: "refs/tags/microcosm-be-2026-11-13",
+    hf_commit: tagCommit,
+  });
+  expect(result.dispatches).toHaveLength(1);
+});
+
+test("the collector request names the repository as configured, not as the delivery spells it", async () => {
+  // The collector compares the name exactly, so neither the delivery's
+  // spelling nor its lower-case form would do.
+  const configured = "Example/us-Release";
+  const result = await deliver(
+    delivery("EXAMPLE/US-RELEASE", [mainUpdate(testSha(45))]),
+    {
+      config: {
+        repositories: new Map([
+          [configured.toLowerCase(), { country: "us", kind: "release", repo: configured }],
+        ]),
+      },
+    },
+  );
+
+  expect(result.status).toBe(200);
+  expect(result.collectorRequests).toHaveLength(1);
+  expect(JSON.parse(String(result.collectorRequests[0].init.body)).hf_repo).toBe(configured);
+});
+
+test("a malformed ref or commit is left out of the collector request, which is still sent", async () => {
+  // Tag names the collector's ref pattern refuses: a leading dot, a space,
+  // and more than 200 characters.
+  for (const tag of [".hidden", "two words", "a".repeat(201)]) {
+    const commit = testSha(46);
+    const result = await deliver(delivery(REPOSITORIES.beRelease, [newTag(tag, commit)]));
+
+    expect(result.status).toBe(200);
+    expectOneTreeBuildRequest(result.collectorRequests, {
+      country: "be",
+      kind: "release",
+      hf_repo: REPOSITORIES.beRelease,
+      hf_commit: commit,
+    });
+    expect(result.dispatches).toHaveLength(1);
+  }
+
+  // Commits that are not 40 lower-case hexadecimal characters.
+  for (const commit of ["A".repeat(40), "abc123"]) {
+    const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(commit)]));
+
+    expect(result.status).toBe(200);
+    expectOneTreeBuildRequest(result.collectorRequests, {
+      country: "us",
+      kind: "staging",
+      hf_repo: REPOSITORIES.usStaging,
+      hf_ref: "refs/heads/main",
+    });
+    expect(dispatchInputs(result.dispatches)).toEqual([
+      { country: "us", event_kind: "staging", release_id: "", hf_commit_sha: commit },
+    ]);
+  }
+});
+
+test("the Vercel OIDC token is read for each collector request, never when the handler is created", async () => {
+  const tokens = ["first-oidc-token", "second-oidc-token"];
+  let reads = 0;
+  const webhook = treeBuildWebhook({
+    vercelOidcToken: async () => tokens[reads++] ?? "unexpected-oidc-token",
+  });
+
+  expect(reads).toBe(0);
+  for (const commit of [testSha(47), testSha(48)]) {
+    const response = await webhook.POST(
+      request(delivery(REPOSITORIES.usStaging, [mainUpdate(commit)])),
+    );
+    expect(response.status).toBe(200);
+  }
+
+  expect(reads).toBe(2);
+  expect(
+    webhook.collectorRequests.map((sent) => new Headers(sent.init.headers).get("Authorization")),
+  ).toEqual(["Bearer first-oidc-token", "Bearer second-oidc-token"]);
+});
+
+test("the collector request and the GitHub dispatch run at the same time", async () => {
+  const events: string[] = [];
+  const pause = () => new Promise((resolve) => setTimeout(resolve, 20));
+  const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(49))]), {
+    dispatch: async () => {
+      events.push("dispatch started");
+      await pause();
+      events.push("dispatch finished");
+      return new Response(null, { status: 204 });
+    },
+    collector: async () => {
+      events.push("collector request started");
+      await pause();
+      events.push("collector request finished");
+      return queuedTreeBuild()();
+    },
+  });
+
+  expect(result.status).toBe(200);
+  expect(events.slice(0, 2).sort()).toEqual(["collector request started", "dispatch started"]);
+});
+
+test("a 202 from the collector answers 200 with its queued or already_queued tree build, and dispatches as before", async () => {
+  for (const outcome of ["queued", "already_queued"] as const) {
+    const commit = testSha(50);
+    const result = await deliver(delivery(REPOSITORIES.ukStaging, [mainUpdate(commit)]), {
+      collector: queuedTreeBuild(outcome, "uk", "staging"),
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({
+      ok: true,
+      country: "uk",
+      dispatched: [{ event_kind: "staging", release_id: null, hf_commit_sha: commit }],
+      alerted: [],
+      tree_build: {
+        status: outcome,
+        task_id: treeBuildTaskId("uk", "staging"),
+        not_before: NOT_BEFORE,
+      },
+    });
+    expect(dispatchInputs(result.dispatches)).toEqual([
+      { country: "uk", event_kind: "staging", release_id: "", hf_commit_sha: commit },
+    ]);
+    expect(result.logged).toEqual([]);
+  }
+});
+
+function expectFailedTreeBuild(result: Awaited<ReturnType<typeof deliver>>) {
+  // The GitHub dispatch decides the answer, as before.
+  expect(result.status).toBe(200);
+  expect(result.dispatches).toHaveLength(1);
+  expect(result.body.dispatched).toHaveLength(1);
+  expect(result.body.tree_build).toMatchObject({ status: "failed" });
+  expect(Object.keys(result.body.tree_build).sort()).toEqual(["detail", "status"]);
+  expect(typeof result.body.tree_build.detail).toBe("string");
+  expect(result.logged.length).toBeGreaterThan(0);
+  // Neither the token nor the collector's own text reaches the answer, and
+  // the token is never logged.
+  expect(result.text).not.toContain(OIDC_TOKEN);
+  expect(result.text).not.toContain(COLLECTOR_REFUSAL);
+  expect(result.logged.join("\n")).not.toContain(OIDC_TOKEN);
+}
+
+test("a collector error answer is a failed tree build: logged with its status, and the dispatch still answers 200", async () => {
+  for (const code of [401, 403, 404, 422, 503]) {
+    const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(51))]), {
+      collector: () => Response.json({ detail: COLLECTOR_REFUSAL }, { status: code }),
+    });
+
+    expectFailedTreeBuild(result);
+    expect(result.body.tree_build.detail).toContain(String(code));
+    expect(result.logged.some((entry) => entry.includes(String(code)))).toBe(true);
+  }
+});
+
+test("a network failure or a timeout reaching the collector is a failed tree build, and the dispatch still answers 200", async () => {
+  const failures: Array<[CollectorAnswer, string]> = [
+    [() => { throw new TypeError("fetch failed"); }, "could not be reached"],
+    [() => { throw new DOMException("The operation timed out.", "TimeoutError"); }, "15 seconds"],
+  ];
+  for (const [failure, detail] of failures) {
+    const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(52))]), {
+      collector: failure,
+    });
+
+    expectFailedTreeBuild(result);
+    expect(result.body.tree_build.detail).toContain(detail);
+    expect(result.collectorRequests).toHaveLength(1);
+    expect(result.collectorRequests[0].init.signal).toBeInstanceOf(AbortSignal);
+  }
+});
+
+test("a 202 whose body is not the collector's queued answer is a failed tree build", async () => {
+  const unreadable: CollectorAnswer[] = [
+    () => new Response(COLLECTOR_REFUSAL, { status: 202 }),
+    () => Response.json({ status: COLLECTOR_REFUSAL, task_id: "x", not_before: NOT_BEFORE }, { status: 202 }),
+    () => Response.json({ status: "queued" }, { status: 202 }),
+  ];
+  for (const answer of unreadable) {
+    const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(53))]), {
+      collector: answer,
+    });
+
+    expectFailedTreeBuild(result);
+  }
+});
+
+test("a failed Vercel OIDC token read is a failed tree build: no collector request, and the dispatch still answers 200", async () => {
+  const failedReads: Array<() => Promise<string>> = [
+    async () => {
+      throw new Error("The 'x-vercel-oidc-token' header is missing from the request.");
+    },
+    async () => "",
+  ];
+  for (const vercelOidcToken of failedReads) {
+    const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(54))]), {
+      vercelOidcToken,
+    });
+
+    expect(result.collectorRequests).toEqual([]);
+    expectFailedTreeBuild(result);
+  }
+});
+
+test("an invalid collector address is a failed tree build on every delivery, and the dispatch still answers 200", async () => {
+  const invalidAddress = "http://collector.example";
+  const { treeBuildCollector } = resolveHfWebhookConfig({
+    MICROCOSM_TELEMETRY_COLLECTOR_URL: invalidAddress,
+  });
+  const webhook = treeBuildWebhook({ config: { treeBuildCollector } });
+  const logged = spyOn(console, "error").mockImplementation(() => {});
+  try {
+    for (const commit of [testSha(55), testSha(56)]) {
+      const response = await webhook.POST(
+        request(delivery(REPOSITORIES.usStaging, [mainUpdate(commit)])),
+      );
+      const text = await response.text();
+      const body = JSON.parse(text);
+
+      expect(response.status).toBe(200);
+      expect(body.dispatched).toHaveLength(1);
+      expect(body.tree_build).toMatchObject({ status: "failed" });
+      expect(text).not.toContain(invalidAddress);
+    }
+    expect(webhook.dispatches).toHaveLength(2);
+    expect(webhook.collectorRequests).toEqual([]);
+    expect(webhook.tokenReads()).toBe(0);
+    expect(logged.mock.calls).toHaveLength(2);
+  } finally {
+    logged.mockRestore();
+  }
+});
+
+test("without a collector address, no collector request is sent and the answer's tree build is not_configured", async () => {
+  const commit = testSha(57);
+  const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(commit)]), {
+    config: { treeBuildCollector: undefined },
+  });
+
+  expect(result.status).toBe(200);
+  expect(result.collectorRequests).toEqual([]);
+  expect(result.tokenReads).toBe(0);
+  expect(result.body).toEqual({
+    ok: true,
+    country: "us",
+    dispatched: [{ event_kind: "staging", release_id: null, hf_commit_sha: commit }],
+    alerted: [],
+    tree_build: { status: "not_configured" },
+  });
+  expect(result.dispatches).toHaveLength(1);
+  expect(result.logged).toEqual([]);
+});
+
+test("a failed GitHub dispatch still answers 502, after sending the collector request, with its tree build", async () => {
+  const result = await deliver(delivery(REPOSITORIES.beRelease, [mainUpdate(testSha(58))]), {
+    dispatch: () => new Response("forbidden", { status: 403 }),
+    collector: queuedTreeBuild("queued", "be", "release"),
+  });
+
+  expect(result.status).toBe(502);
+  expect(result.collectorRequests).toHaveLength(1);
+  expect(result.body).toEqual({
+    detail: "Unable to start calibration tree publication.",
+    tree_build: {
+      status: "queued",
+      task_id: treeBuildTaskId("be", "release"),
+      not_before: NOT_BEFORE,
+    },
+  });
+  expect(result.logged.some((entry) => entry.includes("dispatch failed"))).toBe(true);
+});
+
+test("a transient releases.json failure answers 503 before the dispatch and the collector request, and the retried delivery sends each once", async () => {
+  const update = delivery(REPOSITORIES.ukRelease, [mainUpdate(testSha(59))]);
+  const unavailable = await deliver(update, {
+    releasesRecord: () => new Response("unavailable", { status: 503 }),
+  });
+
+  expect(unavailable.status).toBe(503);
+  expect(unavailable.body).toEqual({
+    detail: "Unable to read releases.json; retry the delivery.",
+  });
+  expect(unavailable.dispatches).toEqual([]);
+  expect(unavailable.collectorRequests).toEqual([]);
+  expect(unavailable.tokenReads).toBe(0);
+
+  const retried = await deliver(update, {
+    collector: queuedTreeBuild("already_queued", "uk", "release"),
+  });
+  expect(retried.status).toBe(200);
+  expect(retried.dispatches).toHaveLength(1);
+  expect(retried.collectorRequests).toHaveLength(1);
+});
+
+test("deliveries that dispatch nothing send no collector request and answer exactly as before", async () => {
+  const webhook = treeBuildWebhook();
+  const nothingDispatched: Array<[unknown, Record<string, unknown>]> = [
+    // An unregistered repository.
+    [
+      delivery("someone/unregistered", [mainUpdate(testSha(60))]),
+      { ok: true, dispatched: [], alerted: [] },
+    ],
+    // No new tag and no main update.
+    [
+      delivery(REPOSITORIES.usRelease, [
+        { ref: "refs/heads/other", oldSha: testSha(61), newSha: testSha(62) },
+        { ref: "refs/tags/moved", oldSha: testSha(63), newSha: testSha(64) },
+      ]),
+      { ok: true, dispatched: [], alerted: [] },
+    ],
+    // A staging repository's new tag starts no build.
+    [
+      delivery(REPOSITORIES.usStaging, [newTag("not-a-finalized-run", testSha(65))]),
+      { ok: true, country: "us", dispatched: [], alerted: [] },
+    ],
+  ];
+  for (const [payload, answer] of nothingDispatched) {
+    const response = await webhook.POST(request(payload));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(JSON.stringify(answer));
+  }
+  expect(webhook.dispatches).toEqual([]);
+  expect(webhook.collectorRequests).toEqual([]);
+  expect(webhook.tokenReads()).toBe(0);
+
+  // The same webhook sends one for a delivery that dispatches, so the checks
+  // above are not met merely because it never sends any.
+  await webhook.POST(request(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(66))])));
+  expect(webhook.collectorRequests).toHaveLength(1);
 });
