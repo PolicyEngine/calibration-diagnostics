@@ -585,11 +585,24 @@ Failure meanings and recovery:
   its tree-build endpoint is not enabled; a 422 `repo_not_registered` means
   the dashboard's configured repository differs from the collector's; a 503
   means it could not queue the build then (its worker queue or Vercel's token
-  signing keys were unavailable, or it was being deployed). The
-  next delivery for the same country and kind queues a build of everything the
-  collector's store lacks. To queue one sooner, replay the delivery once the
-  cause is corrected; a replay also repeats its dispatch, which is idempotent,
-  and any tag alert it carried.
+  signing keys were unavailable, or it was being deployed). Don't replay a
+  delivery answered 200 to retry its collector request: a replay posts its
+  Slack alerts again, the alert for each new tag and, for a US or UK release
+  repository's `main` update, its `releases.json` record alerts. Once the
+  cause is corrected, any of these queues a build of everything the
+  collector's store lacks for that country and kind, without a repeated
+  alert:
+  1. Wait for the next delivery for that country and kind.
+  2. For a staging repository, replay one of its `main`-update deliveries. A
+     staging delivery posts no Slack alert.
+  3. For a release repository, send one authenticated release payload whose
+     only entry is a `refs/heads/main` update with the repository's current
+     head commit as both `oldSha` and `newSha`. It dispatches one
+     reconciliation (`event_kind=branch`) and queues a release build. It posts
+     no alert: it has no new tag, and `releases.json` is the same before and
+     after the update.
+
+  Steps 2 and 3 also repeat the GitHub dispatch, which is idempotent.
 - `503` from the application means a release repository's `releases.json`
   could not be read for a reason that may pass (a Hugging Face 5xx or 429, or
   a failed or timed-out request or body). Nothing was dispatched or posted,
@@ -708,7 +721,10 @@ The answer's `tree_build` reports the request:
   a fixed sentence naming the collector's HTTP status or the kind of failure;
   it never holds the collector's answer, the address or the token. The cause
   is logged as "Calibration tree build request to the collector failed", with
-  the collector's status and at most 200 characters of its answer;
+  the collector's status and at most 200 characters of its answer or, when
+  the request or its answer's body failed, the error and its cause (such as
+  a failed DNS lookup, connection or TLS handshake), never the request's
+  headers;
 - `{"status": "not_configured"}` when `MICROCOSM_TELEMETRY_COLLECTOR_URL` is
   unset.
 
