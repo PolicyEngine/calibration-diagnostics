@@ -22,6 +22,7 @@ import {
   WEIGHTED_TARGET_ERROR_HELP,
 } from "@/components/microcosm/calibration-explorer-view";
 import { CalibrationExplorerFilterMenu } from "@/components/microcosm/calibration-explorer-filter-menu";
+import { InheritedCalibration } from "@/components/microcosm/inherited-calibration-label";
 import { MicrocosmTargetDetail } from "@/components/microcosm/microcosm-target-detail";
 import { stagingTargetDetailPresentation } from "@/components/microcosm/staging-target-detail-presentation";
 import { fmt } from "@/components/shared/format";
@@ -622,6 +623,7 @@ function CalibrationExplorerMapForSource({
             <FitLegend mode={sizeMode} />
           </div>
         </div>
+        <InheritedCalibration provenance={data.calibrationProvenance} />
         {lossUnavailableMessage && (
           <p className="mt-1 text-[10px] text-muted-foreground">
             {lossUnavailableMessage}
