@@ -1,6 +1,7 @@
-import { expect, test } from "bun:test";
+import { afterEach, expect, test } from "bun:test";
 
 import { resolveHfWebhookConfig } from "./hf-webhook-config";
+import { hasReleaseAlertChannel, postReleaseAlert } from "@/lib/slack";
 
 test("resolves the registered release and staging repositories without ambient state", () => {
   const config = resolveHfWebhookConfig({});
@@ -64,7 +65,66 @@ test("reads the Hugging Face token for releases.json alerts as the dashboard's o
 });
 
 test("reads releases.json only for the countries whose Slack channel is configured", () => {
-  const config = resolveHfWebhookConfig({ SLACK_WEBHOOK_POPULACE_UK: "https://hooks.slack.example/uk" });
+  const config = resolveHfWebhookConfig({ SLACK_WEBHOOK_MICROCOSM_UK: "https://hooks.slack.example/uk" });
   expect([...config.releaseAlertCountries]).toEqual(["uk"]);
   expect([...resolveHfWebhookConfig({}).releaseAlertCountries]).toEqual([]);
+});
+
+test("Slack configuration accepts legacy aliases and prefers Microcosm variables", () => {
+  const legacy = {
+    SLACK_WEBHOOK_POPULACE_US: "https://hooks.slack.example/legacy-us", // compat: populace alias, remove after 0.2.0
+    SLACK_WEBHOOK_POPULACE_UK: "https://hooks.slack.example/legacy-uk", // compat: populace alias, remove after 0.2.0
+  };
+  expect([...resolveHfWebhookConfig(legacy).releaseAlertCountries]).toEqual(["us", "uk"]);
+  expect(hasReleaseAlertChannel("uk", { ...legacy, SLACK_WEBHOOK_MICROCOSM_UK: "" })).toBe(false);
+  expect(hasReleaseAlertChannel("uk", { ...legacy, SLACK_WEBHOOK_MICROCOSM_UK: "https://hooks.slack.example/current" })).toBe(true);
+});
+
+// The tests below replace fetch, post a release alert, and check which
+// webhook URL receives it.
+const LEGACY_UK_WEBHOOK_ENV = "SLACK_WEBHOOK_POPULACE_UK"; // compat: populace alias, remove after 0.2.0
+const UK_SLACK_ENV = ["SLACK_WEBHOOK_MICROCOSM_UK", LEGACY_UK_WEBHOOK_ENV];
+const originalFetch = globalThis.fetch;
+const priorUkSlackEnv = UK_SLACK_ENV.map((name) => [name, process.env[name]] as const);
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+  for (const [name, value] of priorUkSlackEnv) {
+    if (value == null) delete process.env[name];
+    else process.env[name] = value;
+  }
+});
+
+async function postUkReleaseAlert(environment: Record<string, string>) {
+  for (const name of UK_SLACK_ENV) {
+    if (name in environment) process.env[name] = environment[name];
+    else delete process.env[name];
+  }
+  const urls: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    urls.push(String(input));
+    return new Response("ok");
+  }) as typeof fetch;
+  const sent = await postReleaseAlert({ country: "uk", releaseId: "release-a", repo: "example/uk-release" });
+  return { sent, urls };
+}
+
+test("a release alert goes to the legacy Slack webhook when the environment provides only that variable", async () => {
+  expect(await postUkReleaseAlert({
+    [LEGACY_UK_WEBHOOK_ENV]: "https://hooks.slack.example/legacy-uk",
+  })).toEqual({ sent: true, urls: ["https://hooks.slack.example/legacy-uk"] });
+});
+
+test("a release alert goes to the Microcosm Slack webhook when the environment provides both variables", async () => {
+  expect(await postUkReleaseAlert({
+    SLACK_WEBHOOK_MICROCOSM_UK: "https://hooks.slack.example/current-uk",
+    [LEGACY_UK_WEBHOOK_ENV]: "https://hooks.slack.example/legacy-uk",
+  })).toEqual({ sent: true, urls: ["https://hooks.slack.example/current-uk"] });
+});
+
+test("an empty Microcosm Slack webhook turns release alerts off even when the environment provides the legacy one", async () => {
+  expect(await postUkReleaseAlert({
+    SLACK_WEBHOOK_MICROCOSM_UK: "",
+    [LEGACY_UK_WEBHOOK_ENV]: "https://hooks.slack.example/legacy-uk",
+  })).toEqual({ sent: false, urls: [] });
+  expect(await postUkReleaseAlert({})).toEqual({ sent: false, urls: [] });
 });

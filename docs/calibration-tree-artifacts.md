@@ -184,9 +184,13 @@ moved to a failed release.
 
 #### Slack release alerts
 
-The webhook posts release alerts to the country's Slack channel
-(`SLACK_WEBHOOK_POPULACE_US` or `SLACK_WEBHOOK_POPULACE_UK`; a country without
-one gets none). A Slack failure is logged and never fails the delivery.
+The webhook posts release alerts to the country's Slack channel: the webhook in
+`SLACK_WEBHOOK_MICROCOSM_US` or `SLACK_WEBHOOK_MICROCOSM_UK` or, when the
+environment lacks that name, in the former `SLACK_WEBHOOK_POPULACE_US` or
+`SLACK_WEBHOOK_POPULACE_UK`, which the Vercel project's Production environment
+held on 2026-10-26 (`frontend/HOSTED_RUNTIME.md`). <!-- compat: populace alias, remove after 0.2.0 -->
+A country with neither gets none. A Slack failure is logged and never fails the
+delivery.
 
 - **New tags:** one "New Microcosm … release" message per new tag, as before,
   after the reconciliation is dispatched.
@@ -196,8 +200,8 @@ one gets none). A Slack failure is logged and never fails the delivery.
   with `HF_TOKEN`, or `HUGGINGFACE_TOKEN` when `HF_TOKEN` is unset. A country
   without a channel (Belgium today) reads none. Both the token and which
   countries have a channel are read when the server starts, so a change to
-  `HF_TOKEN` or to a `SLACK_WEBHOOK_POPULACE_*` variable takes effect only
-  with the next `Deploy production` run.
+  `HF_TOKEN` or to either Slack webhook variable takes effect only with the
+  next `Deploy production` run.
   After dispatching, it posts one message for each change:
   - a newly published build: "New Microcosm UK build `<release>/<build>`: now
     current", or "...: published, not current (current stays `<build>`)";

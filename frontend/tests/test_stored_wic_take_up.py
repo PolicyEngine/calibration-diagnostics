@@ -32,7 +32,7 @@ def modules(monkeypatch):
     return release, core
 
 
-def write_populace_layout_fixture(path: Path) -> None:
+def write_microcosm_layout_fixture(path: Path) -> None:
     """One no-income California household: a parent and two WIC-eligible children.
 
     The tables use the reviewed release's entity-table layout and store only
@@ -75,7 +75,7 @@ def reviewed_fixture(modules, monkeypatch, tmp_path):
     """Serve the fixture as the reviewed H5, without any download."""
     release, core = modules
     dataset_path = tmp_path / "populace_us_2024.h5"
-    write_populace_layout_fixture(dataset_path)
+    write_microcosm_layout_fixture(dataset_path)
     reviewed = release.reviewed_release()
     reviewed["sha256"] = hashlib.sha256(dataset_path.read_bytes()).hexdigest()
     monkeypatch.setattr(release, "reviewed_release", lambda: reviewed)

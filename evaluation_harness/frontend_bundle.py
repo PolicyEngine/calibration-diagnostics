@@ -30,7 +30,7 @@ _SHA256_HEX = re.compile(r"^[a-f0-9]{64}$")
 DEFAULT_SOURCE_LABELS = {
     "census_acs_pums_2024": "Raw ACS PUMS",
     # Deprecated artifact identifier: evaluation bundle v1 retains the former
-    # Populace source ID while the UI labels it Microcosm.
+    # source ID while the UI labels it Microcosm.
     "populace_us_policyengine_us_2024": "Microcosm + PolicyEngine-US",
     "taxcalc_public_cps_2024": "Public CPS + Tax-Calculator",
     "yale_reconstruction_2024": (
@@ -474,7 +474,7 @@ def _build_groups(
         "out_of_sample": all_fact_keys - in_sample_fact_keys,
     }
     # Deprecated artifact identifier: bundle v1 names the Microcosm calibration
-    # partition with the former Populace product name.
+    # partition with its published identifier.
     for sample, fact_keys in sample_fact_keys.items():
         groups.append(
             {
