@@ -66,7 +66,7 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
 
       - name: Check collector read secret exists
-        run: bash telemetry-service/scripts/check-secrets-exist.sh "$READ_SECRET_NAME"
+        run: bash .github/scripts/deploy-dashboard.sh check-read-secret-exists
         env:
           PROJECT_ID: ${{ vars.TELEMETRY_GCP_PROJECT_ID }}
           READ_SECRET_NAME: ${{ vars.TELEMETRY_READ_SECRET_NAME }}
