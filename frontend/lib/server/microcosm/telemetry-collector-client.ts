@@ -1,14 +1,27 @@
 import "server-only";
 
+import {
+  type CollectorClient,
+  CollectorRequestError as ClientRequestError,
+  createCollectorClient,
+} from "@policyengine/microcosm-collector-client";
 import type { BuildRunDocuments } from "@/lib/microcosm/build-monitor";
+import { runDocuments } from "@/lib/microcosm/collector-run-documents";
+import { onOffSetting } from "@/lib/microcosm/on-off-setting";
 import type { MicrocosmCountry } from "@policyengine/calibration-tree/countries";
 import { secretManager, validSecretVersion } from "@/lib/server/secret-manager";
+import { vercelOidc } from "@/lib/server/vercel-oidc";
 
 type JsonObject = Record<string, unknown>;
 
 export const TELEMETRY_COLLECTOR_URL_ENV = "MICROCOSM_TELEMETRY_COLLECTOR_URL";
 export const TELEMETRY_READ_SECRET_VERSION_ENV =
   "MICROCOSM_TELEMETRY_READ_SECRET_VERSION";
+// `1` reads the collector's read API v2 through its typed client,
+// authenticated with the deployment's Vercel OIDC token; unset, empty or `0`
+// reads version 1 with the read credential from Secret Manager.
+export const TELEMETRY_VERCEL_OIDC_ENV = "MICROCOSM_TELEMETRY_VERCEL_OIDC";
+const COLLECTOR_TIMEOUT_MS = 30_000;
 
 // A run's row in the collector's run list (`GET /v1/runs`). The dashboard
 // reuses a run's record while these fields are unchanged.
@@ -21,6 +34,15 @@ export interface CollectorRunSummary extends JsonObject {
   current_stage?: string | null;
   ended_at?: string | null;
   heartbeat_at?: string | null;
+}
+
+// A run id the collector would refuse, so no collector holds such a run; it
+// is refused before any request.
+export class InvalidCollectorRunIdError extends Error {
+  constructor() {
+    super("Telemetry collector run id is invalid.");
+    this.name = "InvalidCollectorRunIdError";
+  }
 }
 
 // A collector request that answered with an HTTP error, such as 404 for a
@@ -51,13 +73,18 @@ function stringValue(value: unknown, label: string): string {
   return value;
 }
 
+type CollectorConfiguration =
+  | { baseUrl: string; credential: "read-secret"; secretVersion: string }
+  | { baseUrl: string; credential: "vercel-oidc" };
+
 function collectorConfiguration(
   environment: Record<string, string | undefined> = process.env,
-): { baseUrl: string; secretVersion: string } | null {
+): CollectorConfiguration | null {
+  const withVercelOidc = onOffSetting(TELEMETRY_VERCEL_OIDC_ENV, environment);
   const rawUrl = environment[TELEMETRY_COLLECTOR_URL_ENV]?.trim();
   const secretVersion = environment[TELEMETRY_READ_SECRET_VERSION_ENV]?.trim();
-  if (!rawUrl || !secretVersion) return null;
-  if (!validSecretVersion(secretVersion)) {
+  if (!rawUrl || (!withVercelOidc && !secretVersion)) return null;
+  if (!withVercelOidc && !validSecretVersion(secretVersion ?? "")) {
     throw new Error("Invalid telemetry read credential resource.");
   }
   const url = new URL(rawUrl);
@@ -72,10 +99,10 @@ function collectorConfiguration(
       "Telemetry collector URL must not contain credentials or query data.",
     );
   }
-  return {
-    baseUrl: url.toString().replace(/\/$/, ""),
-    secretVersion,
-  };
+  const baseUrl = url.toString().replace(/\/$/, "");
+  return withVercelOidc
+    ? { baseUrl, credential: "vercel-oidc" }
+    : { baseUrl, credential: "read-secret", secretVersion: secretVersion ?? "" };
 }
 
 export function collectorConfigured(
@@ -88,23 +115,66 @@ function collectorCountry(country: MicrocosmCountry): string {
   return country === "uk" ? "GB" : country.toUpperCase();
 }
 
-async function collectorJson(path: string): Promise<JsonObject> {
+function requireConfiguration(): CollectorConfiguration {
   const configuration = collectorConfiguration();
   if (!configuration) {
     throw new Error(
-      `Configure ${TELEMETRY_COLLECTOR_URL_ENV} and ${TELEMETRY_READ_SECRET_VERSION_ENV}.`,
+      `Configure ${TELEMETRY_COLLECTOR_URL_ENV} and ${TELEMETRY_READ_SECRET_VERSION_ENV}, or ${TELEMETRY_COLLECTOR_URL_ENV} and ${TELEMETRY_VERCEL_OIDC_ENV}=1.`,
     );
   }
+  return configuration;
+}
+
+// Read API v1, with the read credential from Secret Manager.
+async function collectorJson(
+  configuration: Extract<CollectorConfiguration, { credential: "read-secret" }>,
+  path: string,
+): Promise<JsonObject> {
   const readToken = await secretManager.readVersion(
     configuration.secretVersion,
   );
   const response = await fetch(`${configuration.baseUrl}${path}`, {
     cache: "no-store",
     headers: { "X-Telemetry-Read-Token": readToken },
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(COLLECTOR_TIMEOUT_MS),
   });
   if (!response.ok) throw new CollectorRequestError(response.status);
   return objectValue(await response.json(), "response");
+}
+
+// Read API v2 through the collector's typed client, with the deployment's
+// Vercel OIDC token, which the client asks for before every request. One
+// client per collector address.
+let versionTwoClient: { baseUrl: string; client: CollectorClient } | null =
+  null;
+
+function collectorClient(baseUrl: string): CollectorClient {
+  if (versionTwoClient?.baseUrl !== baseUrl) {
+    versionTwoClient = {
+      baseUrl,
+      client: createCollectorClient({
+        baseUrl,
+        vercelOidcToken: () => vercelOidc.token(),
+        timeoutMs: COLLECTOR_TIMEOUT_MS,
+      }),
+    };
+  }
+  return versionTwoClient.client;
+}
+
+// The client's error answers as this module's, so callers tell a missing run
+// (404) from other failures the same way for both versions.
+async function throughClient<Result>(
+  request: () => Promise<Result>,
+): Promise<Result> {
+  try {
+    return await request();
+  } catch (error) {
+    if (error instanceof ClientRequestError) {
+      throw new CollectorRequestError(error.status);
+    }
+    throw error;
+  }
 }
 
 function parseRunSummary(value: unknown): CollectorRunSummary {
@@ -141,6 +211,14 @@ export async function loadCollectorRuns(
   country: MicrocosmCountry,
   limit: number,
 ): Promise<CollectorRunSummary[]> {
+  const configuration = requireConfiguration();
+  if (configuration.credential === "vercel-oidc") {
+    const client = collectorClient(configuration.baseUrl);
+    const listed = await throughClient(() =>
+      client.listRecentRuns({ country: collectorCountry(country), count: limit }),
+    );
+    return listed.map(parseRunSummary);
+  }
   const runs: CollectorRunSummary[] = [];
   const visited = new Set<string>();
   let before: string | null = null;
@@ -150,7 +228,9 @@ export async function loadCollectorRuns(
       limit: String(Math.min(limit - runs.length, COLLECTOR_MAX_PAGE_SIZE)),
     });
     if (before) params.set("before", before);
-    const page = parseRunPage(await collectorJson(`/v1/runs?${params}`));
+    const page = parseRunPage(
+      await collectorJson(configuration, `/v1/runs?${params}`),
+    );
     runs.push(...page.runs);
     before = page.next_before;
     if (before) {
@@ -168,9 +248,16 @@ export async function loadCollectorRun(
   country: MicrocosmCountry,
 ): Promise<BuildRunDocuments> {
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$/.test(runId)) {
-    throw new Error("Telemetry collector run id is invalid.");
+    throw new InvalidCollectorRunIdError();
   }
-  const payload = await collectorJson(`/v1/runs/${encodeURIComponent(runId)}`);
+  const configuration = requireConfiguration();
+  if (configuration.credential === "vercel-oidc") {
+    return loadCollectorRunThroughClient(configuration.baseUrl, runId, country);
+  }
+  const payload = await collectorJson(
+    configuration,
+    `/v1/runs/${encodeURIComponent(runId)}`,
+  );
   const payloadRunId = stringValue(payload.run_id, "run_id");
   const countryCode = stringValue(payload.country_code, "country_code");
   if (payloadRunId !== runId) {
@@ -201,5 +288,25 @@ export async function loadCollectorRun(
     events: payload.events.map((event, index) =>
       objectValue(event, `event ${index}`),
     ),
+  };
+}
+
+async function loadCollectorRunThroughClient(
+  baseUrl: string,
+  runId: string,
+  country: MicrocosmCountry,
+): Promise<BuildRunDocuments> {
+  const client = collectorClient(baseUrl);
+  const detail = await throughClient(() => client.getRun(runId));
+  // The client answers null for a run the collector has no record of.
+  if (detail === null) throw new CollectorRequestError(404);
+  if (detail.run.country_code !== collectorCountry(country)) {
+    throw new Error("Telemetry collector returned a run for another country.");
+  }
+  return {
+    run_id: runId,
+    source: "staging",
+    country,
+    ...runDocuments(detail),
   };
 }
