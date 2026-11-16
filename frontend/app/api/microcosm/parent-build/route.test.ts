@@ -3,7 +3,8 @@ import { expect, test } from "bun:test";
 import type { CalibrationReleaseLocation } from "@policyengine/calibration-tree/calibration-release-locator";
 import type { MicrocosmCountry } from "@policyengine/calibration-tree/countries";
 
-import { createParentBuildHandler } from "./route";
+import { maxDuration as releaseRouteMaxDuration } from "../route";
+import { createParentBuildHandler, maxDuration } from "./route";
 
 // A US compatibility recertification in its own build folder, the build
 // whose calibration it copies, and that build's staging run. The run name is
@@ -155,4 +156,11 @@ test("a Hugging Face failure is reported as unavailable and not cached", async (
 
   expect(response.status).toBe(502);
   expect(response.headers.get("cache-control")).toBe("no-store");
+});
+
+// The Hugging Face read waits up to 120 seconds, as it does for the release
+// route; a route limit no longer than that ends a slow read with the
+// platform's timeout instead of this route's uncached 502.
+test("allows as long as the release route, which reads through the same Hugging Face fetch", () => {
+  expect(maxDuration).toBeGreaterThanOrEqual(releaseRouteMaxDuration);
 });
