@@ -82,7 +82,11 @@
           "type": "string"
         },
         "hf_commit": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Null for a build folder measured before it is published (measure --build-dir)."
         },
         "release_manifest": {
           "type": "object",
@@ -626,7 +630,8 @@
         "finished_at",
         "seconds",
         "runner",
-        "simulations"
+        "simulations",
+        "limits"
       ],
       "properties": {
         "started_at": {
@@ -673,6 +678,40 @@
               "peak_rss_bytes": {
                 "type": "integer"
               }
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "seconds",
+            "memory_bytes",
+            "dataset_bytes",
+            "warn_at"
+          ],
+          "description": "The runner limits the point ran under (the spec's runner block); a point using warn_at of one is flagged.",
+          "properties": {
+            "seconds": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "memory_bytes": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "dataset_bytes": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "warn_at": {
+              "type": "number"
             }
           }
         }

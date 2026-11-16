@@ -2450,6 +2450,12 @@
   },
   "runtime": {
     "finished_at": "2026-11-12T00:10:00Z",
+    "limits": {
+      "dataset_bytes": 2000000000,
+      "memory_bytes": 16000000000,
+      "seconds": 6600,
+      "warn_at": 0.8
+    },
     "runner": "synthetic",
     "seconds": 600.0,
     "simulations": [

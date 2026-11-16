@@ -74,7 +74,30 @@ def _point(
             "seconds": runtime.get("seconds"),
             "runner": runtime.get("runner"),
             "simulations": runtime.get("simulations") or [],
+            # The limits it ran under, so a reader can tell how close it came to them.
+            "limits": spec.runner_limits(),
         },
+    }
+
+
+def runner_usage(document: dict[str, Any]) -> dict[str, float]:
+    """The share of each runner limit a point used: its seconds, peak memory and file size."""
+    runtime = document["runtime"]
+    limits = runtime.get("limits") or {}
+    peak = max((s.get("peak_rss_bytes") or 0 for s in runtime.get("simulations") or []), default=0)
+    used = {
+        "seconds": (runtime.get("seconds"), limits.get("seconds")),
+        "memory": (peak or None, limits.get("memory_bytes")),
+        "dataset": ((document.get("file") or {}).get("bytes"), limits.get("dataset_bytes")),
+    }
+    return {name: value / limit for name, (value, limit) in used.items() if value and limit}
+
+
+def near_limits(document: dict[str, Any]) -> dict[str, float]:
+    """The limits a point came within 20% of (its `warn_at`), with the share it used."""
+    warn_at = (document["runtime"].get("limits") or {}).get("warn_at", 0.8)
+    return {
+        name: round(share, 3) for name, share in runner_usage(document).items() if share >= warn_at
     }
 
 

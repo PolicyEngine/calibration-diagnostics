@@ -127,9 +127,9 @@ test("a run plans from the series record, uploads, and finalizes; an unmeasured 
     [`${LINE}/build-1`, FILES[0], COMMIT],
     [`${LINE}/build-2`, FILES[1], COMMIT],
   ]);
-  // A first panel's top-up waits for its backfill.
-  expect(await plan({ store, panel: panelDocument(), series: listed, mode: "topup", pin: true }))
-    .toMatchObject({ action: "skip", reason: "first_panel_awaits_backfill" });
+  // A first panel's top-up on the default branch plans its whole series, as the backfill does.
+  expect((await plan({ store, panel: panelDocument(), series: listed, mode: "topup", pin: true })).points)
+    .toEqual(planned.points);
 
   const counts = await uploadDirectory(store, root, { countryFiles: true });
   expect(counts).toEqual({

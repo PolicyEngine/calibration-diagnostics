@@ -6,10 +6,10 @@ name: Release history
 #
 # - Weekly (Sundays, 05:00 UTC): a top-up run for each country listed in the repository
 #   variable RELEASE_HISTORY_WEEKLY (country codes, space- or comma-separated;
-#   unset or empty runs nothing). It measures the files no pinned engine has
-#   measured yet and, after an engine move, the last build the previous
-#   engine measured, so the first new build has a step. A country's first
-#   panel waits for its backfill.
+#   unset or empty runs nothing). It measures every file the default branch's
+#   panel lacks: the new builds on the served panel, or the whole series on a
+#   panel the page doesn't show yet (a country's first, or one after an
+#   engine, spec or producer change), which the page serves once complete.
 # - Manual: `topup`, `backfill` (every file a panel lacks, as after an engine,
 #   spec or producer bump), `release` (one build) or `retry` (the files that
 #   ran out of attempts, or one build's, with fresh attempts). A failure a run
@@ -20,6 +20,9 @@ name: Release history
 #   country's series record, references and labels, and rebuild every panel's
 #   timeline. A run dispatched from another ref measures into its own engine's
 #   panel with `backfill` or `release` and rebuilds only that panel's timeline.
+# - A file that uses 80% of a runner limit (the measure step's time, the
+#   runner's memory, the file-size budget) and a plan of 160+ files are
+#   flagged with a warning on the run's page.
 #
 # The repository is public and the UK data are licensed: logs carry ids,
 # statuses and timings only, library output goes to a private file that is
@@ -153,6 +156,7 @@ jobs:
         working-directory: frontend
       - name: Measure one data file
         # Below the job's limit, so a slow file fails this step and its report still goes up.
+        # The specs' runner.max_seconds (6600) mirrors it.
         timeout-minutes: 110
         env:
           POINT: ${{ toJson(matrix.point) }}

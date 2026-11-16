@@ -47,7 +47,9 @@
       "state": "measured",
       "measurementId": "30f31d7bc337c069111d29f90f3c5a5c945c93547d44f6513d178e7bf92d4cf7",
       "status": "ok",
-      "reason": null
+      "reason": null,
+      "referenceModelCompatibility": "inside",
+      "unknownColumns": []
     },
     {
       "buildId": "microcosm-us-2024-national/synthetic-build-2",
@@ -61,7 +63,9 @@
       "state": "measured",
       "measurementId": "30f31d7bc337c069111d29f90f3c5a5c945c93547d44f6513d178e7bf92d4cf7",
       "status": "ok",
-      "reason": null
+      "reason": null,
+      "referenceModelCompatibility": "inside",
+      "unknownColumns": []
     },
     {
       "buildId": "microcosm-us-2024-national/synthetic-build-3",
@@ -75,7 +79,9 @@
       "state": "measured",
       "measurementId": "352e929da0bdd56f59b09e495ba4bf62fa95cb8e9187204bda3db3d73553aaa1",
       "status": "ok",
-      "reason": null
+      "reason": null,
+      "referenceModelCompatibility": "inside",
+      "unknownColumns": []
     },
     {
       "buildId": "microcosm-us-2024-national/synthetic-build-4",
@@ -89,7 +95,9 @@
       "state": "missing",
       "measurementId": null,
       "status": null,
-      "reason": null
+      "reason": null,
+      "referenceModelCompatibility": null,
+      "unknownColumns": null
     },
     {
       "buildId": "microcosm-us-2024-national/synthetic-build-5",
@@ -103,7 +111,9 @@
       "state": "missing",
       "measurementId": null,
       "status": null,
-      "reason": null
+      "reason": null,
+      "referenceModelCompatibility": null,
+      "unknownColumns": null
     }
   ],
   "outputs": [

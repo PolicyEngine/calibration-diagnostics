@@ -92,7 +92,9 @@
       "state": "measured",
       "measurementId": "686a0a7314e9713cab8d5a78101134cea0d707a320931970951711b4836b54cf",
       "status": "ok",
-      "reason": null
+      "reason": null,
+      "referenceModelCompatibility": "inside",
+      "unknownColumns": []
     },
     {
       "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
@@ -106,7 +108,9 @@
       "state": "measured",
       "measurementId": "686a0a7314e9713cab8d5a78101134cea0d707a320931970951711b4836b54cf",
       "status": "ok",
-      "reason": null
+      "reason": null,
+      "referenceModelCompatibility": "inside",
+      "unknownColumns": []
     },
     {
       "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
@@ -120,7 +124,9 @@
       "state": "measured",
       "measurementId": "f9c81dc3e411b78b3a143e11cc8b6a961d3eaab1ade034d47f80347f50211c5b",
       "status": "ok",
-      "reason": null
+      "reason": null,
+      "referenceModelCompatibility": "inside",
+      "unknownColumns": []
     },
     {
       "buildId": "microcosm-uk-2024-25-national/synthetic-build-4",
@@ -134,7 +140,9 @@
       "state": "missing",
       "measurementId": null,
       "status": null,
-      "reason": null
+      "reason": null,
+      "referenceModelCompatibility": null,
+      "unknownColumns": null
     },
     {
       "buildId": "microcosm-uk-2024-25-national/synthetic-build-5",
@@ -148,7 +156,9 @@
       "state": "gap",
       "measurementId": "3edec4e2154305a433ad570a35fd41db18c82a995433311d54ef497665474300",
       "status": "refused",
-      "reason": "disclosure_source_ids_missing"
+      "reason": "disclosure_source_ids_missing",
+      "referenceModelCompatibility": "inside",
+      "unknownColumns": null
     }
   ],
   "outputs": [

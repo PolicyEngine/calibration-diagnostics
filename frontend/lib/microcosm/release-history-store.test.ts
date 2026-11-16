@@ -11,7 +11,9 @@ import {
   putWriteOnce,
   readJson,
   MAX_PLANNED_POINTS,
+  nearLimits,
   RELEASE_HISTORY_MANIFEST_PATH,
+  runnerUsage,
   seriesAxis,
   storedFileKind,
   updateManifestCountry,
@@ -235,30 +237,26 @@ test("the release mode refuses builds it cannot or need not measure", () => {
   expect(release(`${LINE}/b4`, entry)).toMatchObject({ action: "skip", reason: "release_failed" });
 });
 
-test("a country's first panel waits for its backfill, and only a backfill pins it", () => {
+test("a top-up on the default branch measures a first panel's whole series; a single release never starts one", () => {
   const listed = series([build("b1", file(1)), build("b2", file(2))]);
   const topup = (entry?: ManifestCountry) =>
     planPanel({ country: "zz", panelId: PANEL, mode: "topup", pin: true, series: listed, entry });
-  expect(topup()).toMatchObject({ action: "skip", reason: "first_panel_awaits_backfill" });
-  // A skipped top-up's finalize pins nothing.
-  let entry = finalizeCountry({ mode: "topup", entry: undefined, panel: summary(PANEL), series: listed, planned: [], stored: [], pin: true, at: "t1" });
+  // A country's first panel: the first weekly top-up plans every file, as a backfill does.
+  expect(topup().points.map((p) => p.digest)).toEqual([file(1), file(2)]);
+  // A pinning run with nothing planned and nothing held pins nothing.
+  let entry = finalizeCountry({ mode: "topup", entry: undefined, panel: summary(PANEL), series: listed, planned: [], stored: [], pin: true, at: "t0" });
   expect(entry).toMatchObject({ pinnedPanelId: null, currentPanelId: null });
-  expect(entry.panels[PANEL].pinnedAt).toBeNull();
-  // One release measured on the default branch: held, but still no series, so still no pin.
+  // One release measured on the default branch: held, but no series, so no pin.
   const one = planPanel({ country: "zz", panelId: PANEL, mode: "release", pin: true, buildId: `${LINE}/b1`, series: listed, entry });
-  entry = finalizeCountry({ mode: "release", entry, panel: summary(PANEL), series: listed, planned: one.points, stored: [point(file(1))], pin: true, at: "t2" });
+  entry = finalizeCountry({ mode: "release", entry, panel: summary(PANEL), series: listed, planned: one.points, stored: [point(file(1))], pin: true, at: "t1" });
   expect(entry.panels[PANEL].pinnedAt).toBeNull();
-  expect(topup(entry)).toMatchObject({ reason: "first_panel_awaits_backfill" });
-  // A top-up skipped while the panel holds a point pins nothing either.
-  entry = finalizeCountry({ mode: "topup", entry, panel: summary(PANEL), series: listed, planned: [], stored: [point(file(1))], pin: true, at: "t3" });
-  expect(entry.panels[PANEL].pinnedAt).toBeNull();
-  // The backfill pins it, and from then on a top-up retries what the backfill left.
-  const backfill = planPanel({ country: "zz", panelId: PANEL, mode: "backfill", pin: true, series: listed, entry });
-  expect(backfill.points.map((p) => p.digest)).toEqual([file(2)]);
-  entry = finalizeCountry({ mode: "backfill", entry, panel: summary(PANEL), series: listed, planned: backfill.points, stored: [point(file(1))], pin: true, at: "t4" });
-  expect(entry).toMatchObject({ pinnedPanelId: PANEL, currentPanelId: null });
-  expect(entry.panels[PANEL].pinnedAt).toBe("t4");
-  expect(topup(entry).points.map((p) => [p.digest, p.attempt])).toEqual([[file(2), 2]]);
+  // The top-up plans what the panel lacks, pins it, and the page serves it once it is complete.
+  const planned = topup(entry);
+  expect(planned.points.map((p) => p.digest)).toEqual([file(2)]);
+  entry = finalizeCountry({ mode: "topup", entry, panel: summary(PANEL), series: listed, planned: planned.points, stored: [point(file(1)), point(file(2))], pin: true, at: "t2" });
+  expect(entry).toMatchObject({ pinnedPanelId: PANEL, currentPanelId: PANEL });
+  expect(entry.panels[PANEL].pinnedAt).toBe("t2");
+  expect(topup(entry)).toMatchObject({ action: "skip", reason: "nothing_missing" });
 });
 
 test("a top-up from another ref is skipped: other engines fill their panels by backfill or release", () => {
@@ -288,42 +286,61 @@ test("a run plans at most MAX_PLANNED_POINTS files and says the rest wait", () =
   expect(plan.points[0].build_id).toBe(`${LINE}/b0`);
 });
 
-test("after a new pin, a top-up measures the new builds and the last build the old engine measured", () => {
+test("after an engine change, the next top-up measures the whole series on the new panel, which the page serves once complete", () => {
   const old = series([build("b1", file(1)), build("b2", file(2)), build("b3", file(3))]);
   let entry = finalizeCountry({
     mode: "backfill", entry: undefined, panel: summary(PANEL, "policyengine-zz==1.0.0"), series: old, planned: [],
     stored: [point(file(1)), point(file(2)), point(file(3), [], "refused")], pin: true, at: "2026-11-01T00:00:00Z",
   });
   expect(entry).toMatchObject({ pinnedPanelId: PANEL, currentPanelId: PANEL });
-  expect(entry.panels[PANEL]).toMatchObject({ pinnedAt: "2026-11-01T00:00:00Z", complete: true });
-  // Two new builds arrive and the default branch moves to a new engine.
-  const grown = series([...old.builds, build("b4", file(4)), build("b5", file(5))]);
+  // A new build arrives and the default branch moves to a new engine: its panel lacks every file.
+  const grown = series([...old.builds, build("b4", file(4))]);
   const topup = planPanel({ country: "zz", panelId: OTHER, mode: "topup", pin: true, series: grown, entry });
-  // b3 is a stored gap on the old engine, so the overlap is b2, the last build it measured.
-  expect(topup.points.map((p) => p.build_id)).toEqual([`${LINE}/b2`, `${LINE}/b4`, `${LINE}/b5`]);
+  expect(topup.points.map((p) => p.build_id)).toEqual([1, 2, 3, 4].map((n) => `${LINE}/b${n}`));
+  // One file is not measured this week: the new engine is pinned, the page stays on the old one.
+  const measured = [1, 2, 4].map((n) => point(file(n), [], "ok", OTHER));
   entry = finalizeCountry({
     mode: "topup", entry, panel: summary(OTHER, "policyengine-zz==2.0.0"), series: grown, planned: topup.points,
-    stored: [point(file(2), [], "ok", OTHER), point(file(4), [], "ok", OTHER), point(file(5), [], "ok", OTHER)],
-    pin: true, at: "2026-11-08T00:00:00Z",
+    stored: measured, pin: true, at: "2026-11-08T00:00:00Z",
   });
-  // The new engine is pinned at once; the served panel stays until the new one is complete.
   expect(entry).toMatchObject({ pinnedPanelId: OTHER, currentPanelId: PANEL });
   expect(entry.panels[OTHER]).toMatchObject({ pinnedAt: "2026-11-08T00:00:00Z", complete: false });
   // The finalize recounted the old panel against the grown series too.
   expect(entry.panels[PANEL]).toMatchObject({
     complete: false,
-    coverage: { builds: 5, files: 5, measured: 2, gap: 1, retrying: 0, failed: 0, missing: 2 },
+    coverage: { builds: 4, files: 4, measured: 2, gap: 1, retrying: 0, failed: 0, missing: 1 },
   });
-  // Next week only a newer build is new: nothing either engine holds is measured again.
-  const later = series([...grown.builds, build("b6", file(6))]);
-  const next = planPanel({ country: "zz", panelId: OTHER, mode: "topup", pin: true, series: later, entry });
-  expect(next.points.map((p) => p.build_id)).toEqual([`${LINE}/b6`]);
+  // The next top-up retries what the new panel lacks; once it is complete, the page moves to it.
+  const next = planPanel({ country: "zz", panelId: OTHER, mode: "topup", pin: true, series: grown, entry });
+  expect(next.points.map((p) => [p.build_id, p.attempt])).toEqual([[`${LINE}/b3`, 2]]);
+  entry = finalizeCountry({
+    mode: "topup", entry, panel: summary(OTHER, "policyengine-zz==2.0.0"), series: grown, planned: next.points,
+    stored: [...measured, point(file(3), [], "ok", OTHER)], pin: true, at: "2026-11-15T00:00:00Z",
+  });
+  expect(entry).toMatchObject({ pinnedPanelId: OTHER, currentPanelId: OTHER });
   // Re-pinning the pinned panel keeps its pinnedAt.
-  const again = finalizeCountry({
-    mode: "topup", entry, panel: summary(OTHER, "policyengine-zz==2.0.0"), series: later, planned: [], stored: [], pin: true,
-    at: "2026-11-15T00:00:00Z",
+  expect(entry.panels[OTHER].pinnedAt).toBe("2026-11-08T00:00:00Z");
+});
+
+test("finalize flags a stored point that came within 20% of a runner limit", () => {
+  const listed = series([build("b1", file(1)), build("b2", file(2))]);
+  const limits = { seconds: 6600, memory_bytes: 16e9, dataset_bytes: 2e9, warn_at: 0.8 };
+  const slow: MeasurementDocument = {
+    ...point(file(1)), file: { sha256: file(1), bytes: 1.9e9 },
+    runtime: { seconds: 5400, simulations: [{ peak_rss_bytes: 8e9 }], limits },
+  };
+  const easy: MeasurementDocument = {
+    ...point(file(2)), file: { sha256: file(2), bytes: 1e9 },
+    runtime: { seconds: 600, simulations: [{ peak_rss_bytes: 8e9 }], limits },
+  };
+  expect(runnerUsage(slow)).toEqual({ seconds: 5400 / 6600, memory: 0.5, dataset: 0.95 });
+  expect(nearLimits(slow)).toEqual(["dataset", "seconds"]);
+  expect(nearLimits(point(file(3)))).toEqual([]);
+  const entry = finalizeCountry({
+    mode: "backfill", entry: undefined, panel: summary(PANEL), series: listed, planned: [], stored: [slow, easy], pin: true, at: "t",
   });
-  expect(again.panels[OTHER].pinnedAt).toBe("2026-11-08T00:00:00Z");
+  expect(entry.panels[PANEL].points[file(1)].nearLimits).toEqual(["dataset", "seconds"]);
+  expect(entry.panels[PANEL].points[file(2)].nearLimits).toEqual([]);
 });
 
 test("finalize counts attempts, fails a file after three, and serves a panel once it is complete", () => {
@@ -419,7 +436,7 @@ test("a step joins series neighbours only; withdrawn builds and orphan points ne
   const states = {
     [file(2)]: {
       digest: file(2), state: "retrying" as const, measurementId: null, measurementStatus: null,
-      attempts: 1, lastError: "no_measurement_written", lastStage: null, lastBuildId: `${LINE}/b2`,
+      attempts: 1, lastError: "no_measurement_written", lastStage: null, nearLimits: [], lastBuildId: `${LINE}/b2`,
     },
   };
   const timeline = timelineOf(listed, points, { states });
@@ -576,5 +593,25 @@ test("the states tell measured, gap, retrying, failed and never run apart", () =
     ["retrying", "no_measurement_written"],
     ["failed", "exceeds_runner_budget"],
     ["missing", null],
+  ]);
+});
+
+test("the timeline carries each point's model compatibility and the columns the model ignores", () => {
+  const listed = series([build("b1", file(1)), build("b2", file(2)), build("b3", file(3))]);
+  const measured: MeasurementDocument = {
+    ...point(file(1), [cell(1)]),
+    fetched_from: { declared: { reference_model_compatibility: "outside" } },
+    data: { unknown_columns: ["a_new_column"] },
+  };
+  const gap: MeasurementDocument = {
+    ...point(file(2), [], "refused"),
+    fetched_from: { declared: { reference_model_compatibility: "inside" } },
+    data: null,
+  };
+  const timeline = timelineOf(listed, [measured, gap]);
+  expect(timeline.builds.map((b) => [b.referenceModelCompatibility, b.unknownColumns])).toEqual([
+    ["outside", ["a_new_column"]],
+    ["inside", null],
+    [null, null],
   ]);
 });

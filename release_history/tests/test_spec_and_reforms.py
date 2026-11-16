@@ -56,6 +56,9 @@ def test_the_digest_follows_the_document_not_its_formatting():
         ({"reforms": [{"id": "r", "targets": ["income_tax"]}]}, "at least one of"),
         ({"reforms": [{"id": "r", "add": {"gov.tax.rate": 0.1}}]}, "targets"),
         ({"baseline": [{"id": "p", "stat": "population"}]}, "entity"),
+        ({"runner": {"max_seconds": -1}}, "runner.max_seconds"),
+        ({"runner": {"max_memory_bytes": True}}, "runner.max_memory_bytes"),
+        ({"runner": {"max_dataset_bytes": "2GB"}}, "runner.max_dataset_bytes"),
     ],
 )
 def test_specs_that_cannot_be_measured_are_refused(override, message):

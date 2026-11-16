@@ -178,6 +178,81 @@ def test_a_refusal_no_file_causes_is_never_stored(world, capsys, monkeypatch):
     assert stored == []
 
 
+def test_a_run_near_a_runner_limit_is_flagged(world, capsys):
+    # The fake file is 20 bytes: a 24-byte budget is 83% used, so it is flagged but measured.
+    world["spec"] = parse_spec(fake_spec_dict(runner={"max_dataset_bytes": 24}))
+    code, printed, stored = world["run"](capsys)
+    assert (code, printed["status"]) == (0, "ok")
+    assert printed["near_limits"] == {"dataset": 0.833}
+    document = json.loads(stored[0].read_text())
+    assert document["runtime"]["limits"] == {
+        "seconds": None,
+        "memory_bytes": None,
+        "dataset_bytes": 24,
+        "warn_at": 0.8,
+    }
+
+
+def test_the_warning_reaches_the_run_page(world, capsys, monkeypatch, tmp_path):
+    world["spec"] = parse_spec(fake_spec_dict(runner={"max_dataset_bytes": 24}))
+    planned = {
+        "build_id": BUILD,
+        "release_directory": BUILD,
+        "hf_repo": "policyengine/zz",
+        "hf_commit": FAKE_COMMIT,
+        "digest": H5_SHA,
+    }
+    out = tmp_path / "flagged"
+    assert (
+        cli.main(["measure", "--country", "zz", "--point", json.dumps(planned), "--out", str(out)])
+        == 0
+    )
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0] == (
+        "::warning title=Release history near a runner limit::"
+        f"zz {BUILD}: dataset at 83% of its limit"
+    )
+
+
+def test_a_build_folder_is_measured_before_it_is_published(world, capsys, tmp_path, monkeypatch):
+    # A Microcosm post-build step: the folder Microcosm writes before it publishes. No Hub call.
+    folder = tmp_path / "build"
+    folder.mkdir()
+    for path, data in world["hub"].files.items():
+        if path.startswith(f"releases/{BUILD}/"):
+            (folder / path.removeprefix(f"releases/{BUILD}/")).write_bytes(data)
+
+    def no_hub():
+        raise AssertionError("the Hub is not used for a build folder")
+
+    monkeypatch.setattr(cli, "HubClient", no_hub)
+    out = tmp_path / "out-local"
+    code = cli.main(
+        [
+            "measure",
+            "--country",
+            "zz",
+            "--build-dir",
+            str(folder),
+            "--build-id",
+            BUILD,
+            "--out",
+            str(out),
+            "--workdir",
+            str(tmp_path / "work-local"),
+        ]
+    )
+    printed = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert (code, printed["status"]) == (0, "ok")
+    points = [p for p in out.rglob("*.json") if POINT_NAME.match(p.name)]
+    document = json.loads(points[0].read_text())
+    assert document["fetched_from"]["hf_commit"] is None
+    assert document["fetched_from"]["build_id"] == BUILD
+    assert document["file"]["sha256"] == H5_SHA
+    # The build's own file is never deleted.
+    assert (folder / "zz.h5").read_bytes() == H5
+
+
 def test_a_reform_failure_is_stored_as_partial_on_the_last_attempt(world, capsys):
     world["backend"] = FakeBackend(fail_on=lambda reform: bool(reform) and "gov.tax.rate" in reform)
     code, printed, stored = world["run"](capsys, attempt=3, last_attempt=True)
@@ -265,6 +340,7 @@ def test_stdout_carries_no_figure(world, capsys):
         "seconds",
         "peak_rss_gb",
         "reforms",
+        "near_limits",
     }
 
 

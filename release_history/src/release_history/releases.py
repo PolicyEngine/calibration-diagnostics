@@ -69,7 +69,8 @@ class Point:
     build_id: str
     release_directory: str
     hf_repo: str
-    hf_commit: str
+    # None for a build folder read before it is published (`measure --build-dir`).
+    hf_commit: str | None
     digest: str | None = None
     attempt: int = 1
     last_attempt: bool = True
@@ -234,6 +235,49 @@ class HubClient:
         local = self.download(repo, commit, path, directory)
         data = local.read_bytes()
         return json.loads(data), file_sha256(local)
+
+
+class LocalBuildFolder:
+    """A build folder on disk, read as `HubClient` reads a published one.
+
+    For a Microcosm post-build step (`release-history measure --build-dir`): the
+    folder Microcosm writes before it publishes, holding `release_manifest.json`,
+    `build_manifest.json` if any, and the national file. Paths under
+    `releases/<release_directory>/` map into the folder. Nothing is copied, and
+    the file is never deleted: `download` returns the folder's own file.
+    """
+
+    def __init__(self, folder: Path, release_directory: str) -> None:
+        self.folder = Path(folder)
+        self.prefix = f"releases/{release_directory}/"
+
+    def _local(self, path: str) -> Path:
+        relative = path[len(self.prefix) :] if path.startswith(self.prefix) else path
+        local = (self.folder / relative).resolve()
+        if self.folder.resolve() not in local.parents and local != self.folder.resolve():
+            raise ReleaseRefused("error", "repository_or_revision_unreadable")
+        return local
+
+    def resolve_revision(self, repo: str, revision: str) -> None:
+        return None
+
+    def read_json(
+        self, repo: str, commit: str | None, path: str, directory: Path
+    ) -> tuple[Any, str]:
+        local = self._local(path)
+        if not local.is_file():
+            raise FileNotFoundError(path)
+        return json.loads(local.read_bytes()), file_sha256(local)
+
+    def file_size(self, repo: str, commit: str | None, path: str) -> int | None:
+        local = self._local(path)
+        return local.stat().st_size if local.is_file() else None
+
+    def download(self, repo: str, commit: str | None, path: str, directory: Path) -> Path:
+        local = self._local(path)
+        if not local.is_file():
+            raise FileNotFoundError(path)
+        return local
 
 
 def release_directory_for(revision: str, series_releases: tuple[str, ...]) -> str:

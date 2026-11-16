@@ -48,6 +48,8 @@ PERIOD_LABELS = ("fiscal_year", "calendar_year")
 DISCLOSURE_POLICIES = ("none", "source_household_small_cells")
 # CD171's absolute floor; a spec may raise it, never lower it.
 MIN_SOURCE_HOUSEHOLD_FLOOR = 3
+# A run is flagged once it uses this share of a runner limit: 20% short of the limit.
+RUNNER_WARN_AT = 0.8
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _DEFAULT_UNIT = {"sum": "currency", "count": "count", "mean": "rate", "population": "count"}
@@ -157,6 +159,9 @@ class Spec:
     min_source_households: int
     source_id_columns: tuple[str, ...]
     max_dataset_bytes: int | None
+    # The measure step's time limit and the runner's memory; a run near either is flagged.
+    max_seconds: int | None = None
+    max_memory_bytes: int | None = None
     digest: str = field(default="")
 
     def weight_variable(self, entity: str) -> str:
@@ -166,6 +171,15 @@ class Spec:
         if self.period_label == "fiscal_year":
             return f"{period}-{(period + 1) % 100:02d}"
         return str(period)
+
+    def runner_limits(self) -> dict[str, Any]:
+        """The limits a point runs under, recorded on the point (`runtime.limits`)."""
+        return {
+            "seconds": self.max_seconds,
+            "memory_bytes": self.max_memory_bytes,
+            "dataset_bytes": self.max_dataset_bytes,
+            "warn_at": RUNNER_WARN_AT,
+        }
 
     @property
     def household_id_variable(self) -> str:
@@ -391,6 +405,14 @@ def parse_spec(raw: Mapping[str, Any], *, expected_country: str | None = None) -
         raise SpecError("source_household_small_cells needs disclosure.source_id_columns.")
     runner = raw.get("runner") or {}
     max_bytes = runner.get("max_dataset_bytes")
+    limits = {
+        key: runner.get(key) for key in ("max_dataset_bytes", "max_seconds", "max_memory_bytes")
+    }
+    for key, value in limits.items():
+        if value is not None and (
+            isinstance(value, bool) or not isinstance(value, int) or value <= 0
+        ):
+            raise SpecError(f"runner.{key} must be a positive whole number.")
     spec = Spec(
         raw=raw,
         country=country,
@@ -419,6 +441,8 @@ def parse_spec(raw: Mapping[str, Any], *, expected_country: str | None = None) -
         min_source_households=floor,
         source_id_columns=source_id_columns,
         max_dataset_bytes=int(max_bytes) if max_bytes is not None else None,
+        max_seconds=limits["max_seconds"],
+        max_memory_bytes=limits["max_memory_bytes"],
         digest=json_sha256(measurement_definition(raw)),
     )
     return spec

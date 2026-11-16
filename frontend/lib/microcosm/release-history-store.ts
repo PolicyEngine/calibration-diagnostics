@@ -343,6 +343,8 @@ export interface ManifestPoint {
   lastError: string | null;
   /** Where the last failed attempt stopped (open, download, baseline, reform:<id>, ...). */
   lastStage: string | null;
+  /** The runner limits its stored point came within 20% of: seconds, memory, dataset. */
+  nearLimits: string[];
   /** The build the file was last planned under, when a plan named it. */
   lastBuildId: string | null;
 }
@@ -512,9 +514,9 @@ function oneBuildPerFile(builds: SeriesBuild[]): SeriesBuild[] {
  * Which files a run measures on a panel.
  *
  * - `backfill`: every file on the axis the panel does not hold yet.
- * - `topup` (runs that pin only): the files no panel that was ever pinned holds, and, when another
- *   panel was pinned before, the latest build that panel measured, so the first new build has a
- *   step. A country's first panel waits for its backfill.
+ * - `topup` (runs that pin only): the same. On the served panel that is the new builds; on a panel
+ *   the page does not show yet (a country's first, or one after an engine, spec or producer change)
+ *   it is the whole series, so the page moves to that panel once the panel is complete.
  * - `release`: one build, by its `<release>/<build>` id.
  * - `retry`: the files that ran out of attempts (or one build's), with fresh attempts.
  *
@@ -584,27 +586,10 @@ export function planPanel(options: {
     const failed = axis.filter((build) => stateOf(build)?.state === "failed");
     return failed.length > 0 ? measure(failed) : skip("nothing_failed");
   }
-  if (mode === "backfill") return measure(axis.filter((build) => !heldHere(build)));
-  // A top-up follows the pinned engine: a run from another ref fills its panel with a backfill or
-  // single releases instead.
-  if (!pin) return skip("topup_only_on_the_default_branch");
-  const everPinned = Object.values(entry?.panels ?? {}).filter((candidate) => candidate.pinnedAt !== null);
-  if (everPinned.length === 0) return skip("first_panel_awaits_backfill");
-  const heldAnywhere = (build: SeriesBuild) =>
-    heldHere(build) ||
-    everPinned.some((candidate) => isFinal(own(candidate.points, build.digest as string)));
-  const fresh = axis.filter((build) => !heldAnywhere(build));
-  // The panel pinned before this one: the pinned panel, or, when this is it, the one before.
-  const previous = everPinned
-    .filter((candidate) => candidate.panelId !== panelId)
-    .sort((left, right) => compareText(right.pinnedAt as string, left.pinnedAt as string))[0];
-  const overlap = previous
-    ? [...axis].reverse().find(
-      (build) => own(previous.points, build.digest as string)?.state === "measured",
-    )
-    : undefined;
-  const chosen = new Set([...fresh, ...(overlap && !heldHere(overlap) ? [overlap] : [])]);
-  return measure(axis.filter((build) => chosen.has(build)));
+  // A top-up follows the default branch's engine; a run from another ref fills its panel with a
+  // backfill or single releases instead.
+  if (mode === "topup" && !pin) return skip("topup_only_on_the_default_branch");
+  return measure(axis.filter((build) => !heldHere(build)));
 }
 
 // ---------------------------------------------------------------------------
@@ -644,6 +629,37 @@ export interface AttemptReport {
   at: string;
 }
 
+/** The runner limits a point ran under, as the producer records them (`runtime.limits`). */
+export interface RunnerLimits {
+  seconds: number | null;
+  memory_bytes: number | null;
+  dataset_bytes: number | null;
+  /** The share of a limit at which a run is flagged: 0.8, 20% short of the limit. */
+  warn_at: number;
+}
+
+/** How much of each limit a stored point used: seconds, peak memory and the file's size. */
+export function runnerUsage(document: MeasurementDocument): Record<string, number> {
+  const runtime = document.runtime;
+  const limits = runtime?.limits;
+  if (!runtime || !limits) return {};
+  const peak = Math.max(0, ...(runtime.simulations ?? []).map((s) => s.peak_rss_bytes ?? 0));
+  const usage: Record<string, number> = {};
+  const share = (name: string, used: number | null | undefined, limit: number | null) => {
+    if (typeof used === "number" && typeof limit === "number" && limit > 0) usage[name] = used / limit;
+  };
+  share("seconds", runtime.seconds, limits.seconds);
+  share("memory", peak || null, limits.memory_bytes);
+  share("dataset", document.file.bytes, limits.dataset_bytes);
+  return usage;
+}
+
+/** The limits a stored point came within 20% (its `warn_at`) of, by name. */
+export function nearLimits(document: MeasurementDocument): string[] {
+  const warnAt = document.runtime?.limits?.warn_at ?? 0.8;
+  return Object.entries(runnerUsage(document)).filter(([, used]) => used >= warnAt).map(([name]) => name).sort();
+}
+
 /** A failure no later attempt can fix: the file is over the runner's budget. */
 export const FAILS_AT_ONCE: ReadonlySet<string> = new Set(["exceeds_runner_budget"]);
 
@@ -659,6 +675,13 @@ export interface MeasurementDocument {
   reason: string | null;
   /** The file alone; what the build it was fetched through declares is under `fetched_from`. */
   file: { sha256: string; bytes: number | null };
+  fetched_from?: { declared?: { reference_model_compatibility?: string | null } };
+  data?: { unknown_columns?: string[] } | null;
+  runtime?: {
+    seconds: number | null;
+    simulations?: Array<{ peak_rss_bytes?: number | null }>;
+    limits?: RunnerLimits | null;
+  };
   cells: MeasurementCell[];
 }
 
@@ -728,6 +751,7 @@ export function finalizeCountry(options: {
       attempts: point.attempt,
       lastError: reason,
       lastStage: report?.stage ?? null,
+      nearLimits: [],
       lastBuildId: point.build_id,
     };
   }
@@ -743,15 +767,17 @@ export function finalizeCountry(options: {
       attempts: point?.attempt ?? Math.max(before?.attempts ?? 0, 1),
       lastError: refused ? document.reason : null,
       lastStage: null,
+      nearLimits: nearLimits(document),
       lastBuildId: point?.build_id ?? before?.lastBuildId ?? null,
     };
   }
   // A pinning run with nothing planned and nothing held pins nothing, and a country's first
-  // panel is pinned only by its backfill: a single release or a top-up never starts a series.
+  // panel is pinned only by a run that measures its whole series (a top-up or a backfill): a single
+  // release or a retry never starts a series.
   const pinnedBefore = Object.values(entry.panels).some((candidate) => candidate.pinnedAt !== null);
   const pinning = options.pin &&
     (options.planned.length > 0 || Object.keys(points).length > 0) &&
-    (pinnedBefore || options.mode === "backfill");
+    (pinnedBefore || options.mode === "backfill" || options.mode === "topup");
   let pinnedAt = previous?.pinnedAt ?? null;
   if (pinning && (entry.pinnedPanelId !== panelId || pinnedAt === null)) pinnedAt = options.at;
   entry.panels[panelId] = {
@@ -830,6 +856,12 @@ export interface TimelineBuild {
   status: string | null;
   /** A gap's refusal reason, or the last error of a failed or retrying file. */
   reason: string | null;
+  /** Whether the reference model is inside the range the build declares (inside, outside,
+   *  undeclared or unreadable); null where the panel holds no point for the file. */
+  referenceModelCompatibility: string | null;
+  /** Columns in the file the reference model does not define (it drops them); null where the panel
+   *  holds no point, or the point is a gap. */
+  unknownColumns: string[] | null;
 }
 
 export interface TimelineValue {
@@ -932,6 +964,8 @@ export function buildTimeline(options: {
       measurementId: point?.measurement_id ?? null,
       status: point?.status ?? null,
       reason: point ? point.reason : state?.lastError ?? null,
+      referenceModelCompatibility: point?.fetched_from?.declared?.reference_model_compatibility ?? null,
+      unknownColumns: point?.data?.unknown_columns ?? null,
     };
   });
   const pointOf = listed.map((build) => byDigest.get(build.digest as string));

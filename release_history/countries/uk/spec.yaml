@@ -134,4 +134,9 @@ disclosure:
   min_source_households: 3
   source_id_columns: [household_source_id, source_household_id, source_household_key]
 runner:
+  # The measure step's time limit (timeout-minutes: 110 in the workflow) and the memory of a
+  # standard GitHub-hosted Linux runner for a public repository. A file that uses 80% of either,
+  # or of max_dataset_bytes, is flagged on the run's page and in the manifest.
+  max_seconds: 6600
+  max_memory_bytes: 16000000000
   max_dataset_bytes: 2000000000

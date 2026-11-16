@@ -114,7 +114,9 @@
           "state",
           "measurementId",
           "status",
-          "reason"
+          "reason",
+          "referenceModelCompatibility",
+          "unknownColumns"
         ],
         "properties": {
           "buildId": {
@@ -184,6 +186,30 @@
               "string",
               "null"
             ]
+          },
+          "referenceModelCompatibility": {
+            "enum": [
+              null,
+              "inside",
+              "outside",
+              "undeclared",
+              "unreadable"
+            ],
+            "description": "Whether the reference model is inside the range the build declares; null where the panel holds no point."
+          },
+          "unknownColumns": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "description": "Columns of the file the reference model does not define; null where the panel holds no point or the point is a gap."
           }
         }
       }

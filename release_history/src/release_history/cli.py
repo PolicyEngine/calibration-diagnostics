@@ -26,7 +26,7 @@ from typing import Any
 
 from release_history import ATTEMPT_FORMAT_VERSION, LABELS_FORMAT_VERSION, PRODUCER_VERSION
 from release_history.canonical import document_bytes, file_sha256, write_atomic
-from release_history.document import measured_point, measurement_id, refused_document
+from release_history.document import measured_point, measurement_id, near_limits, refused_document
 from release_history.engine import EngineMismatch, engine_identity, environment, panel_document
 from release_history.export import export_csv
 from release_history.local_store import (
@@ -48,6 +48,7 @@ from release_history.references import (
 from release_history.reforms import UnknownParameterError, baseline_value, parameter_node
 from release_history.releases import (
     HubClient,
+    LocalBuildFolder,
     Point,
     ReleaseRefused,
     TransientError,
@@ -365,6 +366,14 @@ def source_ids_for(spec: Spec, path: Path, household_ids: Any) -> Any:
 
 
 def _point_from_args(args: argparse.Namespace, spec: Spec, hub: HubClient) -> Point:
+    if args.build_dir:
+        # A Microcosm post-build step: the build is not published, so there is no commit.
+        return Point(
+            build_id=args.build_id,
+            release_directory=args.build_id,
+            hf_repo=spec.release_repo,
+            hf_commit=None,
+        )
     if args.point:
         source = Path(args.point).read_text() if Path(args.point).is_file() else args.point
         return Point.from_json(json.loads(source))
@@ -470,7 +479,9 @@ def cmd_measure(args: argparse.Namespace) -> int:
     write_once(folder / "panel.json", panel)
     env = environment(_lockfile(spec.country))
     producer_commit = _producer_commit()
-    hub = HubClient()
+    if args.build_dir and not args.build_id:
+        raise SystemExit("measure --build-dir needs --build-id <release>/<build>")
+    hub = LocalBuildFolder(Path(args.build_dir), args.build_id) if args.build_dir else HubClient()
     report = AttemptReport(folder, spec.country, panel_id, producer_commit)
     workdir = Path(args.workdir) if args.workdir else Path(tempfile.mkdtemp(prefix="rh-"))
     log_path = Path(args.log) if args.log else root / ".logs" / f"{spec.country}-{int(clock)}.log"
@@ -568,9 +579,18 @@ def cmd_measure(args: argparse.Namespace) -> int:
         )
         write_immutable(target, document)
         report.clear()
+        near = near_limits(document)
+        for name, share in near.items():
+            # A GitHub Actions warning on the run's page: ids and shares only.
+            print(
+                f"::warning title=Release history near a runner limit::{spec.country} "
+                f"{point.build_id}: {name} at {round(100 * share)}% of its limit",
+                flush=True,
+            )
         _emit(
             {
                 "command": "measure",
+                "near_limits": near,
                 "status": document["status"],
                 "measurement_id": measurement,
                 "panel_id": panel_id,
@@ -601,7 +621,8 @@ def cmd_measure(args: argparse.Namespace) -> int:
             report, "unexpected", "unexpected_error", point, error_class=type(error).__name__
         )
     finally:
-        if h5_path is not None and not args.h5 and not args.keep_h5:
+        # Never delete a file the run did not download: a --h5 copy or a build folder's own file.
+        if h5_path is not None and not args.h5 and not args.keep_h5 and not args.build_dir:
             h5_path.unlink(missing_ok=True)
         if not args.workdir:
             shutil.rmtree(workdir, ignore_errors=True)
@@ -655,6 +676,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--repo", help="release repository (defaults to the spec's)")
     p.add_argument("--release-directory", help="folder under releases/ (derived from a cut tag)")
     p.add_argument("--h5", help="a local copy of the national H5 (still sha256-checked)")
+    p.add_argument(
+        "--build-dir",
+        help="a build folder before it is published (a Microcosm post-build step; off by default)",
+    )
+    p.add_argument("--build-id", help="with --build-dir: the build's <release>/<build> name")
     p.add_argument("--workdir")
     p.add_argument("--log", help="private log for library output (never uploaded)")
     p.add_argument("--keep-h5", action="store_true")

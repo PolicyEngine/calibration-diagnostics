@@ -32,6 +32,7 @@ import {
   encodeDocument,
   finalizeCountry,
   listedBuilds,
+  MAX_PLANNED_POINTS,
   panelPrefix,
   PLAN_MODES,
   planPanel,
@@ -326,6 +327,7 @@ export async function finalize(options: {
       attempts: point.attempts,
       lastError: point.lastError,
       lastStage: point.lastStage,
+      nearLimits: point.nearLimits,
     })),
   };
 }
@@ -396,6 +398,14 @@ function blobStore(): ReleaseHistoryStore {
   return vercelBlobStore(process.env.BLOB_READ_WRITE_TOKEN || undefined);
 }
 
+// A run is flagged once it comes within 20% of a limit: the runner's (per file) or a plan's cap.
+const WARN_AT = 0.8;
+
+/** A GitHub Actions warning, shown on the run's page; it carries ids and shares only. */
+function warning(title: string, message: string): void {
+  console.log(`::warning title=${title}::${message}`);
+}
+
 function planMode(value: string | undefined): PlanMode {
   if (PLAN_MODES.includes(value as PlanMode)) return value as PlanMode;
   throw new Error(`--mode must be one of ${PLAN_MODES.join(", ")}.`);
@@ -433,6 +443,11 @@ async function main(argv: string[]): Promise<void> {
       buildId: values["build-id"] || null,
     });
     if (values["plan-out"]) await writeFile(values["plan-out"], encodeDocument(result));
+    const nearCap = result.points.length >= WARN_AT * MAX_PLANNED_POINTS;
+    if (nearCap) {
+      warning("Release history plan near its cap",
+        `${result.country}: ${result.points.length} of at most ${MAX_PLANNED_POINTS} files in one run`);
+    }
     await githubOutput({
       action: result.action,
       count: String(result.points.length),
@@ -443,7 +458,8 @@ async function main(argv: string[]): Promise<void> {
     await stepSummary(
       `### Release history plan: ${result.country}\n\nPanel \`${result.panelId}\`, mode \`${result.mode}\`: ` +
         `${result.action} ${result.points.length} of ${result.seriesFiles} files in the series` +
-        (result.reason ? ` (${result.reason})` : "") + ".",
+        (result.reason ? ` (${result.reason})` : "") + "." +
+        (nearCap ? `\n\n**Near the cap:** ${result.points.length} of at most ${MAX_PLANNED_POINTS} files in one run.` : ""),
     );
     console.log(JSON.stringify({ ...result, points: result.points.map((p) => p.build_id) }));
   } else if (command === "upload") {
@@ -458,8 +474,13 @@ async function main(argv: string[]): Promise<void> {
       store, panel, plan: planned, pin: values.pin === true, measureResult: values["measure-result"],
     });
     const rows = summary.points
-      .map((p) => `| ${p.buildId ?? ""} | \`${p.digest.slice(0, 12)}\` | ${p.state} | ${p.measurementStatus ?? ""} | ${p.attempts} | ${[p.lastError, p.lastStage].filter(Boolean).join(" at ")} |`)
+      .map((p) => `| ${p.buildId ?? ""} | \`${p.digest.slice(0, 12)}\` | ${p.state} | ${p.measurementStatus ?? ""} | ${p.attempts} | ${[p.lastError, p.lastStage].filter(Boolean).join(" at ")} | ${p.nearLimits.join(", ")} |`)
       .join("\n");
+    const near = summary.points.filter((p) => p.nearLimits.length > 0);
+    for (const p of near) {
+      warning("Release history near a runner limit",
+        `${summary.country} ${p.buildId ?? p.digest.slice(0, 12)}: within 20% of its ${p.nearLimits.join(", ")} limit`);
+    }
     const { coverage } = summary;
     await stepSummary(
       `### Release history: ${summary.country}\n\nPanel \`${summary.panelId}\`: ` +
@@ -467,7 +488,10 @@ async function main(argv: string[]): Promise<void> {
         `${summary.current ? "current" : "not current"}. Series: ${coverage.builds} builds, ${coverage.files} files; ` +
         `${coverage.measured} measured, ${coverage.gap} gaps, ${coverage.retrying} retrying, ` +
         `${coverage.failed} failed, ${coverage.missing} never run. ${summary.timelines} timelines rebuilt.\n\n` +
-        `| Build | File | State | Measurement | Attempts | Last error |\n|---|---|---|---|---|---|\n${rows}`,
+        (near.length > 0
+          ? `**Near a runner limit:** ${near.length} file(s) used 80% or more of their time, memory or file-size limit.\n\n`
+          : "") +
+        `| Build | File | State | Measurement | Attempts | Last error | Near a limit |\n|---|---|---|---|---|---|---|\n${rows}`,
     );
     console.log(JSON.stringify(summary));
   } else if (command === "pull") {

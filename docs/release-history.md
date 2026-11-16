@@ -99,7 +99,11 @@ branches on a country code. Its main parts:
   `targets` names the variables whose change is reported.
 - `outputs`: the output levels (`targets`, `budget`, `distribution`,
   `poverty`); a reform may narrow them.
-- `disclosure`, `runner.max_dataset_bytes`.
+- `disclosure`.
+- `runner`: `max_dataset_bytes`, `max_seconds` (the measure step's time limit)
+  and `max_memory_bytes` (the runner's memory). A file over the size budget
+  fails at once; a file that uses 80% of any of the three is flagged. The
+  runner block is outside the panel id.
 
 ### What a point holds
 
@@ -190,7 +194,16 @@ plan --plan-out <file>` writes them: `build_id` and `release_directory`
 takes a cut tag or commit and measures whatever file its manifest names; `--h5`
 reuses a local copy of the national file, still checked against the manifest.
 A failure the run causes writes the file's attempt report and exits 3; a
-transient one exits 75.
+transient one exits 75. A run that uses 80% of a runner limit prints a GitHub
+Actions warning.
+
+`--build-dir <folder> --build-id <release>/<build>` measures a build folder
+before it is published, as a Microcosm post-build step would: it reads the
+folder's `release_manifest.json`, `build_manifest.json` and national file with
+no Hugging Face read, records no commit, and never deletes the folder's file.
+The point is written to `--out` like any other. Nothing calls it today: the
+workflow measures published builds, and handing a post-build point to the
+collector is not built.
 
 `export` reads the panel's `timeline.json` when there is one (the document the
 TypeScript side writes, in camelCase): one row per build and output, with the
@@ -229,7 +242,8 @@ The manifest holds each country's pinned and current panel and, per panel, its
 engine, when it was created and last pinned (`pinnedAt`), its coverage of the
 series (builds, files, and files measured, gaps, retrying, failed and never
 run) and its points, keyed by file sha256: state, measurement id and status,
-attempts, last error and stage, last build. Every panel ever filled stays
+attempts, last error and stage, last build, and the runner limits its stored
+point came within 20% of. Every panel ever filled stays
 listed with its engine, so a page can offer each engine's timeline and say
 which builds an engine has no point for. Every manifest write is conditional on
 the version read, re-applied on a lost race, and never unconditional; a
@@ -239,14 +253,17 @@ Only a run of the default branch's engine (the workflow passes `--pin` to
 `plan`, `upload` and `finalize` on the default branch) pins: it moves the
 pinned panel, and the current (served) panel once that panel is complete,
 replaces the country's series record, references and labels, and rebuilds
-every panel's timeline. A country's first panel is pinned only by its
-backfill. A run dispatched from another ref fills the panel of the engine
+every panel's timeline. A country's first panel is pinned only by a run that
+measures its whole series, a top-up or a backfill. A run dispatched from
+another ref fills the panel of the engine
 that ref pins, rebuilds only that panel's timeline, and leaves the country's
 files and both pointers as they are, so an unmerged spec never reaches the
 served page.
 
 `timeline.json` holds, for each build of the series record in publish order,
-its file, state and point, and for each output and period, one value per
+its file, state and point, whether the reference model is inside the range the
+build declares, and the file's columns the model does not define (it drops
+them); and for each output and period, one value per
 build, the change from the previous build on the series when both hold the
 cell (relative for money and counts, in percentage points for rates), and the
 output's official reference. A withdrawn build is listed but is never a
@@ -273,11 +290,13 @@ tests build each country's timeline fixture from the producer's.
 
 - **New release**: the weekly run (Sundays at 05:00 UTC, for each country
   listed in the repository variable `RELEASE_HISTORY_WEEKLY`) dispatches a
-  top-up on the default branch: it measures the files no pinned engine has
-  measured yet. A manual `topup` does the same at any time; `release` measures
-  one build. A top-up dispatched from another ref is skipped, and a country's
-  first panel waits for its backfill. Weekly runs are off for every country
-  while the variable is unset or empty.
+  top-up on the default branch: it measures every file the default branch's
+  panel lacks. On the served panel that is the new builds; on a panel the page
+  does not show yet (a country's first, or one after an engine, spec or
+  producer change) it is the whole series, and the page moves to that panel
+  once it is complete. A manual `topup` does the same at any time; `release`
+  measures one build. A top-up dispatched from another ref is skipped. Weekly
+  runs are off for every country while the variable is unset or empty.
 - **The same release on another engine**: never automatic. Dispatch `release`
   (one build) or `backfill` from a ref whose country folder pins that engine,
   or run `measure` locally with that engine installed. The point lands in that
@@ -285,12 +304,11 @@ tests build each country's timeline fixture from the producer's.
 - **Engine bump**: a PR bumps one country's `pyproject.toml` and `uv.lock`,
   typically when policyengine.py changes that country's model or core pin or a
   model fix matters. Only that country's panel id changes. The first top-up on
-  the default branch after the merge measures the new builds at once, plus the
-  last build the previous engine measured, so the first new build has a step;
-  it pins the new panel. The served panel stays on the earlier engine until a
-  manual `backfill` completes the new one; the old panel is kept, which gives
-  an engine-axis comparison for every file. Every country goes through the
-  same steps.
+  the default branch after the merge pins the new panel and measures its whole
+  series, at most 200 files a run (the rest the next week). The served panel
+  stays on the earlier engine until the new panel is complete, then moves; the
+  old panel is kept, which gives an engine-axis comparison for every file.
+  Every country goes through the same steps.
 - **Spec change**: the same, for that country only.
 - **Producer change**: bump `PRODUCER_VERSION` for any change that can alter a
   stored number (never for a refactor), and the point format version for a
@@ -321,6 +339,14 @@ dependency chain and nothing else. A file over `runner.max_dataset_bytes` is
 never opened: it fails at once (`exceeds_runner_budget`), and a `retry` after
 raising the budget frees it. A run measures at most 200 files; the rest wait
 for the next. Runs use GitHub-hosted runners, free for this public repository.
+
+A file that uses 80% of a runner limit (20% short of it) is flagged: the
+measure step's time (`runner.max_seconds`), the peak memory of its largest
+simulation (`runner.max_memory_bytes`) or the file's size
+(`runner.max_dataset_bytes`). The flag is a warning on the run's page, a
+column in finalize's summary, and `nearLimits` on the file's manifest entry;
+each point records the limits it ran under. A plan of 160 files or more (80%
+of the cap) is flagged the same way.
 
 Measured on 2026-11-09, for one UK point (the national cut of 7 November,
 78,181 households) on a laptop. The baseline took 43 seconds and each of the
@@ -362,7 +388,9 @@ core, declared compatible range and whether the reference model is inside it,
 description, and from the build manifest the Microcosm code commit, target
 surface digest and size, target registry version and household weight basis),
 the environment it ran on (Python, platform, packages and the engine lock's
-digest) and the producer version and commit. Publish times, `current` and
+digest), the runner limits it ran under, and the producer version and commit;
+a build folder measured before it is published has no commit. Publish times,
+`current` and
 withdrawn flags are listing facts and live in the series record, so a
 corrected publish time re-orders the timeline with no re-run. Each panel
 records its key, the hashed spec and the engine (bundle digest, model and core
@@ -376,7 +404,7 @@ engine version).
 The repository is public and the UK data are licensed. The workflow runs only
 on `workflow_dispatch` and its weekly schedule, never on pull requests. Logs
 carry ids, statuses, counts and timings; an unexpected error prints its class
-only; library output goes to a private file that is never printed or
+only; a near-limit warning names a build and a share of its limit; library output goes to a private file that is never printed or
 uploaded; nothing is stored as an Actions artifact or cache; points and
 attempt reports go straight to private Blob. Two repository variables control
 it without a pull request: `RELEASE_HISTORY_WEEKLY` lists the countries whose

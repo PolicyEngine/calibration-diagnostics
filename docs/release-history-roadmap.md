@@ -34,7 +34,9 @@ engine. A move between two builds then comes from the data, not from the model.
   and people that gain or lose, the net income change (also by decile), and poverty.
 - **Facts for later:** the file's digest; where it was fetched from; what its build declared (the Microcosm
   code commit, the model and core that built it, the digest and number of its targets, the target registry
-  version); the environment and the digest of the engine lock.
+  version); the environment and the digest of the engine lock; the runner limits it ran under.
+- **In the timeline:** each build also carries whether the reference model is inside the range the build
+  declares, and the file's columns the model drops.
 - **No listing fact.** Publish time, `current` and withdrawn are in the series record. A corrected publish
   time re-orders the timeline with no re-run.
 
@@ -50,8 +52,12 @@ engine. A move between two builds then comes from the data, not from the model.
 
 **A run** has three jobs: plan, measure (one file per job, in parallel), finalize.
 
-- **Modes:** `topup` (files that no pinned engine measured), `backfill` (the whole series), `release` (one
-  build) and `retry` (failed files).
+- **Modes:** `topup` (every file the default branch's panel lacks: the new builds, or the whole series on a
+  panel the page does not show yet), `backfill` (the same, from any branch), `release` (one build) and
+  `retry` (failed files).
+- **Near a limit:** a file that uses 80% of the measure step's time, the runner's memory or the file-size
+  budget is flagged on the run's page and in the manifest; so is a plan of 160 files or more (the cap is
+  200).
 - **Split:** Python does everything that touches PolicyEngine, a data file, the release repository or
   Chronicle. TypeScript does everything that touches the store.
 
@@ -59,11 +65,11 @@ engine. A move between two builds then comes from the data, not from the model.
 
 - **A new build: automatic,** once the weekly switch names the country. On Sundays at 05:00 UTC a top-up
   measures it on the engine that the default branch pins.
-- **A country's first panel: manual.** One `backfill` dispatch on the default branch.
-- **An engine bump: a pull request, then a backfill.** The pull request changes the country's engine lock.
-  The next top-up measures the new builds on the new engine, plus the last build of the earlier engine, so
-  that the first new build has a step. The served panel stays on the earlier engine until a manual
-  backfill completes the new one. The earlier panel is kept.
+- **A country's first panel: automatic** once the weekly switch names the country: the first top-up
+  measures its whole series. A `backfill` dispatch on the default branch does the same at any time.
+- **An engine bump: a pull request.** The pull request changes the country's engine lock. The next top-up
+  on the default branch measures the whole series on the new engine, at most 200 files a run. The served
+  panel moves to the new engine once its panel is complete. The earlier panel is kept.
 - **A change to the definition or to the producer version:** the same steps as an engine bump.
 - **One build on another engine: manual,** from a git ref that pins that engine.
 - **A change to a label or to a reference:** no re-measurement. The next run rebuilds the timelines.
@@ -110,11 +116,12 @@ engine. A move between two builds then comes from the data, not from the model.
 - No code branches on a country code. The storage is the same for every country.
 - Every measured output carries an official reference.
 - The page uses neutral words: "moved", "nearer to", "further from".
-- Experimental schedules are weekly or manual. Backfills are manual.
+- Experimental schedules are weekly or manual, and off until switched on per country. Once on, a weekly
+  top-up also backfills a panel the page does not show yet.
 - The UK data are licensed. The disclosure policy binds everything that people read.
 
 **Next for PR 1, each a manual step:** after the merge, a UK dry run, one UK point and the UK backfill;
-then the weekly switch.
+then the weekly switch, after which an engine bump backfills on its own.
 
 ## 2. Discussion points for PR 2: the page
 
@@ -132,8 +139,9 @@ A preview page exists, and the pull request links to it.
 - **What it does:** the same series under another engine. Every engine's runs are stored.
 - **To discuss:**
   - Which engines the toggle lists. A start: those under the current definition.
-  - Which panel opens after an engine bump. The served panel is the earlier engine, with no new build
-    until the backfill. The pinned panel is the new engine, with a short series.
+  - Which panel opens after an engine bump. The served panel stays on the earlier engine until the new
+    panel is complete, normally the next weekly run. A start: the served panel, with a note while a file
+    of the new panel is retrying.
   - How a build with no run on the chosen engine shows. A start: a notice that names the missing builds.
 
 **P3. What moved: the list**
@@ -240,8 +248,9 @@ A preview page exists, and the pull request links to it.
 
 **L3. The definition: which reforms and baselines** (always open)
 
-- **The cost rule:** a change to periods, baseline items, reforms or outputs starts a new panel and needs
-  a backfill. That is runner time only, and the earlier panel stays. Labels and references cost nothing.
+- **The cost rule:** a change to periods, baseline items, reforms or outputs starts a new panel, which the
+  next weekly top-up backfills. That is runner time only, and the earlier panel stays. Labels and
+  references cost nothing.
 - **Candidates so far:** baseline items for the calibration year, so that a build's own fit and the
   fixed-engine value share a period; a full US spec (L7).
 - **Later, when a full re-run is slow:** reuse by block. A new panel copies the baseline block and each
@@ -252,9 +261,9 @@ A preview page exists, and the pull request links to it.
 
 - **Runs on demand for another engine:** fill a past engine's panel for chosen builds. Ways: a git tag per
   engine pin, an engine input on the workflow, or a local run with an upload.
-- **"What the bump did":** one file on two engines. Each bump gives one such pair, the overlap build.
-- **History across a bump:** a stitched view that joins two panels at the overlap build, a full backfill,
-  or a sampled backfill.
+- **"What the bump did":** one file on two engines. After its backfill, every file is on both engines.
+- **History across a bump:** the new panel holds the whole series once its backfill completes, so no
+  stitching is needed; a sampled backfill would make the new panel cheaper but partial.
 - **Other paths:** each build on its own build engine (an as-built series).
 - **An engine that is no published bundle:** a relaxed environment check in the producer. No id changes.
 - **Old panels:** keep them. The objects are small.
@@ -272,7 +281,12 @@ A preview page exists, and the pull request links to it.
 
 - **A top-up when a build is published.** The dashboard's Hugging Face webhook already reacts to a changed
   `releases.json`. Weekly or manual stays the default for an experimental feature.
-- **Notices:** a Slack note on a failed file or a large step. It links to the page and carries no figure.
+- **Notices:** a Slack note on a failed file, a large step, or a run near a runner limit. It links to the
+  page and carries no figure.
+- **A Microcosm post-build step (built, off):** `release-history measure --build-dir` measures a build
+  folder before it is published, with no Hugging Face read and no Blob token. Not built: the Microcosm
+  hook that would call it after a build, and a collector intake for its result. Both are in other
+  repositories.
 - **Dense US files:** their memory need on a standard runner is not measured. The record's national line
   names none today.
 
