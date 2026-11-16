@@ -4,10 +4,8 @@ import Link from "next/link";
 import type { CalibrationProvenance } from "@policyengine/calibration-tree/target-loss-attribution";
 
 import { useCountry } from "@/components/layout/country-context";
-import { useBuildRun } from "@/lib/api/hooks/use-microcosm";
 import {
   inheritedCalibrationSource,
-  parentStagingRunId,
   type InheritedCalibrationSource,
 } from "@/lib/microcosm/inherited-calibration";
 
@@ -40,7 +38,6 @@ export function InheritedCalibration({
   provenance: CalibrationProvenance | undefined;
 }) {
   const { country } = useCountry();
-  const { data: parentRun } = useBuildRun("staging", parentStagingRunId(provenance, country));
-  const source = inheritedCalibrationSource(provenance, country, parentRun);
+  const source = inheritedCalibrationSource(provenance, country, undefined);
   return source ? <InheritedCalibrationLabel {...source} /> : null;
 }
