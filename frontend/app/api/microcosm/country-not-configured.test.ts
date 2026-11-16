@@ -18,6 +18,7 @@ const COUNTRY_ROUTES: Record<string, () => Promise<RouteModule>> = {
   "microcosm/comparison-tree/target-detail": () =>
     import("./comparison-tree/target-detail/route"),
   "microcosm/cross-dataset": () => import("./cross-dataset/route"),
+  "microcosm/parent-build": () => import("./parent-build/route"),
   "microcosm/releases": () => import("./releases/route"),
   "microcosm/staging/compare": () => import("./staging/compare/route"),
   "microcosm/staging/run": () => import("./staging/run/route"),
