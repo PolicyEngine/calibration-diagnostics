@@ -47,6 +47,7 @@ import type {
   TargetChangeTreeApiResponse,
   TargetChangeTreeResponse,
 } from "@/lib/microcosm/target-change-tree";
+import type { ParentBuildResponse } from "@/lib/microcosm/inherited-calibration";
 import { HOSTED_US_RELEASE } from "@/lib/microcosm/production-release";
 import {
   hasCapability,
@@ -1673,6 +1674,24 @@ export function useBuildRuns(source: BuildRunSource, enabled = true) {
 export function retryBuildRun(failureCount: number, error: Error): boolean {
   if (error instanceof ApiError && error.status === 404) return false;
   return retryFailedQuery(failureCount, error);
+}
+
+// The build whose calibration `releaseId` inherits, and that build's staging
+// run, read from the parent build manifest at the build's pinned commit: an
+// answer that does not change, so it is never asked for again, and a build
+// without one (404) is not asked for twice.
+export function useMicrocosmParentBuild(releaseId: string | undefined) {
+  const { country } = useCountry();
+  return useQuery({
+    queryKey: ["microcosm", "parent-build", country, releaseId],
+    queryFn: () =>
+      apiGet<ParentBuildResponse>("/microcosm/parent-build", { country, release: releaseId }),
+    enabled: Boolean(releaseId),
+    staleTime: Infinity,
+    retry: (failureCount, error) =>
+      !(error instanceof ApiError && error.status === 404) &&
+      retryFailedQuery(failureCount, error),
+  });
 }
 
 export function useBuildRun(source: BuildRunSource, runId?: string) {

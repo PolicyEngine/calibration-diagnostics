@@ -623,7 +623,10 @@ function CalibrationExplorerMapForSource({
             <FitLegend mode={sizeMode} />
           </div>
         </div>
-        <InheritedCalibration provenance={data.calibrationProvenance} />
+        <InheritedCalibration
+          provenance={data.calibrationProvenance}
+          releaseId={stagingRunId ? undefined : data.releaseId}
+        />
         {lossUnavailableMessage && (
           <p className="mt-1 text-[10px] text-muted-foreground">
             {lossUnavailableMessage}
