@@ -6,7 +6,6 @@ import {
   type BuildForecast,
   type BuildTimeline,
   buildTimeline,
-  phaseTotals,
 } from "@/lib/microcosm/build-monitor";
 import {
   INVESTIGATION_NOW_MS,
@@ -14,13 +13,7 @@ import {
   usRunningCollectorDocuments,
 } from "@/lib/microcosm/test-support/collector-run-fixtures";
 import type { ViewerZone } from "@/lib/microcosm/viewer-time";
-import {
-  linkedRunFailure,
-  linkedRunOptionLabel,
-  RunHistoryItem,
-  RunOverview,
-  runOptionLabel,
-} from "./build-monitor-view";
+import { linkedRunFailure, linkedRunOptionLabel, RunOverview, runOptionLabel } from "./build-monitor-view";
 import { useViewerZone } from "./viewer-time";
 
 const LONDON: ViewerZone = { timeZone: "Europe/London", locale: "en-GB" };
@@ -79,7 +72,9 @@ test("the run overview names the viewer's zone on the run's start and end, with 
   // In October London keeps summer time (BST, UTC+1).
   const markup = overview(failedRun(), null, LONDON);
 
-  expect(markup).toContain('Started <time dateTime="2026-10-19T22:23:36.000Z">19 Oct, 23:23 BST</time>');
+  // The card's subtitle is the start time and nothing after it.
+  expect(markup).toContain('>Started <time dateTime="2026-10-19T22:23:36.000Z">19 Oct, 23:23 BST</time></p>');
+  expect(markup).not.toContain("hosted telemetry");
   expect(markup).toContain('<time dateTime="2026-10-20T06:37:45.000Z">20 Oct, 07:37 BST</time>');
   expect(markup).not.toContain("UTC");
 });
@@ -90,7 +85,8 @@ test("a running run's expected finish reads in the viewer's zone, named", () => 
 
   const markup = overview(running, forecast, NEW_YORK);
 
-  expect(markup).toContain(">Oct 21, 12:02 PM EDT</time>");
+  expect(markup).toContain(">Oct 21, 12:02 PM EDT</time></p>");
+  expect(markup).not.toContain("last telemetry");
   // 01:30 UTC on October 23 is still October 22 in New York, the viewer's
   // today, so the date is left out.
   expect(markup).toContain('<time dateTime="2026-10-23T01:30:00.000Z">09:30 PM EDT</time>');
@@ -98,26 +94,10 @@ test("a running run's expected finish reads in the viewer's zone, named", () => 
   expect(markup).toContain(">Oct 23, 12:45 AM EDT</time>");
 });
 
-test("the run selector and run history give each run's start in the viewer's zone, named", () => {
-  const run = failedRun();
-
-  expect(plain(runOptionLabel(run, INVESTIGATION_NOW_MS, NEW_YORK))).toStartWith(
+test("the run selector gives each run's start in the viewer's zone, named", () => {
+  expect(plain(runOptionLabel(failedRun(), INVESTIGATION_NOW_MS, NEW_YORK))).toStartWith(
     "Failed · Oct 19, 6:23 PM EDT · ",
   );
-
-  const markup = plain(
-    renderToStaticMarkup(
-      createElement(RunHistoryItem, {
-        run,
-        total: phaseTotals(run, INVESTIGATION_NOW_MS),
-        longest: 1,
-        selected: false,
-        onSelect: () => {},
-        zone: NEW_YORK,
-      }),
-    ),
-  );
-  expect(markup).toContain('<time dateTime="2026-10-19T22:23:36.000Z">Mon, Oct 19, 6:23 PM EDT</time>');
 });
 
 test("a linked run the list does not hold is named in the Run selector only once its detail arrives", () => {

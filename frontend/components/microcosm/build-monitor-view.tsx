@@ -4,14 +4,16 @@ import {
   type CSSProperties,
   type ReactNode,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
+  useReducer,
   useState,
 } from "react";
 import { useSearchParams } from "next/navigation";
+import { ChevronRight } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/empty-state";
-import { HelpHint } from "@/components/shared/help-hint";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { LoadingBlock } from "@/components/shared/LoadingBlock";
 import { PageHeader } from "@/components/shared/page-header";
@@ -21,8 +23,48 @@ import { ToolbarSelect } from "@/components/shared/toolbar-select";
 import { useViewerZone, ViewerTime } from "@/components/microcosm/viewer-time";
 import { ApiError } from "@/lib/api/client";
 import { useBuildRun, useBuildRuns } from "@/lib/api/hooks/use-microcosm";
+import { detailBehindList } from "@/lib/microcosm/build-refresh";
 import { hostedListRequested, localListRequested, opensLocalRuns } from "@/lib/microcosm/build-list-requests";
-import { buildRunToShow, waitsForRunList } from "@/lib/microcosm/build-run-selection";
+import {
+  buildRunToShow,
+  placeholderHidesFailure,
+  runDetailLoading,
+  waitsForRunList,
+} from "@/lib/microcosm/build-run-selection";
+import {
+  axisIntervals,
+  axisOffset,
+  filteredAxis,
+  phasesByFirstAppearance,
+  type StageExtent,
+} from "@/lib/microcosm/timeline-layout";
+import { scaleTicks } from "@/lib/microcosm/chart-scale";
+import {
+  CHART_KEYS,
+  type ChartHoverEvent,
+  hoveredIndex as chartHoveredIndex,
+  NO_CHART_HOVER,
+  nextChartHover,
+} from "@/lib/microcosm/chart-hover";
+import {
+  availableCores,
+  type MachineReading,
+  type MachineSegment,
+  memoryLimitBytes,
+  readingRuns,
+  type SleepBand,
+} from "@/lib/microcosm/machine-readings";
+import {
+  focusNarrows,
+  focusOnDrawnStages,
+  initialTimelineCard,
+  narrowedToStage,
+  nextTimelineCard,
+  pointerHovers,
+  stageFocus,
+  type TimelineFocus,
+  wholeRunLabel,
+} from "@/lib/microcosm/timeline-focus";
 import {
   orderRunOptions,
   parseRunOrder,
@@ -31,25 +73,16 @@ import {
   withRunOrder,
 } from "@/lib/microcosm/run-order";
 import {
-  BUILD_GATE_CATALOG_SOURCE,
-  GATE_POSITIONS,
-  type CatalogGate,
-} from "@/lib/microcosm/build-gate-catalog";
-import {
   BUILD_PHASES,
   type BuildForecast,
   type BuildPhase,
   type BuildRunSource,
   type BuildRunState,
   type BuildTimeline,
-  type StopOutcome,
-  type StopStat,
-  type GateStat,
-  type PhaseTotals,
   type SolverForecast,
   type SolverSegment,
   type StageForecast,
-  type StageStat,
+  childSpans,
   formatStageName,
   phaseTotals,
   runDurationMs,
@@ -61,24 +94,21 @@ import {
   type StageSpan,
 } from "@/lib/microcosm/build-monitor";
 import {
-  type RunStage,
-  P90_MIN_RUNS,
-  type RunStageTime,
-  runStageBreakdown,
-  runStageTimes,
-} from "@/lib/microcosm/run-stage-breakdown";
-import {
   clockTime,
   runStartTime,
   type ViewerZone,
 } from "@/lib/microcosm/viewer-time";
 
-const PHASE_COLOR: Record<BuildPhase, string> = {
-  setup: "var(--chart-4)",
-  checks: "var(--chart-2)",
-  compile: "var(--chart-1)",
-  calibrate: "var(--chart-3)",
-  export: "var(--chart-5)",
+const BUILD_PHASE_LABEL = Object.fromEntries(BUILD_PHASES.map((phase) => [phase.id, phase.label])) as Record<
+  BuildPhase,
+  string
+>;
+export const PHASE_COLOR: Record<BuildPhase, string> = {
+  setup: "var(--phase-setup)",
+  checks: "var(--phase-checks)",
+  compile: "var(--phase-compile)",
+  calibrate: "var(--phase-calibrate)",
+  export: "var(--phase-export)",
 };
 const FAILED_COLOR = "var(--destructive)";
 // Light stripes laid over a running stage's bar; `bar-running` moves them.
@@ -101,14 +131,6 @@ const STATE_TONE: Record<BuildRunState, StatusTone> = {
   failed: "danger",
   stalled: "warning",
 };
-const STATE_SWATCH: Record<BuildRunState, string> = {
-  running: "swatch-info",
-  passed: "swatch-pos",
-  blocked: "swatch-warn",
-  failed: "swatch-neg",
-  stalled: "swatch-warn",
-};
-
 const FAILURE_CLASS_LABEL: Record<string, string> = {
   gate_refused: "Gate refused",
   terminated: "Terminated (SIGTERM)",
@@ -414,7 +436,11 @@ export function BuildMonitorView({
   };
 
   const detail = useBuildRun(source, selected || undefined);
-  const data = detail.data;
+  // While a run that failed is asked for again, the previous run's detail
+  // stands in as a placeholder; the tab shows it loading instead.
+  const data = placeholderHidesFailure(detail.isPlaceholderData, detail.errorUpdateCount)
+    ? undefined
+    : detail.data;
   const runNotFound = detail.error instanceof ApiError && detail.error.status === 404;
   // The page's URL names the run shown: the default run is written there, and
   // a run no source holds gives way to the default run.
@@ -425,6 +451,15 @@ export function BuildMonitorView({
   }, [runs, selected, preferredRunId, runNotFound, onRunChange]);
   // A run that was not found is about to give way to the default run.
   const replacingRun = runNotFound && runs.some((run) => run.run_id !== selected);
+  // The run list is asked for every five minutes and the run only while it
+  // runs, so a run that went silent and came back shows as running in the
+  // list first: ask for the run again, once per list answer.
+  const listRunState = runs.find((run) => run.run_id === selected)?.state;
+  const detailRunState = data?.run.run_id === selected ? data.run.state : undefined;
+  useEffect(() => {
+    if (detailBehindList(listRunState, detailRunState)) void detail.refetch();
+    // Only a new list answer prompts this; the run's own answers do not.
+  }, [list.dataUpdatedAt]);
   const nowMs = data?.now_ms ?? Date.now();
   const zone = useViewerZone();
   // A run a link named that the list does not hold, such as one older than
@@ -470,12 +505,6 @@ export function BuildMonitorView({
         eyebrow="Microcosm · staging"
         title="Staging candidates"
         status={tabs}
-        description={
-          <>
-            Follow a build while it runs, see when it should finish, and find where build time goes and which checks
-            fail late.
-          </>
-        }
         actions={
           <div className="flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
             {/* A hosted dashboard never reads local run folders, so it
@@ -523,7 +552,7 @@ export function BuildMonitorView({
           title={source === "local" ? "Local runs are off" : "Hosted runs unavailable"}
           description={list.data.detail ?? undefined}
         />
-      ) : !runs.length && !(selected && (data || detail.isLoading)) ? (
+      ) : !runs.length && !(selected && (data || runDetailLoading(detail, false))) ? (
         <EmptyState
           title="No build runs found"
           description={
@@ -532,7 +561,7 @@ export function BuildMonitorView({
               : "The collector and historical staging repository have no runs for this country."
           }
         />
-      ) : (detail.isLoading && !data) || replacingRun ? (
+      ) : runDetailLoading(detail, data != null) || replacingRun ? (
         <LoadingBlock label="Loading run…" />
       ) : detail.error ? (
         <EmptyState
@@ -551,35 +580,9 @@ export function BuildMonitorView({
         <>
           <StaleSourceNotice runs={runs} source={source} nowMs={nowMs} />
           <RunOverview run={data.run} forecast={data.forecast} nowMs={nowMs} zone={zone} />
-          <TimelineCard run={data.run} forecast={data.forecast} nowMs={nowMs} />
-          <RunHistoryCard runs={runs} selected={data.run} nowMs={nowMs} zone={zone} onSelect={selectRun} />
-          <RunStageCard
-            run={data.run}
-            stageStats={data.stage_stats}
-            nowMs={nowMs}
-            pipelineLabel={data.run.pipeline_label}
-          />
-          <TimeBudgetCard
-            run={data.run}
-            nowMs={nowMs}
-            pipelineLabel={data.run.pipeline_label}
-            pipelineRuns={data.pipeline_runs}
-            otherSequenceRuns={data.other_sequence_runs ?? 0}
-            stats={data.stage_stats}
-            totals={data.phase_totals}
-          />
-          <GatesCard
-            stats={data.gate_stats}
-            stops={data.stop_stats ?? []}
-            catalog={data.gate_catalog}
-            pipelineRuns={data.pipeline_runs}
-          />
+          <TimelineCard run={data.run} forecast={data.forecast} nowMs={nowMs} zone={zone} />
           {list.data?.problems.length ? (
-            <SectionCard
-              title="Runs that could not be read"
-              description="Their telemetry does not match the staging contract."
-              descriptionClassName="max-w-none"
-            >
+            <SectionCard title="Runs that could not be read">
               <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
                 {list.data.problems.map((problem) => (
                   <li key={problem.run_id}>
@@ -646,16 +649,6 @@ export function RunOverview({
       description={
         <>
           Started <ClockTime ms={run.started_ms} nowMs={nowMs} zone={zone} />
-          {[
-            running || run.state === "stalled" ? `last telemetry ${fmtDuration(silentFor)} ago` : null,
-            run.heartbeat_ms != null && (running || run.state === "stalled")
-              ? `heartbeat ${fmtDuration(nowMs - run.heartbeat_ms)} ago`
-              : null,
-            run.source === "local" ? "local run folder" : "hosted telemetry",
-          ]
-            .filter(Boolean)
-            .map((part) => ` · ${part}`)
-            .join("")}
         </>
       }
     >
@@ -947,6 +940,9 @@ function tickLabel(ms: number): string {
 
 interface TimelineRow {
   key: string;
+  // The key of the stage the row belongs to: its own for a stage, its
+  // stage's for a solver pass.
+  stageKey: string;
   stage: string;
   label: string;
   phase: BuildPhase;
@@ -958,6 +954,9 @@ interface TimelineRow {
   // A stretch inside a calibration stage (a solver pass, or time with no
   // epochs logged), shown indented under its stage.
   segment: SolverSegment | null;
+  // How deep a nested stage sits under its top-level stage; 0 for the
+  // top-level stage itself.
+  depth?: number;
 }
 
 // A pass's epochs and speed, most telling first: where a running pass is,
@@ -1050,6 +1049,7 @@ function solverRows(
     const open = segment.end_ms == null;
     return {
       key: `${row.key}-segment-${index}`,
+      stageKey: row.key,
       stage: row.stage,
       label: segment.label,
       phase: row.phase,
@@ -1063,15 +1063,430 @@ function solverRows(
   });
 }
 
+// The stages nested in a top-level row's stage, each a row indented under it.
+function nestedRows(row: TimelineRow, run: BuildTimeline, runStart: number, nowOffset: number): TimelineRow[] {
+  if (!row.span) return [];
+  return childSpans(run, row.span).map((span, index) => ({
+    key: `${row.key}-nested-${index}`,
+    stageKey: row.key,
+    stage: span.stage,
+    label: formatStageName(span.stage),
+    // The top-level stage's type, which the row's selection and the stage-type
+    // filter follow.
+    phase: row.phase,
+    start: span.start_ms - runStart,
+    end: Math.max(span.start_ms, span.end_ms ?? runStart + nowOffset) - runStart,
+    status: span.status === "failed" ? "failed" : span.status === "running" ? "running" : "done",
+    basis: "observed",
+    span,
+    segment: null,
+    depth: span.depth - row.span!.depth,
+  }));
+}
+
 function TimelineCard({
   run,
   forecast,
   nowMs,
+  zone,
 }: {
   run: BuildTimeline;
   forecast: BuildForecast | null;
   nowMs: number;
+  zone: ViewerZone | null;
 }) {
+  const [card, dispatch] = useReducer(nextTimelineCard, run.run_id, initialTimelineCard);
+  // Another run is reset while it renders, before anything is drawn, so it
+  // never shows the last run's filter or clicked stage.
+  if (card.runId !== run.run_id) dispatch({ kind: "show_run", runId: run.run_id });
+  return (
+    <TimelineView
+      run={run}
+      forecast={forecast}
+      nowMs={nowMs}
+      zone={zone}
+      expanded={card.expanded}
+      chartsExpanded={card.chartsExpanded}
+      focus={{
+        filter: card.filter,
+        hoveredPhase: card.hoveredPhase,
+        selectedStage: card.selected?.stageKey ?? null,
+        selectedPhase: card.selected?.phase ?? null,
+        hoveredStage: card.hoveredStage,
+      }}
+      onToggleExpanded={() => dispatch({ kind: "toggle_expanded" })}
+      onToggleCharts={() => dispatch({ kind: "toggle_charts" })}
+      onHoverPhase={(phase) => dispatch({ kind: "hover_phase", phase })}
+      onTogglePhase={(phase) => dispatch({ kind: "toggle_phase", phase })}
+      onHoverStage={(stageKey) => dispatch({ kind: "hover_stage", stageKey })}
+      onToggleStage={(stageKey, phase) => dispatch({ kind: "toggle_stage", stageKey, phase })}
+    />
+  );
+}
+
+export interface TimelineViewProps {
+  run: BuildTimeline;
+  forecast: BuildForecast | null;
+  nowMs: number;
+  // The viewer's zone, for clock times; null for the runtime's default.
+  zone?: ViewerZone | null;
+  // Whether the per-stage breakdown is open.
+  expanded: boolean;
+  // Whether the Memory and CPU charts are open.
+  chartsExpanded: boolean;
+  focus: TimelineFocus;
+  onToggleExpanded: () => void;
+  onToggleCharts: () => void;
+  onHoverPhase: (phase: BuildPhase | null) => void;
+  onTogglePhase: (phase: BuildPhase) => void;
+  onToggleStage: (stageKey: string, phase: BuildPhase) => void;
+  onHoverStage: (stageKey: string | null) => void;
+}
+
+// What the Timeline's hover card says about one reading of the build machine.
+export function readingSummary(
+  reading: MachineReading,
+  machine: MachineSegment | null,
+  nowMs: number,
+  zone: ViewerZone | null,
+): string[] {
+  const lines = [
+    clockTime(reading.time_ms, nowMs, zone, { zoneName: true }),
+    reading.stages.length ? reading.stages.map(formatStageName).join(" › ") : "—",
+  ];
+  if (reading.memory_bytes != null) {
+    const limit = machine ? memoryLimitBytes(machine) : null;
+    lines.push(`Memory ${fmtBytes(reading.memory_bytes)}${limit != null ? ` of ${fmtBytes(limit)}` : ""}`);
+  }
+  if (reading.cpu_cores != null) {
+    const cores = machine ? availableCores(machine) : null;
+    lines.push(
+      `CPU ${fmtCores(reading.cpu_cores)} cores${
+        cores ? `, ${Math.round((reading.cpu_cores / cores) * 100)}% of ${fmtCores(cores)}` : ""
+      }`,
+    );
+  }
+  if (reading.machine_cpu_share != null) lines.push(`Machine ${Math.round(reading.machine_cpu_share * 100)}% busy`);
+  return lines;
+}
+
+// A machine as the Whole run hover text names it: its label, and a Modal
+// container's task ID, which finds its logs.
+function machineName(machine: MachineSegment): string {
+  return machine.modal_task_id ? `${machineLabel(machine)} · ${machine.modal_task_id}` : machineLabel(machine);
+}
+
+// "4", or "0.5": a CPU count as a request names it.
+function fmtCount(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function osName(machine: MachineSegment): string | null {
+  const name = machine.os === "Darwin" ? "macOS" : machine.os;
+  if (!name) return null;
+  return machine.os_version ? `${name} ${machine.os_version}` : name;
+}
+
+// A machine's label: a Modal container by its resource class, request and
+// region; any other by its system, processor, CPUs and memory.
+function machineLabel(machine: MachineSegment): string {
+  const parts =
+    machine.kind === "modal_container"
+      ? [
+          machine.request ? `Modal ${machine.request.resource_class}` : "Modal",
+          machine.request
+            ? `${fmtCount(machine.request.cpu)} CPU`
+            : machine.logical_cpus != null
+              ? `${machine.logical_cpus} CPU`
+              : null,
+          memoryLimitBytes(machine) != null ? fmtBytes(memoryLimitBytes(machine)) : null,
+          machine.modal_region,
+        ]
+      : [
+          osName(machine),
+          machine.cpu_model,
+          machine.logical_cpus != null ? `${machine.logical_cpus} CPU` : null,
+          machine.memory_total_bytes != null ? fmtBytes(machine.memory_total_bytes) : null,
+        ];
+  return parts.filter((part): part is string => Boolean(part)).join(" · ");
+}
+
+function sleepTitle(sleep: SleepBand, nowMs: number, zone: ViewerZone | null): string {
+  const kind = sleep.estimated ? "Asleep (estimated)" : "Asleep";
+  const from = clockTime(sleep.start_ms, nowMs, zone, { zoneName: true });
+  const to = clockTime(sleep.end_ms, nowMs, zone, { zoneName: true });
+  return `${kind}: ${fmtDuration(sleep.end_ms - sleep.start_ms)}, ${from} to ${to}`;
+}
+
+const SLEEP_FILL = "color-mix(in srgb, var(--foreground) 16%, transparent)";
+const ESTIMATED_SLEEP_FILL =
+  "repeating-linear-gradient(135deg, color-mix(in srgb, var(--foreground) 20%, transparent) 0 3px, transparent 3px 6px)";
+// The build's own line, the same in both charts, and the whole machine's.
+const BUILD_COLOR = "var(--chart-1)";
+const MACHINE_COLOR = "color-mix(in srgb, var(--muted-foreground) 70%, transparent)";
+// The charts' drawing box: 1000 wide, stretched to the track, and 40 high.
+const CHART_WIDTH = 1000;
+const CHART_HEIGHT = 40;
+
+interface ChartLine {
+  series: string;
+  color: string;
+  points: { x: number; value: number }[];
+}
+
+interface ChartLimit {
+  start: number;
+  end: number;
+  value: number;
+}
+
+// One reading's place on a chart, for the hover card.
+interface ChartPoint {
+  x: number;
+  reading: MachineReading;
+}
+
+// A chart of one measure on the Timeline's axis: its lines, its limits as
+// dashed rules, the machine's sleeps shaded, and a hover card naming the
+// reading nearest the pointer.
+function MachineChart({
+  label,
+  ticks,
+  scaleMax,
+  lines,
+  limits,
+  limitKind,
+  shades,
+  points,
+  summary,
+}: {
+  label: string;
+  // The value axis's ticks, in the chart's own unit, with their labels.
+  ticks: { value: number; label: string }[];
+  scaleMax: number;
+  lines: ChartLine[];
+  limits: ChartLimit[];
+  limitKind: string;
+  // Sleeps, as [start, end] fractions of the axis.
+  shades: { start: number; end: number; estimated: boolean }[];
+  points: ChartPoint[];
+  summary: (reading: MachineReading) => string[];
+}) {
+  // The card's reading, by a moment in its stretch: a refresh that moves the
+  // reading moves the card, and one that drops it closes the card.
+  const [hover, setHover] = useState(NO_CHART_HOVER);
+  const stretches = points.map((point) => ({
+    first_ms: point.reading.first_reading_ms ?? point.reading.time_ms,
+    last_ms: point.reading.time_ms,
+  }));
+  const hoveredIndex = chartHoveredIndex(stretches, hover);
+  const hovered = hoveredIndex >= 0 ? points[hoveredIndex] : null;
+  // What the live region reads out: the reading the keyboard last picked,
+  // set only when the keyboard picks one, so a refresh does not repeat it.
+  const [announcement, setAnnouncement] = useState("");
+  const update = (event: ChartHoverEvent) => {
+    const next = nextChartHover(hover, event, stretches);
+    setHover(next);
+    if (event.kind === "key" || event.kind === "focus_visible") {
+      const index = chartHoveredIndex(stretches, next);
+      setAnnouncement(index >= 0 ? summary(points[index].reading).join(", ") : "");
+    } else if (event.kind === "blur") {
+      setAnnouncement("");
+    }
+  };
+  const y = (value: number) => CHART_HEIGHT - (Math.max(0, value) / scaleMax) * CHART_HEIGHT;
+  const pointAt = (event: { clientX: number; currentTarget: HTMLElement }) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    if (!box.width || !points.length) return null;
+    const fraction = (event.clientX - box.left) / box.width;
+    const nearest = points.reduce((best, point) =>
+      Math.abs(point.x - fraction) < Math.abs(best.x - fraction) ? point : best,
+    );
+    return Math.abs(nearest.x - fraction) * box.width <= 12 ? nearest : null;
+  };
+  return (
+    <>
+      {/* The chart's name, and its value axis's tick labels against the chart. */}
+      <div className="relative mt-3 min-w-0 text-muted-foreground">
+        <span className="block truncate pr-12 font-medium leading-tight">{label}</span>
+        {ticks.map((tick) => (
+          <span
+            key={tick.value}
+            data-y-tick=""
+            className="absolute right-0 -translate-y-1/2 text-[10px] leading-none tabular-nums"
+            style={{ top: `${(1 - tick.value / scaleMax) * 100}%` }}
+          >
+            {tick.label}
+          </span>
+        ))}
+      </div>
+      <div
+        role="group"
+        tabIndex={0}
+        aria-label={label}
+        className="relative mt-3 h-16 rounded bg-muted/40 outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        onPointerMove={(event) =>
+          update({
+            kind: "pointer_move",
+            pointer_type: event.pointerType,
+            time_ms: pointAt(event)?.reading.time_ms ?? null,
+          })
+        }
+        onPointerDown={(event) =>
+          update({
+            kind: "pointer_down",
+            pointer_type: event.pointerType,
+            time_ms: pointAt(event)?.reading.time_ms ?? null,
+          })
+        }
+        onPointerUp={(event) =>
+          update({
+            kind: "pointer_up",
+            pointer_type: event.pointerType,
+            time_ms: pointAt(event)?.reading.time_ms ?? null,
+          })
+        }
+        onPointerCancel={(event) => update({ kind: "pointer_cancel", pointer_type: event.pointerType })}
+        onPointerLeave={(event) => update({ kind: "pointer_leave", pointer_type: event.pointerType })}
+        onFocus={(event) => {
+          if (event.currentTarget.matches(":focus-visible")) update({ kind: "focus_visible" });
+        }}
+        onBlur={() => update({ kind: "blur" })}
+        onKeyDown={(event) => {
+          const modified = event.altKey || event.ctrlKey || event.metaKey;
+          if (!points.length || !CHART_KEYS.has(event.key) || modified) return;
+          event.preventDefault();
+          update({ kind: "key", key: event.key, modified });
+        }}
+      >
+        {/* A reading the keyboard picks is read out. */}
+        <div aria-live="polite" className="sr-only">
+          {announcement}
+        </div>
+        {shades.map((shade, index) => (
+          <div
+            key={`shade-${index}`}
+            data-sleep-shade={shade.estimated ? "estimated" : "recorded"}
+            className="pointer-events-none absolute top-0 h-full"
+            style={{
+              left: `${shade.start * 100}%`,
+              width: `${Math.max(0.05, (shade.end - shade.start) * 100)}%`,
+              background: shade.estimated ? ESTIMATED_SLEEP_FILL : SLEEP_FILL,
+            }}
+          />
+        ))}
+        <svg
+          aria-hidden="true"
+          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+          preserveAspectRatio="none"
+          className="absolute inset-0 h-full w-full overflow-visible"
+        >
+          {ticks.map((tick) => (
+            <line
+              key={`grid-${tick.value}`}
+              data-grid=""
+              x1={0}
+              x2={CHART_WIDTH}
+              y1={y(tick.value)}
+              y2={y(tick.value)}
+              stroke="var(--border)"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {limits.map((limit, index) => (
+            <line
+              key={`limit-${index}`}
+              data-limit={limitKind}
+              x1={limit.start * CHART_WIDTH}
+              x2={limit.end * CHART_WIDTH}
+              y1={y(limit.value)}
+              y2={y(limit.value)}
+              stroke="var(--muted-foreground)"
+              strokeDasharray="4 3"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {lines.map((line, index) => (
+            <polyline
+              key={`${line.series}-${index}`}
+              data-series={line.series}
+              fill="none"
+              stroke={line.color}
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+              // A lone reading is drawn as a dot.
+              points={(line.points.length === 1 ? [line.points[0], line.points[0]] : line.points)
+                .map((point) => `${(point.x * CHART_WIDTH).toFixed(2)},${y(point.value).toFixed(2)}`)
+                .join(" ")}
+            />
+          ))}
+        </svg>
+        {hovered ? (
+          <>
+            <div
+              className="pointer-events-none absolute top-0 h-full w-px bg-foreground/50"
+              style={{ left: `${hovered.x * 100}%` }}
+            />
+            <div
+              role="tooltip"
+              className="pointer-events-none absolute bottom-full z-20 mb-1 w-56 rounded border border-border bg-popover px-2 py-1 text-[10px] leading-4 text-popover-foreground shadow-sm [overflow-wrap:anywhere]"
+              // Centred on the reading, kept inside the chart's track; on a
+              // track narrower than the card (a phone), ending at the track's
+              // right edge and reaching over the labels.
+              style={{
+                left: `clamp(min(0px, calc(100% - 14rem)), calc(${hovered.x * 100}% - 7rem), calc(100% - 14rem))`,
+              }}
+            >
+              {summary(hovered.reading).map((line, index) => (
+                <div key={index} className={index === 1 ? "font-medium" : "tabular-nums"}>
+                  {line}
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+function LegendSwatch({ background, label }: { background: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span aria-hidden="true" className="inline-block h-2 w-3 rounded-sm" style={{ background }} />
+      {label}
+    </span>
+  );
+}
+
+// A dimmed stage's opacity, while another stage type, or another stage in
+// the breakdown, is hovered.
+const DIMMED_OPACITY = 0.25;
+// Bars move, resize and fade over 0.2 seconds when the focus or the filter
+// changes; not at all for viewers who ask for less motion.
+const SEGMENT_MOTION = "transition-[left,width,opacity] duration-200 ease-out motion-reduce:transition-none";
+
+// The Timeline card's drawing, given what is open and focused; the card keeps
+// that state.
+export function TimelineView({
+  run,
+  forecast,
+  nowMs,
+  zone = null,
+  expanded,
+  chartsExpanded,
+  focus,
+  onToggleExpanded,
+  onToggleCharts,
+  onHoverPhase,
+  onTogglePhase,
+  onToggleStage,
+  onHoverStage,
+}: TimelineViewProps) {
   const [measureArea, areaWidth] = useElementWidth();
   const failedStages = new Set(
     run.spans.filter((span) => span.depth === 0 && span.status === "failed").map((span) => span.start_ms),
@@ -1085,6 +1500,7 @@ function TimelineCard({
         ? null
         : (spanAt.get(run.started_ms + stage.start_offset_ms) ?? null),
     key: `${stage.stage}-${index}`,
+    stageKey: `${stage.stage}-${index}`,
     stage: stage.stage,
     label: formatStageName(stage.stage),
     segment: null,
@@ -1106,15 +1522,51 @@ function TimelineCard({
     forecast?.finish_p50_ms != null && run.started_ms != null && run.state === "running"
       ? forecast.finish_p50_ms - run.started_ms
       : null;
-  const domain = Math.max(1, elapsed, p90Offset ?? 0, ...rows.map((row) => row.end)) * 1.02;
+  // The machines a stage ran on, named in its Whole run hover text.
+  const machinesOf = (row: TimelineRow): string[] => {
+    const runStart = run.started_ms;
+    if (runStart == null || row.status === "pending") return [];
+    return (run.machines ?? [])
+      .filter((machine) => machine.start_ms < runStart + row.end && machine.end_ms > runStart + row.start)
+      .map(machineName);
+  };
+  // A refresh can drop or renumber the row a stage was hovered or clicked in.
+  const drawnFocus = focusOnDrawnStages(focus, new Set(rows.map((row) => row.stageKey)));
+  // Under a stage-type filter the picked types' stages, and with a stage
+  // clicked that stage alone, are laid end to end and fill the bar, so the
+  // axis counts time in those stages, not time since the start; the forecast
+  // band and the present are left off it.
+  const filtered = focusNarrows(drawnFocus);
+  const extents = rows.map((row) => ({ key: row.stageKey, phase: row.phase, start: row.start, end: row.end }));
+  const axis = filtered ? filteredAxis(extents, drawnFocus.filter, narrowedToStage(drawnFocus)) : null;
+  const stageStart = new Map(rows.map((row) => [row.stageKey, row.start]));
+  // Where a row sits on the bar's axis; null when the filter hides it.
+  const place = (row: TimelineRow): { start: number; end: number } | null => {
+    if (!axis) return { start: row.start, end: row.end };
+    const base = axis.starts.get(row.stageKey);
+    if (base == null) return null;
+    const start = base + (row.start - (stageStart.get(row.stageKey) ?? row.start));
+    return { start, end: start + (row.end - row.start) };
+  };
+  const domain = axis
+    ? Math.max(1, axis.length)
+    : Math.max(1, elapsed, p90Offset ?? 0, ...rows.map((row) => row.end)) * 1.02;
   const pct = (ms: number) => `${Math.min(100, Math.max(0, (ms / domain) * 100))}%`;
   const width = (start: number, end: number) => `${Math.max(0.25, ((end - start) / domain) * 100)}%`;
   // Every stage gets a row, however short: a seconds-long stage is still a
   // step the build went through. A stage that ran the solver is followed by
   // its passes and the stretches between them.
-  const visible = rows.flatMap((row) =>
-    run.started_ms == null ? [row] : [row, ...solverRows(row, run, run.started_ms, elapsed)],
-  );
+  const visible = rows
+    .flatMap((row) =>
+      run.started_ms == null
+        ? [row]
+        : [
+            row,
+            ...nestedRows(row, run, run.started_ms, elapsed),
+            ...solverRows(row, run, run.started_ms, elapsed),
+          ],
+    )
+    .filter((row) => place(row) != null);
   const ticks = axisTicks(domain);
 
   if (!rows.length) {
@@ -1124,11 +1576,26 @@ function TimelineCard({
       </SectionCard>
     );
   }
+  const totals = phaseTotals(run, nowMs).phases;
+  const machine = machineParts({
+    run,
+    nowMs,
+    zone,
+    domain,
+    pct,
+    width,
+    extents,
+    axis,
+    chartsExpanded,
+    onToggleCharts,
+  });
+  const focusOf = (row: TimelineRow) => stageFocus(drawnFocus, row.phase, row.stageKey);
 
   const barStyle = (row: TimelineRow): CSSProperties => {
-    const place = {
-      left: pct(row.start),
-      width: width(row.start, row.end),
+    const onAxis = place(row) ?? { start: row.start, end: row.end };
+    const placement = {
+      left: pct(onAxis.start),
+      width: width(onAxis.start, onAxis.end),
       // Stretches without epochs are drawn faint, passes at full strength.
       opacity: row.segment && !row.segment.pass ? 0.35 : 1,
     };
@@ -1139,80 +1606,323 @@ function TimelineCard({
       const done =
         row.end > row.start ? Math.min(100, Math.max(0, ((elapsed - row.start) / (row.end - row.start)) * 100)) : 100;
       return {
-        ...place,
+        ...placement,
         backgroundImage: `${RUNNING_STRIPES}, linear-gradient(to right, ${color} ${done}%, color-mix(in srgb, ${color} 35%, transparent) ${done}%)`,
         backgroundSize: "16px 16px, 100% 100%",
       };
     }
     return {
-      ...place,
+      ...placement,
       background:
         row.status === "pending" ? PENDING_FILL : row.status === "failed" ? FAILED_COLOR : PHASE_COLOR[row.phase],
     };
   };
 
   return (
-    <SectionCard
-      title="Timeline"
-      descriptionClassName="max-w-none"
-      description={
-        run.state === "running"
-          ? "Solid bars are stages that ran; hatched bars are what comparable runs did next, stretched to the forecast. The band marks the 90% finish range. Calibration is split into its solver passes; faint bars are time with no epochs logged."
-          : "Each stage of the run on one time axis. Calibration is split into its solver passes; faint bars are time with no epochs logged."
-      }
-    >
+    <SectionCard title="Timeline">
       <div className="flex flex-col gap-1">
         {/* Below md the stage names keep 8rem so the bar track gets the rest of
             a phone's width instead of what is left after a 14rem name column. */}
         <div className="mt-2 grid grid-cols-[minmax(8rem,14rem)_1fr] gap-x-3 gap-y-1 text-xs max-md:grid-cols-[8rem_1fr]">
-          <div className="font-medium text-muted-foreground">Whole run</div>
-          <div ref={measureArea} className="relative h-6 rounded bg-muted/40">
-            {rows.map((row) => (
-              <div
-                key={`whole-${row.key}`}
-                className={`absolute top-0 h-full ${row.status === "running" ? "bar-running" : ""}`}
-                style={barStyle(row)}
-                title={`${row.label}: ${fmtDuration(row.end - row.start)}`}
+          <div className="flex min-w-0 items-center gap-1 font-medium text-muted-foreground">
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-label={expanded ? "Hide the stages" : "Show the stages"}
+              onClick={onToggleExpanded}
+              className="-ml-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-muted"
+            >
+              <ChevronRight
+                aria-hidden="true"
+                className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-90" : ""}`}
               />
-            ))}
-            {p50Offset != null && p90Offset != null ? (
+            </button>
+            <span className="truncate">{wholeRunLabel(drawnFocus)}</span>
+          </div>
+          <div ref={measureArea} className="relative h-6 rounded bg-muted/40">
+            {rows.map((row) => {
+              const { visible, dimmed } = focusOf(row);
+              // A stage the filter hides stays drawn with no width where it
+              // falls between the shown stages, so changing the filter
+              // animates hidden stages shrinking and shown ones growing.
+              const collapsedAt = visible ? null : (axis?.collapsed.get(row.stageKey) ?? 0);
+              const style: CSSProperties =
+                collapsedAt == null
+                  ? { ...barStyle(row), opacity: dimmed ? DIMMED_OPACITY : 1 }
+                  : { ...barStyle(row), left: pct(collapsedAt), width: "0%" };
+              return (
+                <div
+                  key={`whole-${row.key}`}
+                  className={`absolute top-0 h-full ${SEGMENT_MOTION} ${row.status === "running" ? "bar-running" : ""}`}
+                  style={style}
+                  title={[`${row.label}: ${fmtDuration(row.end - row.start)}`, ...machinesOf(row)].join("\n")}
+                />
+              );
+            })}
+            {!filtered && p50Offset != null && p90Offset != null ? (
               <div
                 className="absolute -top-1 h-8 border-x border-dashed border-foreground/40 bg-foreground/5"
                 style={{ left: pct(p50Offset), width: width(p50Offset, p90Offset) }}
                 title={`Finish between ${fmtDuration(p50Offset)} and ${fmtDuration(p90Offset)} after start`}
               />
             ) : null}
-            {run.state === "running" ? <NowLine left={pct(elapsed)} /> : null}
+            {!filtered && run.state === "running" ? <NowLine left={pct(elapsed)} /> : null}
+            {machine.sleepBands}
           </div>
 
-          {visible.map((row) => (
-            <TimelineStageRow
-              key={row.key}
-              row={row}
-              barStyle={barStyle(row)}
-              nowLeft={run.state === "running" ? pct(elapsed) : null}
-              nowOffset={run.state === "running" ? elapsed : null}
-              areaWidth={areaWidth}
-              startFraction={Math.min(1, row.start / domain)}
-              endFraction={Math.min(1, Math.max(row.end, row.start + 0.0025 * domain) / domain)}
-            />
-          ))}
+          {expanded
+            ? visible.map((row) => {
+                const onAxis = place(row) ?? { start: row.start, end: row.end };
+                return (
+                  <TimelineStageRow
+                    key={row.key}
+                    row={row}
+                    barStyle={barStyle(row)}
+                    dimmed={focusOf(row).dimmed}
+                    selected={focus.selectedStage === row.stageKey}
+                    onSelect={() => onToggleStage(row.stageKey, row.phase)}
+                    onHover={(hovering) => onHoverStage(hovering ? row.stageKey : null)}
+                    nowLeft={!filtered && run.state === "running" ? pct(elapsed) : null}
+                    nowOffset={run.state === "running" ? elapsed : null}
+                    areaWidth={areaWidth}
+                    startFraction={Math.min(1, onAxis.start / domain)}
+                    endFraction={Math.min(1, Math.max(onAxis.end, onAxis.start + 0.0025 * domain) / domain)}
+                  />
+                );
+              })
+            : null}
 
-          <div />
-          <div className="relative mt-1 h-4 border-t border-border text-[10px] text-muted-foreground">
-            {ticks.map((tick) => (
-              <span key={tick} className="absolute -translate-x-1/2 pt-0.5 tabular-nums" style={{ left: pct(tick) }}>
-                {tickLabel(tick)}
-              </span>
-            ))}
-          </div>
+          {machine.rows}
+
+          {machine.chartsClosed ? null : (
+            <>
+              <div />
+              <div
+                data-time-axis=""
+                className="relative mt-1 h-4 border-t border-border text-[10px] text-muted-foreground"
+              >
+                {ticks.map((tick) => (
+                  <span key={tick} className="absolute -translate-x-1/2 pt-0.5 tabular-nums" style={{ left: pct(tick) }}>
+                    {tickLabel(tick)}
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
         </div>
         <div className="mt-3">
-          <PhaseLegend />
+          <PhaseLegend
+            order={phasesByFirstAppearance(extents)}
+            totals={totals}
+            focus={focus}
+            onHoverPhase={onHoverPhase}
+            onTogglePhase={onTogglePhase}
+          />
         </div>
       </div>
     </SectionCard>
   );
+}
+
+// The Timeline's build machine parts: the sleep bands drawn in the Whole run
+// bar, and the Memory and CPU charts under a caret of their own, all on the
+// stages' axis (under a stage-type filter or with a stage clicked, only what
+// falls in the shown stages).
+function machineParts({
+  run,
+  nowMs,
+  zone,
+  domain,
+  pct,
+  width,
+  extents,
+  axis,
+  chartsExpanded,
+  onToggleCharts,
+}: {
+  run: BuildTimeline;
+  nowMs: number;
+  zone: ViewerZone | null;
+  domain: number;
+  pct: (ms: number) => string;
+  width: (start: number, end: number) => string;
+  extents: StageExtent[];
+  axis: ReturnType<typeof filteredAxis> | null;
+  chartsExpanded: boolean;
+  onToggleCharts: () => void;
+}): { sleepBands: ReactNode; rows: ReactNode; chartsClosed: boolean } {
+  const runStart = run.started_ms;
+  const readings = run.readings ?? [];
+  const sleeps = run.sleeps ?? [];
+  const machines = run.machines ?? [];
+  if (runStart == null || (!readings.length && !sleeps.length)) {
+    return { sleepBands: null, rows: null, chartsClosed: false };
+  }
+  // With the charts closed, their legend, the sleeps' too, and the time axis
+  // are hidden with them; a run without readings has no charts to open.
+  const chartsClosed = readings.length > 0 && !chartsExpanded;
+  // A stretch of the run, and a moment in it, on the drawn axis.
+  const intervals = (startMs: number, endMs: number) =>
+    axis
+      ? axisIntervals(startMs - runStart, endMs - runStart, extents, axis)
+      : [{ start: startMs - runStart, end: endMs - runStart }];
+  const offset = (ms: number) => (axis ? axisOffset(ms - runStart, extents, axis) : ms - runStart);
+  const fraction = (ms: number) => Math.min(1, Math.max(0, ms / domain));
+
+  const sleepBands = sleeps.flatMap((sleep, index) =>
+    intervals(sleep.start_ms, sleep.end_ms).map((part, partIndex) => (
+      <div
+        key={`sleep-${index}-${partIndex}`}
+        data-sleep={sleep.estimated ? "estimated" : "recorded"}
+        className="absolute top-0 h-full"
+        style={{
+          left: pct(part.start),
+          width: width(part.start, part.end),
+          background: sleep.estimated ? ESTIMATED_SLEEP_FILL : SLEEP_FILL,
+        }}
+        title={sleepTitle(sleep, nowMs, zone)}
+      />
+    )),
+  );
+  const shades = sleeps.flatMap((sleep) =>
+    intervals(sleep.start_ms, sleep.end_ms).map((part) => ({
+      start: fraction(part.start),
+      end: fraction(part.end),
+      estimated: sleep.estimated,
+    })),
+  );
+
+  const machineOf = (reading: MachineReading) =>
+    machines.find((candidate) => candidate.producer_id === reading.producer_id) ?? null;
+  // A line per stretch of readings, broken where a reading is off the axis.
+  const linesOf = (series: string, color: string, value: (reading: MachineReading) => number | null) =>
+    readingRuns(readings, sleeps).flatMap((stretch) => {
+      const lines: ChartLine[] = [];
+      let current: ChartLine["points"] = [];
+      for (const reading of stretch) {
+        const at = offset(reading.time_ms);
+        const measured = value(reading);
+        if (at == null || measured == null) {
+          if (current.length) lines.push({ series, color, points: current });
+          current = [];
+          continue;
+        }
+        current.push({ x: fraction(at), value: measured });
+      }
+      if (current.length) lines.push({ series, color, points: current });
+      return lines;
+    });
+  const points: ChartPoint[] = readings.flatMap((reading) => {
+    const at = offset(reading.time_ms);
+    return at == null ? [] : [{ x: fraction(at), reading }];
+  });
+  const summary = (reading: MachineReading) => readingSummary(reading, machineOf(reading), nowMs, zone);
+
+  const memoryLimits = machines.flatMap((candidate) => {
+    const value = memoryLimitBytes(candidate);
+    return value == null
+      ? []
+      : intervals(candidate.start_ms, candidate.end_ms).map((part) => ({
+          start: fraction(part.start),
+          end: fraction(part.end),
+          value,
+        }));
+  });
+  const memoryMax = Math.max(
+    1,
+    ...memoryLimits.map((limit) => limit.value),
+    ...readings.map((reading) => reading.memory_peak_bytes ?? reading.memory_bytes ?? 0),
+  );
+  const cpuShare = (reading: MachineReading) => {
+    const cores = machineOf(reading) ? availableCores(machineOf(reading)!) : null;
+    return reading.cpu_cores != null && cores ? reading.cpu_cores / cores : null;
+  };
+  const cpuMax = Math.max(1, ...readings.map((reading) => cpuShare(reading) ?? 0));
+
+  const chartsToggle = readings.length ? (
+    <>
+      <div className="flex min-w-0 items-center gap-1 font-medium text-muted-foreground">
+        <button
+          type="button"
+          aria-expanded={chartsExpanded}
+          aria-label={chartsExpanded ? "Hide memory and CPU" : "Show memory and CPU"}
+          onClick={onToggleCharts}
+          className="-ml-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-muted"
+        >
+          <ChevronRight
+            aria-hidden="true"
+            className={`h-3.5 w-3.5 transition-transform ${chartsExpanded ? "rotate-90" : ""}`}
+          />
+        </button>
+        <span className="truncate">Memory and CPU</span>
+      </div>
+      <div />
+    </>
+  ) : null;
+
+  const charts = readings.length && chartsExpanded ? (
+    <>
+      <MachineChart
+        label="Memory"
+        ticks={scaleTicks(memoryMax / 1e9).map((gigabytes) => ({ value: gigabytes * 1e9, label: `${gigabytes} GB` }))}
+        scaleMax={memoryMax}
+        lines={linesOf("build-memory", BUILD_COLOR, (reading) => reading.memory_bytes)}
+        limits={memoryLimits}
+        limitKind="memory"
+        shades={shades}
+        points={points}
+        summary={summary}
+      />
+      <MachineChart
+        label="CPU"
+        ticks={scaleTicks(cpuMax * 100).map((percent) => ({ value: percent / 100, label: `${percent}%` }))}
+        scaleMax={cpuMax}
+        lines={[
+          ...linesOf("machine-cpu", MACHINE_COLOR, (reading) => reading.machine_cpu_share),
+          ...linesOf("build-cpu", BUILD_COLOR, cpuShare),
+        ]}
+        limits={[]}
+        limitKind="cpu"
+        shades={shades}
+        points={points}
+        summary={summary}
+      />
+    </>
+  ) : null;
+  const legend =
+    !chartsClosed && (charts || sleeps.length) ? (
+      <>
+        <div />
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+          {charts ? (
+            <>
+              <LegendSwatch background={BUILD_COLOR} label="Build" />
+              <LegendSwatch background={MACHINE_COLOR} label="Machine CPU" />
+              <LegendSwatch
+                background="repeating-linear-gradient(90deg, var(--muted-foreground) 0 4px, transparent 4px 7px)"
+                label="Limit"
+              />
+            </>
+          ) : null}
+          {sleeps.some((sleep) => !sleep.estimated) ? <LegendSwatch background={SLEEP_FILL} label="Asleep" /> : null}
+          {sleeps.some((sleep) => sleep.estimated) ? (
+            <LegendSwatch background={ESTIMATED_SLEEP_FILL} label="Asleep (estimated)" />
+          ) : null}
+        </div>
+      </>
+    ) : null;
+
+  return {
+    sleepBands,
+    rows: (
+      <>
+        {chartsToggle}
+        {charts}
+        {legend}
+      </>
+    ),
+    chartsClosed,
+  };
 }
 
 function NowLine({ left }: { left: string }) {
@@ -1226,6 +1936,10 @@ function NowLine({ left }: { left: string }) {
 function TimelineStageRow({
   row,
   barStyle,
+  dimmed,
+  selected,
+  onSelect,
+  onHover,
   nowLeft,
   nowOffset,
   areaWidth,
@@ -1234,6 +1948,14 @@ function TimelineStageRow({
 }: {
   row: TimelineRow;
   barStyle: CSSProperties;
+  // Drawn faint while another stage type, or another stage, is hovered.
+  dimmed: boolean;
+  // This stage is the one clicked; clicking its name narrows the Timeline to
+  // its stage, or shows every stage again.
+  selected: boolean;
+  onSelect: () => void;
+  // The pointer, or keyboard focus, entering (true) or leaving (false) the row.
+  onHover: (hovering: boolean) => void;
   nowLeft: string | null;
   nowOffset: number | null;
   // The bar area's width in pixels (null before it is measured), and the
@@ -1267,11 +1989,25 @@ function TimelineStageRow({
   const { text, place: labelPlace } = placeLabel(parts, areaWidth, startFraction, endFraction, running ? 10 : 0);
   const swatchSize = row.segment ? "h-1.5 w-1.5" : "h-2 w-2";
   const swatchColor = row.status === "failed" ? FAILED_COLOR : PHASE_COLOR[row.phase];
+  const rowBarStyle = dimmed ? { ...barStyle, opacity: DIMMED_OPACITY } : barStyle;
   return (
     <>
-      <div
-        className={`flex min-w-0 items-center gap-1.5 ${row.segment ? "pl-3.5 text-muted-foreground" : ""}`}
-        title={row.segment ? row.label : row.stage}
+      <button
+        type="button"
+        aria-pressed={selected}
+        onClick={onSelect}
+        onPointerEnter={(event) => {
+          if (pointerHovers(event.pointerType)) onHover(true);
+        }}
+        onPointerLeave={() => onHover(false)}
+        onFocus={(event) => {
+          if (event.currentTarget.matches(":focus-visible")) onHover(true);
+        }}
+        onBlur={() => onHover(false)}
+        className={`flex min-w-0 items-center gap-1.5 rounded text-left hover:bg-muted/60 ${
+          selected && !row.segment && !row.depth ? "bg-muted font-medium" : ""
+        } ${row.segment || row.depth ? "text-muted-foreground" : ""} ${row.segment ? "pl-3.5" : ""}`}
+        style={row.depth ? { paddingLeft: `${row.depth * 0.875}rem` } : undefined}
       >
         {running ? (
           // A pulsing dot marks what is running now.
@@ -1296,10 +2032,20 @@ function TimelineStageRow({
         >
           {row.label}
         </span>
-      </div>
+      </button>
       {/* Labels that do not fit are clipped; the tooltip has the full text. */}
-      <div className="relative h-5 overflow-hidden" title={`${row.label}: ${full}`}>
-        <div className={`absolute top-0.5 h-4 rounded-sm ${running ? "bar-running" : ""}`} style={barStyle} />
+      <div
+        className="relative h-5 overflow-hidden"
+        title={`${row.label}: ${full}`}
+        onPointerEnter={(event) => {
+          if (pointerHovers(event.pointerType)) onHover(true);
+        }}
+        onPointerLeave={() => onHover(false)}
+      >
+        <div
+          className={`absolute top-0.5 h-4 rounded-sm ${SEGMENT_MOTION} ${running ? "bar-running" : ""}`}
+          style={rowBarStyle}
+        />
         <span
           className={`absolute top-0.5 whitespace-nowrap text-[10px] leading-4 ${
             labelPlace === "inside"
@@ -1333,20 +2079,76 @@ function TimelineStageRow({
   );
 }
 
-function PhaseLegend() {
+// The stage types, each a button: hovering one shows its total time in the
+// run and dims the other types; clicking adds it to, or removes it from, the
+// Whole run filter. Failed and expected stages are drawn apart from type.
+function PhaseLegend({
+  order,
+  totals,
+  focus,
+  onHoverPhase,
+  onTogglePhase,
+}: {
+  // The stage types in the order the build first reached them.
+  order: BuildPhase[];
+  totals: Record<BuildPhase, number>;
+  focus: TimelineFocus;
+  onHoverPhase: (phase: BuildPhase | null) => void;
+  onTogglePhase: (phase: BuildPhase) => void;
+}) {
+  const tooltipIdPrefix = useId();
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-      {BUILD_PHASES.map((phase) => (
-        <span key={phase.id} className="inline-flex items-center gap-1.5">
-          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-sm" style={{ background: PHASE_COLOR[phase.id] }} />
-          {phase.label}
-        </span>
-      ))}
-      <span className="inline-flex items-center gap-1.5">
+    <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
+      {order.map((id) => {
+        const phase = { id, label: BUILD_PHASE_LABEL[id] };
+        const picked = focus.filter.has(phase.id);
+        const hovered = focus.hoveredPhase === phase.id;
+        const tooltipId = `${tooltipIdPrefix}-${phase.id}`;
+        return (
+          <span key={phase.id} className="relative">
+            <button
+              type="button"
+              aria-pressed={picked}
+              aria-describedby={hovered ? tooltipId : undefined}
+              onClick={() => onTogglePhase(phase.id)}
+              // A mouse or pen, or keyboard focus, opens the hover card; a
+              // tap, or the focus a click leaves behind, does not.
+              onPointerEnter={(event) => {
+                if (pointerHovers(event.pointerType)) onHoverPhase(phase.id);
+              }}
+              onPointerLeave={() => onHoverPhase(null)}
+              onFocus={(event) => {
+                if (event.currentTarget.matches(":focus-visible")) onHoverPhase(phase.id);
+              }}
+              onBlur={() => onHoverPhase(null)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") onHoverPhase(null);
+              }}
+              className={`inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5 ${
+                picked ? "border-border-strong bg-muted font-medium text-foreground" : "border-transparent hover:bg-muted/60"
+              }`}
+            >
+              <span aria-hidden="true" className="h-2.5 w-2.5 rounded-sm" style={{ background: PHASE_COLOR[phase.id] }} />
+              {phase.label}
+            </button>
+            {hovered ? (
+              <span
+                id={tooltipId}
+                role="tooltip"
+                className="absolute bottom-full left-0 z-10 mb-1 flex items-center gap-2 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-foreground shadow-[var(--elev-1)]"
+              >
+                <span className="font-medium">{phase.label}</span>
+                <span className="tabular-nums">{fmtDuration(totals[phase.id])}</span>
+              </span>
+            ) : null}
+          </span>
+        );
+      })}
+      <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5">
         <span aria-hidden="true" className="h-2.5 w-2.5 rounded-sm" style={{ background: FAILED_COLOR }} />
         Failed
       </span>
-      <span className="inline-flex items-center gap-1.5">
+      <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5">
         <span aria-hidden="true" className="h-2.5 w-2.5 rounded-sm" style={{ background: PENDING_FILL }} />
         Expected
       </span>
@@ -1354,786 +2156,3 @@ function PhaseLegend() {
   );
 }
 
-// A stage this run is in that no compared run has finished yet.
-function emptyStat(span: StageSpan): StageStat {
-  return {
-    stage: span.stage,
-    phase: span.phase,
-    is_gate: span.is_gate,
-    samples: 0,
-    failures: 0,
-    median_ms: 0,
-    p90_ms: 0,
-    max_ms: 0,
-    finished_median_ms: null,
-    finished_p90_ms: null,
-    finished_max_ms: null,
-    cut_short: 0,
-    median_offset_ms: 0,
-    share: 0,
-    cores_median: null,
-    memory_max_bytes: null,
-  };
-}
-
-// How a stage's time compares with its p50 (typical) time: "+30 min (2.0×)",
-// "−4 min", "about typical" within a minute or 5%, or "—" without one.
-function againstTypical(stage: RunStageTime): string {
-  const over = stage.over_typical_ms;
-  const typical = stage.typical_ms;
-  if (over == null || typical == null) return "—";
-  if (stage.about_typical) return "about typical";
-  if (over < 0) return `−${fmtDuration(-over)}`;
-  const ratio = typical > 0 ? stage.ms / typical : null;
-  return `+${fmtDuration(over)}${ratio != null && ratio >= 1.5 ? ` (${ratio.toFixed(1)}×)` : ""}`;
-}
-
-// The selected run's stages, slowest first, beside the pipeline's p50, p90
-// and longest times, so the stages that took this run longest are plain to
-// see.
-export function RunStageCard({
-  run,
-  stageStats,
-  nowMs,
-  pipelineLabel,
-}: {
-  run: BuildTimeline;
-  stageStats: StageStat[];
-  nowMs: number;
-  pipelineLabel: string;
-}) {
-  const breakdown = useMemo(() => runStageBreakdown(run, stageStats, nowMs), [run, stageStats, nowMs]);
-  if (!breakdown.stages.length) return null;
-  const longest = Math.max(
-    1,
-    ...breakdown.stages.map((stage) => Math.max(stage.ms, stage.typical_ms ?? 0)),
-  );
-  const share = (value: number | null) => (value == null ? "—" : `${Math.round(value * 100)}%`);
-  return (
-    <SectionCard
-      title="This run by stage"
-      descriptionClassName="max-w-none"
-      description={`How long each of this run's stages took, slowest first, and its share of the run's ${fmtDuration(
-        breakdown.total_ms,
-      )}${run.state === "running" ? " so far" : ""}. p50, p90 and Max are the median, 90th percentile and longest time of the ${pipelineLabel} runs with this stage sequence that finished the stage (this run included when it did); p50 gives their number when fewer than three, and p90 needs at least three. The mark on each bar is p50. A stage still running, or stopped early, is compared only once it has run past p50. A time beyond "about typical" and past p90 is shown in red.`}
-    >
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs tabular-nums">
-          <thead className="text-left text-muted-foreground">
-            <tr className="border-b border-border">
-              <th className="pb-1.5 font-medium">Stage</th>
-              <th className="pb-1.5 font-medium" colSpan={2}>
-                This run
-              </th>
-              <th className="pb-1.5 text-right font-medium">Share</th>
-              <th className="pb-1.5 text-right font-medium">p50</th>
-              <th className="pb-1.5 text-right font-medium">p90</th>
-              <th className="pb-1.5 text-right font-medium">Max</th>
-              <th className="pb-1.5 text-right font-medium">Against p50</th>
-            </tr>
-          </thead>
-          <tbody>
-            {breakdown.stages.map((stage) => {
-              const pastP90 = stage.past_p90;
-              return (
-                <tr key={stage.stage} className="border-b border-border/60 last:border-b-0">
-                  <td className="py-1.5 pr-3">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span
-                        aria-hidden="true"
-                        className="h-2.5 w-2.5 shrink-0 rounded-sm"
-                        style={{ background: PHASE_COLOR[stage.phase] }}
-                      />
-                      {formatStageName(stage.stage)}
-                    </span>
-                  </td>
-                  {/* The bar and the time sit in cells of their own: the
-                      table gives the time column its longest time's width,
-                      so every bar has the same width and bars compare. */}
-                  <td className="w-[40%] py-1.5 pr-2">
-                    <span className="relative h-2 block rounded-sm bg-muted/40">
-                      <span
-                        aria-hidden="true"
-                        className="absolute inset-y-0 left-0 rounded-sm"
-                        style={{
-                          width: `${Math.max(1, (stage.ms / longest) * 100)}%`,
-                          background: stage.status === "failed" ? FAILED_COLOR : PHASE_COLOR[stage.phase],
-                        }}
-                      />
-                      {stage.typical_ms != null ? (
-                        <span
-                          aria-hidden="true"
-                          title={`p50: ${fmtDuration(stage.typical_ms)}`}
-                          className="absolute -inset-y-0.5 w-0.5 bg-foreground/70"
-                          style={{ left: `${(stage.typical_ms / longest) * 100}%` }}
-                        />
-                      ) : null}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap py-1.5 pr-3">
-                    <ThisRunCell stage={stage} />
-                  </td>
-                  <td className="py-1.5 text-right">{share(stage.share)}</td>
-                  <td className="whitespace-nowrap py-1.5 pl-3 text-right">
-                    {stage.typical_ms != null
-                      ? `${fmtDuration(stage.typical_ms)}${
-                          stage.typical_runs < P90_MIN_RUNS
-                            ? ` · ${stage.typical_runs} run${stage.typical_runs === 1 ? "" : "s"}`
-                            : ""
-                        }`
-                      : "—"}
-                  </td>
-                  <td className="whitespace-nowrap py-1.5 pl-3 text-right">
-                    {stage.typical_p90_ms != null && stage.typical_runs >= P90_MIN_RUNS
-                      ? fmtDuration(stage.typical_p90_ms)
-                      : "—"}
-                  </td>
-                  <td className="whitespace-nowrap py-1.5 pl-3 text-right">
-                    {stage.typical_max_ms != null ? fmtDuration(stage.typical_max_ms) : "—"}
-                  </td>
-                  <td
-                    className={`whitespace-nowrap py-1.5 pl-3 text-right ${pastP90 ? "font-medium tone-neg" : "text-muted-foreground"}`}
-                  >
-                    {againstTypical(stage)}
-                    {pastP90 ? <span className="sr-only"> past the 90th percentile</span> : null}
-                  </td>
-                </tr>
-              );
-            })}
-            {breakdown.between_stages_ms >= 60_000 ? (
-              <tr className="text-muted-foreground">
-                <td className="py-1.5 pr-3">Between stages</td>
-                <td />
-                <td className="whitespace-nowrap py-1.5 pr-3">{fmtDuration(breakdown.between_stages_ms)}</td>
-                <td className="py-1.5 text-right">
-                  {share(breakdown.total_ms ? breakdown.between_stages_ms / breakdown.total_ms : null)}
-                </td>
-                <td />
-                <td />
-                <td />
-                <td />
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
-    </SectionCard>
-  );
-}
-
-function ThisRunCell({ stage }: { stage: RunStage | undefined }) {
-  if (!stage) return <span className="text-muted-foreground">—</span>;
-  if (stage.status === "running") {
-    return (
-      <span className="inline-flex items-center gap-1 font-medium">
-        <span aria-hidden="true" className="live-blink swatch-info inline-block h-1.5 w-1.5 rounded-full" />
-        {fmtDuration(stage.ms)} so far
-      </span>
-    );
-  }
-  if (stage.status === "failed") return <span className="tone-neg">failed after {fmtDuration(stage.ms)}</span>;
-  if (stage.status === "silent") return <span>went silent after {fmtDuration(stage.ms)}</span>;
-  return <span>{fmtDuration(stage.ms)}</span>;
-}
-
-function TimeBudgetCard({
-  run,
-  nowMs,
-  pipelineLabel,
-  pipelineRuns,
-  otherSequenceRuns,
-  stats,
-  totals,
-}: {
-  run: BuildTimeline;
-  nowMs: number;
-  pipelineLabel: string;
-  pipelineRuns: number;
-  otherSequenceRuns: number;
-  stats: StageStat[];
-  totals: PhaseTotals[];
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const thisRun = useMemo(() => runStageTimes(run, nowMs), [run, nowMs]);
-  // Every stage a compared run reached, plus any this run is in that none
-  // has finished yet (its open stage). Longest typical time first; stages
-  // without one follow by this run's time in them.
-  const rows = useMemo(() => {
-    const known = new Set(stats.map((stat) => stat.stage));
-    const extra = run.spans
-      .filter((span) => span.depth === 0 && !known.has(span.stage))
-      .filter((span, index, spans) => spans.findIndex((other) => other.stage === span.stage) === index)
-      .map(emptyStat);
-    const key = (stat: StageStat) => stat.finished_median_ms ?? thisRun.get(stat.stage)?.ms ?? 0;
-    return [...stats, ...extra].sort(
-      (a, b) =>
-        Number(b.finished_median_ms != null) - Number(a.finished_median_ms != null) ||
-        key(b) - key(a) ||
-        b.samples - a.samples,
-    );
-  }, [stats, run, thisRun]);
-  const shown = expanded ? rows : rows.slice(0, 10);
-  // A typical run exists only once a run of this stage sequence has finished.
-  const anyFinished = totals.some((total) => total.state === "passed" || total.state === "blocked");
-  const phaseShare = useMemo(() => {
-    const sums = new Map<BuildPhase, number>();
-    for (const stat of stats) {
-      sums.set(stat.phase, (sums.get(stat.phase) ?? 0) + (stat.finished_median_ms ?? 0));
-    }
-    const total = [...sums.values()].reduce((a, b) => a + b, 0);
-    return BUILD_PHASES.map((phase) => ({
-      ...phase,
-      ms: sums.get(phase.id) ?? 0,
-      share: total ? (sums.get(phase.id) ?? 0) / total : 0,
-    }));
-  }, [stats]);
-  const maxMedian = Math.max(1, ...rows.map((stat) => stat.finished_median_ms ?? 0));
-  const hasResources = stats.some(
-    (stat) => stat.cores_median != null || stat.memory_max_bytes != null,
-  );
-
-  return (
-    <SectionCard
-      title="Where build time goes"
-      descriptionClassName="max-w-none"
-      description={`Stage times across the ${pipelineRuns} ${pipelineLabel} run${pipelineRuns === 1 ? "" : "s"} from this source that went through this run's stages, this run included. A typical time comes only from runs that completed the stage; "This run" shows the selected run on its own.${
-        otherSequenceRuns
-          ? ` ${otherSequenceRuns} other run${otherSequenceRuns === 1 ? "" : "s"} of this pipeline went through a different stage sequence and ${otherSequenceRuns === 1 ? "is" : "are"} left out here and in the forecast.`
-          : ""
-      }`}
-    >
-      {!rows.length ? (
-        <EmptyState title="No stages to measure yet." variant="compact" />
-      ) : (
-        <div className="flex flex-col gap-5">
-          {!anyFinished ? (
-            <p className="text-xs text-muted-foreground">
-              No run with this stage sequence has finished yet, so there is no typical run to split by phase.
-            </p>
-          ) : (
-            <div>
-              <div className="mb-1.5 text-xs font-medium text-muted-foreground">Share of a typical run, by phase</div>
-              <div className="flex h-4 w-full overflow-hidden rounded">
-                {phaseShare
-                  .filter((phase) => phase.share > 0)
-                  .map((phase) => (
-                    <div
-                      key={phase.id}
-                      style={{ width: `${phase.share * 100}%`, background: PHASE_COLOR[phase.id] }}
-                      title={`${phase.label}: ${fmtDuration(phase.ms)} (${Math.round(phase.share * 100)}%)`}
-                    />
-                  ))}
-              </div>
-              <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                {phaseShare
-                  .filter((phase) => phase.share > 0)
-                  .map((phase) => (
-                    <span key={phase.id} className="inline-flex items-center gap-1.5">
-                      <span aria-hidden="true" className="h-2.5 w-2.5 rounded-sm" style={{ background: PHASE_COLOR[phase.id] }} />
-                      {phase.label} {Math.round(phase.share * 100)}% · {fmtDuration(phase.ms)}
-                    </span>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {/* The negative margin keeps the cells' side padding from pushing the
-              text out of line with the card's other content. */}
-          <div className="@container -mx-2 overflow-x-auto">
-            <table className="w-full text-xs [&_td]:px-2 [&_th]:px-2">
-              <thead className="text-left text-muted-foreground">
-                <tr className="whitespace-nowrap">
-                  <th className="pb-1.5 font-medium">Stage</th>
-                  {/* In a narrow card the bar gives way to the stage names. */}
-                  <th className="hidden w-[24%] pb-1.5 font-medium @2xl:table-cell">Typical</th>
-                  <th className="pb-1.5 text-right font-medium">Median</th>
-                  <th className="pb-1.5 text-right font-medium">
-                    <HelpHint label="p90" tooltip="90% of the runs that completed this stage did so within this time." />
-                  </th>
-                  <th className="pb-1.5 text-right font-medium">Share</th>
-                  {hasResources ? (
-                    <>
-                      <th className="pb-1.5 text-right font-medium">
-                        <HelpHint label="Cores" tooltip="Median cores the stage kept busy: CPU seconds over wall seconds." />
-                      </th>
-                      <th className="pb-1.5 text-right font-medium">
-                        <HelpHint label="Memory" tooltip="Largest resident memory seen at the stage's start or end." />
-                      </th>
-                    </>
-                  ) : null}
-                  <th className="pb-1.5 text-right font-medium">
-                    <HelpHint
-                      label="Completed"
-                      tooltip="Runs that ran this stage to its end, of the runs that reached it. Only these give the typical times; the rest failed in it or went silent in it."
-                    />
-                  </th>
-                  <th className="pb-1.5 text-right font-medium">
-                    <HelpHint label="This run" tooltip="The selected run's time in this stage, and how the stage ended for it." />
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((stat) => {
-                  const completed = stat.samples - stat.cut_short;
-                  const silent = stat.cut_short - stat.failures;
-                  return (
-                    <tr key={stat.stage} className="border-t border-border/60 align-top">
-                      <td className="whitespace-nowrap py-1.5">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-sm" style={{ background: PHASE_COLOR[stat.phase] }} />
-                          {formatStageName(stat.stage)}
-                        </span>
-                      </td>
-                      <td className="hidden py-1.5 align-middle @2xl:table-cell">
-                        {stat.finished_median_ms != null ? (
-                          <div
-                            className="h-2 rounded-sm"
-                            style={{
-                              width: `${Math.max(0.5, (stat.finished_median_ms / maxMedian) * 100)}%`,
-                              background: PHASE_COLOR[stat.phase],
-                            }}
-                          />
-                        ) : null}
-                      </td>
-                      <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{fmtDuration(stat.finished_median_ms)}</td>
-                      <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{fmtDuration(stat.finished_p90_ms)}</td>
-                      <td className="py-1.5 text-right tabular-nums">
-                        {stat.finished_median_ms != null ? `${Math.round(stat.share * 100)}%` : "—"}
-                      </td>
-                      {hasResources ? (
-                        <>
-                          <td className="py-1.5 text-right tabular-nums">{fmtCores(stat.cores_median)}</td>
-                          <td className="py-1.5 text-right tabular-nums">{fmtBytes(stat.memory_max_bytes)}</td>
-                        </>
-                      ) : null}
-                      <td className="whitespace-nowrap py-1.5 text-right tabular-nums">
-                        {stat.samples ? `${completed} of ${stat.samples}` : "—"}
-                        {stat.failures ? <div className="tone-neg text-[11px]">{stat.failures} failed</div> : null}
-                        {silent > 0 ? <div className="text-[11px] text-muted-foreground">{silent} went silent</div> : null}
-                      </td>
-                      <td className="whitespace-nowrap py-1.5 text-right tabular-nums">
-                        <ThisRunCell stage={thisRun.get(stat.stage)} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {rows.length > 10 ? (
-              <button
-                type="button"
-                onClick={() => setExpanded((value) => !value)}
-                className="mt-2 px-2 text-xs font-medium text-primary hover:underline"
-              >
-                {expanded ? "Show the 10 longest" : `Show all ${rows.length} stages`}
-              </button>
-            ) : null}
-          </div>
-        </div>
-      )}
-    </SectionCard>
-  );
-}
-
-// Every run of the selected run's pipeline, newest first, as a list to open
-// runs from. Runs whose stages differ from the selected run's are listed
-// apart, as its statistics and forecast leave them out.
-function RunHistoryCard({
-  runs,
-  selected,
-  nowMs,
-  zone,
-  onSelect,
-}: {
-  runs: BuildTimeline[];
-  selected: BuildTimeline;
-  nowMs: number;
-  zone: ViewerZone | null;
-  onSelect: (runId: string) => void;
-}) {
-  const [showAll, setShowAll] = useState(false);
-  const pipelineRuns = runs.filter((run) => run.pipeline === selected.pipeline);
-  const same = pipelineRuns.filter(
-    (run) => run.run_id === selected.run_id || sameStageSequence(selected, run),
-  );
-  const other = pipelineRuns.filter((run) => !same.includes(run));
-  const totals = new Map(pipelineRuns.map((run) => [run.run_id, phaseTotals(run, nowMs)]));
-  const longest = Math.max(1, ...[...totals.values()].map((total) => total.total_ms ?? 0));
-  const limit = 12;
-  const shownSame = showAll ? same : same.slice(0, limit);
-  const shownOther = showAll ? other : other.slice(0, Math.max(0, limit - shownSame.length));
-  const hidden = pipelineRuns.length - shownSame.length - shownOther.length;
-  const phases = BUILD_PHASES.filter((phase) =>
-    [...totals.values()].some((total) => total.phases[phase.id] > 0),
-  );
-
-  const row = (run: BuildTimeline) => (
-    <RunHistoryItem
-      key={run.run_id}
-      run={run}
-      total={totals.get(run.run_id)!}
-      longest={longest}
-      selected={run.run_id === selected.run_id}
-      onSelect={onSelect}
-      zone={zone}
-    />
-  );
-
-  return (
-    <SectionCard
-      title="Run history"
-      descriptionClassName="max-w-none"
-      description={`Every ${selected.pipeline_label} run from this source, newest first, with how long it ran and how it ended. Bars share one time scale and split by phase. Select a run to open it.`}
-    >
-      <div className="flex flex-col gap-1">
-        {shownSame.map(row)}
-        {shownOther.length ? (
-          <>
-            <div className="mt-3 border-t border-border px-2 pb-1 pt-3 text-xs text-muted-foreground">
-              Different stage sequence · left out of this run&apos;s statistics and forecast
-            </div>
-            <div className="opacity-70">{shownOther.map(row)}</div>
-          </>
-        ) : null}
-        {hidden > 0 || showAll ? (
-          <button
-            type="button"
-            onClick={() => setShowAll((value) => !value)}
-            className="mt-1 self-start px-2 text-xs font-medium text-primary hover:underline"
-          >
-            {showAll ? "Show fewer runs" : `Show all ${pipelineRuns.length} runs`}
-          </button>
-        ) : null}
-        {phases.length ? (
-          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 px-2 text-xs text-muted-foreground">
-            {phases.map((phase) => (
-              <span key={phase.id} className="inline-flex items-center gap-1.5">
-                <span aria-hidden="true" className="h-2.5 w-2.5 rounded-sm" style={{ background: PHASE_COLOR[phase.id] }} />
-                {phase.label}
-              </span>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </SectionCard>
-  );
-}
-
-export function RunHistoryItem({
-  run,
-  total,
-  longest,
-  selected,
-  onSelect,
-  zone,
-}: {
-  run: BuildTimeline;
-  total: PhaseTotals;
-  longest: number;
-  selected: boolean;
-  onSelect: (runId: string) => void;
-  zone: ViewerZone | null;
-}) {
-  const ms = total.total_ms ?? 0;
-  const running = run.state === "running";
-  const where = runWhere(run);
-  const started = run.started_ms ? (
-    <ViewerTime ms={run.started_ms}>{runStartTime(run.started_ms, zone, { weekday: true, zoneName: true })}</ViewerTime>
-  ) : (
-    "Unknown start"
-  );
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(run.run_id)}
-      aria-current={selected ? "true" : undefined}
-      title={run.run_id}
-      className={`grid w-full grid-cols-[minmax(9rem,15rem)_1fr_auto] items-center gap-x-3 rounded-md px-2 py-1.5 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-        selected ? "bg-primary/5 ring-1 ring-primary/30" : "hover:bg-muted/50"
-      }`}
-    >
-      <span className="flex min-w-0 items-start gap-2">
-        {running ? (
-          <span aria-hidden="true" className="relative mt-1 flex h-2 w-2 shrink-0">
-            <span className={`absolute inline-flex h-full w-full rounded-full opacity-60 motion-safe:animate-ping ${STATE_SWATCH[run.state]}`} />
-            <span className={`relative inline-flex h-2 w-2 rounded-full ${STATE_SWATCH[run.state]}`} />
-          </span>
-        ) : (
-          <span aria-hidden="true" className={`mt-1 h-2 w-2 shrink-0 rounded-full ${STATE_SWATCH[run.state]}`} />
-        )}
-        <span className="flex min-w-0 flex-col">
-          <span className={`truncate ${selected ? "font-semibold" : "font-medium"}`}>{started}</span>
-          <span className="truncate text-muted-foreground">
-            {STATE_LABEL[run.state]}
-            {where ? ` · ${where}` : ""}
-          </span>
-        </span>
-      </span>
-      <span className="relative flex h-3 overflow-hidden rounded-sm bg-muted/40" style={{ width: `${Math.max(1, (ms / longest) * 100)}%` }}>
-        {BUILD_PHASES.map((phase) => {
-          const phaseMs = total.phases[phase.id];
-          if (!phaseMs || !ms) return null;
-          return (
-            <span
-              key={phase.id}
-              style={{ width: `${(phaseMs / ms) * 100}%`, background: PHASE_COLOR[phase.id] }}
-              title={`${phase.label}: ${fmtDuration(phaseMs)}`}
-            />
-          );
-        })}
-        {running ? (
-          <span
-            aria-hidden="true"
-            className="bar-running absolute inset-0"
-            style={{ backgroundImage: RUNNING_STRIPES, backgroundSize: "16px 16px" }}
-          />
-        ) : null}
-      </span>
-      <span className={`whitespace-nowrap text-right tabular-nums ${running ? "font-medium" : "text-muted-foreground"}`}>
-        {fmtDuration(ms)}
-        {running ? " so far" : ""}
-      </span>
-    </button>
-  );
-}
-
-const STOP_OUTCOME_LABEL: Record<StopOutcome, string> = {
-  failed: "Failed",
-  blocked: "Refused by gates",
-  stalled: "Went silent",
-};
-
-// What a group of stopped runs recorded about the stop, as recorded: error
-// types and codes, failure classes, and messages or failure lines.
-function RecordedValues({ stat }: { stat: StopStat }) {
-  if (stat.outcome === "stalled") {
-    return <span className="text-muted-foreground">No final event, so nothing about the cause</span>;
-  }
-  const times = (count: number) => (stat.runs > 1 && count > 1 ? ` ×${count}` : "");
-  const codes = [
-    ...stat.error_types.map((item) => ({ ...item, title: "Error type" })),
-    ...stat.error_codes.map((item) => ({ ...item, title: "Error code" })),
-  ];
-  return (
-    <div className="flex flex-col gap-1">
-      {codes.length || stat.failure_classes.length ? (
-        <div className="flex flex-wrap gap-1">
-          {codes.map((item) => (
-            <span
-              key={`${item.title}-${item.value}`}
-              title={item.title}
-              className="rounded border border-border px-1.5 py-px font-mono text-[11px]"
-            >
-              {item.value}
-              {times(item.count)}
-            </span>
-          ))}
-          {stat.failure_classes.map((item) => (
-            <span
-              key={`class-${item.value}`}
-              title="Failure class the run recorded"
-              className="rounded border border-border px-1.5 py-px text-[11px]"
-            >
-              {failureClassLabel(item.value)}
-              {times(item.count)}
-            </span>
-          ))}
-        </div>
-      ) : null}
-      {stat.reasons.slice(0, 3).map((item) => (
-        <span key={item.value} className="break-words text-muted-foreground">
-          {item.value}
-          {times(item.count)}
-        </span>
-      ))}
-      {stat.reasons.length > 3 ? (
-        <span className="text-muted-foreground">and {stat.reasons.length - 3} more</span>
-      ) : null}
-      {stat.unexplained ? (
-        <span className="text-muted-foreground">
-          {stat.unexplained === stat.runs ? "Nothing recorded" : `${stat.unexplained} recorded nothing`}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
-function GatesCard({
-  stats,
-  stops,
-  catalog,
-  pipelineRuns,
-}: {
-  stats: GateStat[];
-  stops: StopStat[];
-  catalog: CatalogGate[] | null;
-  pipelineRuns: number;
-}) {
-  const failuresByGate = new Map(stats.map((stat) => [stat.gate, stat]));
-  const [openPositions, setOpenPositions] = useState<Set<string>>(new Set());
-  return (
-    <SectionCard
-      title="Why runs stop"
-      descriptionClassName="max-w-none"
-      description={`Runs of this pipeline and stage sequence that did not finish (${stops.reduce((sum, stop) => sum + stop.runs, 0)} of ${pipelineRuns}): where and how they stopped, how far into the run, and what their telemetry recorded. Only recorded values show; a run that recorded nothing says so.`}
-    >
-      <div className="flex flex-col gap-5">
-        {stops.length ? (
-          <div className="-mx-2 overflow-x-auto">
-            <table className="w-full text-xs [&_td]:px-2 [&_th]:px-2">
-              <thead className="text-left text-muted-foreground">
-                <tr className="whitespace-nowrap">
-                  <th className="pb-1.5 font-medium">Stopped in</th>
-                  <th className="pb-1.5 font-medium">How</th>
-                  <th className="pb-1.5 text-right font-medium">Runs</th>
-                  <th className="pb-1.5 text-right font-medium">
-                    <HelpHint
-                      label="Time at stop"
-                      tooltip="Median time from the start of the run to where it stopped: the run time a stop there throws away."
-                    />
-                  </th>
-                  <th className="w-1/2 pb-1.5 font-medium">What the runs recorded</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stops.map((stop) => (
-                  <tr key={`${stop.outcome}-${stop.stage}`} className="border-t border-border/60 align-top">
-                    <td className="whitespace-nowrap py-1.5 font-medium">
-                      {stop.stage ? formatStageName(stop.stage) : "—"}
-                    </td>
-                    <td className={`whitespace-nowrap py-1.5 ${stop.outcome === "stalled" ? "" : "tone-neg"}`}>
-                      {STOP_OUTCOME_LABEL[stop.outcome]}
-                    </td>
-                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{stop.runs}</td>
-                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums">
-                      {fmtDuration(stop.median_time_at_stop_ms)}
-                    </td>
-                    <td className="py-1.5">
-                      <RecordedValues stat={stop} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            No run of this pipeline and stage sequence failed, was refused by its gates or went silent.
-          </p>
-        )}
-
-        {stats.length ? (
-          <div className="-mx-2 overflow-x-auto">
-            <div className="mb-1.5 px-2 text-xs font-medium text-muted-foreground">Checks that failed</div>
-            <table className="w-full text-xs [&_td]:px-2 [&_th]:px-2">
-              <thead className="text-left text-muted-foreground">
-                <tr className="whitespace-nowrap">
-                  <th className="pb-1.5 font-medium">Check</th>
-                  <th className="pb-1.5 text-right font-medium">Failed</th>
-                  <th className="pb-1.5 text-right font-medium">
-                    <HelpHint
-                      label="Time at failure"
-                      tooltip="Median time into the build when the check failed: the run time a failure there throws away."
-                    />
-                  </th>
-                  <th className="w-1/2 pb-1.5 font-medium">Most common reasons</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.map((stat) => (
-                  <tr key={stat.gate} className="border-t border-border/60 align-top">
-                    <td className="whitespace-nowrap py-1.5 font-medium">{formatStageName(stat.gate)}</td>
-                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums">
-                      {stat.failures} of {pipelineRuns}
-                    </td>
-                    <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{fmtDuration(stat.median_offset_ms)}</td>
-                    <td className="py-1.5 text-muted-foreground">
-                      {stat.reasons.length
-                        ? stat.reasons
-                            .slice(0, 3)
-                            .map((reason) => `${reason.reason}${reason.count > 1 ? ` ×${reason.count}` : ""}`)
-                            .join(" · ")
-                        : stat.last_message ?? "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : catalog ? (
-          <p className="text-xs text-muted-foreground">
-            No check failed in these runs. Checks that pass write no telemetry, so only failures would show here.
-          </p>
-        ) : null}
-
-        {catalog ? (
-          <div className="flex flex-col gap-3">
-            <div className="text-xs text-muted-foreground">
-              The US release build runs {catalog.length} checks. Where each one sits decides how much compute a failure
-              wastes (from {BUILD_GATE_CATALOG_SOURCE.repo} @ {BUILD_GATE_CATALOG_SOURCE.commit}).
-            </div>
-            {GATE_POSITIONS.map((position) => {
-              const gates = catalog.filter((gate) => gate.position === position.id);
-              const collapsible = gates.length > 12;
-              const open = !collapsible || openPositions.has(position.id);
-              const shownGates = open ? gates : gates.filter((gate) => failuresByGate.has(gate.stage));
-              return (
-                <div key={position.id} className="rounded-md border border-border p-3">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <div className="text-sm font-semibold">
-                      {position.label} <span className="font-normal text-muted-foreground">· {gates.length} checks</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">{position.detail}</div>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {shownGates.map((gate) => {
-                      const failed = failuresByGate.get(gate.stage);
-                      return (
-                        <span
-                          key={gate.stage}
-                          title={gate.covers ?? gate.stage}
-                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${
-                            failed ? "pill-neg font-medium" : "pill-neutral"
-                          }`}
-                        >
-                          {formatStageName(gate.stage)}
-                          {failed ? <span className="tabular-nums">· {failed.failures}×</span> : null}
-                        </span>
-                      );
-                    })}
-                    {collapsible ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setOpenPositions((current) => {
-                            const next = new Set(current);
-                            if (next.has(position.id)) next.delete(position.id);
-                            else next.add(position.id);
-                            return next;
-                          })
-                        }
-                        className="px-1 text-[11px] font-medium text-primary hover:underline"
-                      >
-                        {open
-                          ? "Hide the list"
-                          : `${shownGates.length ? "Show all " : "Show the "}${gates.length} checks`}
-                      </button>
-                    ) : null}
-                  </div>
-                  {gates.some((gate) => gate.covers) ? (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {gates
-                        .filter((gate) => gate.covers)
-                        .map((gate) => `${formatStageName(gate.stage)}: ${gate.covers}`)
-                        .join(" ")}
-                    </p>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
-      </div>
-    </SectionCard>
-  );
-}

@@ -1103,12 +1103,6 @@ function MicrocosmStagingRunsView({
         eyebrow="Microcosm · staging"
         title="Staging candidates"
         status={tabs}
-        description={
-          <>
-            Monitor Microcosm build candidates before they are promoted to the published Hugging Face release
-            channel.
-          </>
-        }
         actions={
           <RunSelect
             runs={runs}
