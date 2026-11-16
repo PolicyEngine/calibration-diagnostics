@@ -2,7 +2,7 @@
 // diagnostics base URL from MICROCOSM_DIAGNOSTICS_BASE_URL and falls back to
 // the variable's former name, which existing callers set.
 // These tests live in the frontend so CI's `bun test` runs them. Each one runs
-// the script in a child Bun process with fetch replaced by a preload, so no
+// the script in a child Bun process whose preload replaces fetch, so no
 // request leaves the machine, and checks which base URL it uses.
 import { afterAll, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -19,8 +19,8 @@ const FORMER_ENV = "POPULACE_DIAGNOSTICS_BASE_URL"; // compat: populace alias, r
 
 const workDir = mkdtempSync(join(tmpdir(), "investigation-packet-"));
 const preload = join(workDir, "fetch-stub.mjs");
-// Answers each request with the origin it reached, or, when
-// PACKET_TEST_FETCH_FAILS is set, with an error, so the script lists every
+// Answers each request with the origin it reached, or, when the environment
+// provides PACKET_TEST_FETCH_FAILS, with an error, so the script lists every
 // base URL it tried.
 writeFileSync(
   preload,
@@ -65,23 +65,23 @@ function triedBaseUrls(environment: Record<string, string>, args: string[] = [])
   return [...result.stderr.matchAll(/^(\S+): stubbed failure$/gm)].map((match) => match[1]);
 }
 
-test("with neither variable set, the packet script tries production and then the local servers", () => {
+test("when callers provide neither variable, the packet script tries production and then the local servers", () => {
   expect(selectedOrigin({})).toBe(PRODUCTION);
   expect(triedBaseUrls({})).toEqual([PRODUCTION, ...LOCAL_FALLBACKS]);
 });
 
-test("the packet script uses MICROCOSM_DIAGNOSTICS_BASE_URL alone when it is set", () => {
+test("the packet script uses MICROCOSM_DIAGNOSTICS_BASE_URL alone when callers provide only that variable", () => {
   expect(selectedOrigin({ MICROCOSM_DIAGNOSTICS_BASE_URL: CURRENT })).toBe(CURRENT);
   expect(triedBaseUrls({ MICROCOSM_DIAGNOSTICS_BASE_URL: CURRENT })).toEqual([CURRENT]);
 });
 
-test("the packet script falls back to the former variable alone when only it is set", () => {
+test("the packet script falls back to the former variable alone when callers provide only that variable", () => {
   const former = { [FORMER_ENV]: FORMER };
   expect(selectedOrigin(former)).toBe(FORMER);
   expect(triedBaseUrls(former)).toEqual([FORMER]);
 });
 
-test("the packet script prefers MICROCOSM_DIAGNOSTICS_BASE_URL when both variables are set", () => {
+test("the packet script prefers MICROCOSM_DIAGNOSTICS_BASE_URL when callers provide both variables", () => {
   const both = {
     MICROCOSM_DIAGNOSTICS_BASE_URL: CURRENT,
     [FORMER_ENV]: FORMER,

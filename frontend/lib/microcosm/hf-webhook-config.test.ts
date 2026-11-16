@@ -80,7 +80,7 @@ test("Slack configuration accepts legacy aliases and prefers Microcosm variables
   expect(hasReleaseAlertChannel("uk", { ...legacy, SLACK_WEBHOOK_MICROCOSM_UK: "https://hooks.slack.example/current" })).toBe(true);
 });
 
-// The tests below post a release alert with fetch replaced, and check which
+// The tests below replace fetch, post a release alert, and check which
 // webhook URL receives it.
 const LEGACY_UK_WEBHOOK_ENV = "SLACK_WEBHOOK_POPULACE_UK"; // compat: populace alias, remove after 0.2.0
 const UK_SLACK_ENV = ["SLACK_WEBHOOK_MICROCOSM_UK", LEGACY_UK_WEBHOOK_ENV];
@@ -108,20 +108,20 @@ async function postUkReleaseAlert(environment: Record<string, string>) {
   return { sent, urls };
 }
 
-test("a release alert goes to the legacy Slack webhook when only it is set", async () => {
+test("a release alert goes to the legacy Slack webhook when the environment provides only that variable", async () => {
   expect(await postUkReleaseAlert({
     [LEGACY_UK_WEBHOOK_ENV]: "https://hooks.slack.example/legacy-uk",
   })).toEqual({ sent: true, urls: ["https://hooks.slack.example/legacy-uk"] });
 });
 
-test("a release alert goes to the Microcosm Slack webhook when both are set", async () => {
+test("a release alert goes to the Microcosm Slack webhook when the environment provides both variables", async () => {
   expect(await postUkReleaseAlert({
     SLACK_WEBHOOK_MICROCOSM_UK: "https://hooks.slack.example/current-uk",
     [LEGACY_UK_WEBHOOK_ENV]: "https://hooks.slack.example/legacy-uk",
   })).toEqual({ sent: true, urls: ["https://hooks.slack.example/current-uk"] });
 });
 
-test("an empty Microcosm Slack webhook turns release alerts off even when the legacy one is set", async () => {
+test("an empty Microcosm Slack webhook turns release alerts off even when the environment provides the legacy one", async () => {
   expect(await postUkReleaseAlert({
     SLACK_WEBHOOK_MICROCOSM_UK: "",
     [LEGACY_UK_WEBHOOK_ENV]: "https://hooks.slack.example/legacy-uk",
