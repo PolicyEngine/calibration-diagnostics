@@ -1678,8 +1678,9 @@ export function retryBuildRun(failureCount: number, error: Error): boolean {
 
 // The build whose calibration `releaseId` inherits, and that build's staging
 // run, read from the parent build manifest at the build's pinned commit. The
-// answer does not change, so it is never asked for again; a release the tree
-// manifest does not hold (404) is not asked for twice.
+// answer does not change, so one that arrived is never asked for again. A
+// release the tree manifest does not hold (404) is not retried, but is asked
+// for again the next time the map mounts.
 export function useMicrocosmParentBuild(releaseId: string | undefined) {
   const { country } = useCountry();
   return useQuery({
