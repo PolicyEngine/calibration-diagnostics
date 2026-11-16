@@ -19,11 +19,13 @@ import { isBuildFolderId } from "@policyengine/calibration-tree/release-record";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+// The Hugging Face read waits up to 120 seconds, so the route allows longer,
+// as the release route does, and a slow read ends in this route's 502.
+export const maxDuration = 300;
 
 // The file is read at the build's pinned commit, where its bytes never
-// change, so the read is cached for a day. The release's tree may be
-// republished at another commit, so the CDN keeps the answer for an hour.
+// change, so the read is cached for a day and the CDN keeps the answer for an
+// hour.
 const PARENT_MANIFEST_REVALIDATE_SECONDS = 86_400;
 const ANSWER_CACHE_HEADERS = {
   "Cache-Control": "public, max-age=0, must-revalidate",
