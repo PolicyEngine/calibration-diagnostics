@@ -79,6 +79,7 @@ returns HTTP 404 with `{"error": "country_not_configured", "requested_country",
 | `GET /api/microcosm?release=<id>` | Published-release summary (default: latest) |
 | `GET /api/microcosm/tree?country=<code>&release=<id>&part=<part>` | Redirect to an exact build artifact ID and stream one immutable tree-bundle part |
 | `GET /api/microcosm/tree-manifest?country=<code>` | List selectable release and finalized-staging builds and the current release build |
+| `GET /api/microcosm/parent-build?country=<code>&release=<id>` | For one release build (`release_id`; a missing release or `latest` is refused with 400): the build whose calibration it inherits (`parent_build_id`) and that build's staging run (`staging_run_id`), from the `parent_build_manifest.json` in its folder at its pinned commit; both null when the folder has none |
 | `GET /api/microcosm/comparison-tree?country=<code>&a=<build>&b=<build>&mode=reported\|shared&part=<part>` | Build an ordered pair once when absent, then stream its immutable comparison-tree parts |
 | `GET /api/microcosm/target-diagnostics?release=<id>&...` | Faceted per-target diagnostics for a published release |
 | `GET /api/microcosm/target-investigation?target=<id>&release=<id>` | Copyable investigation packet for one published target: fit evidence, chronicle metadata, artifact paths, repo searches, and next checks |
