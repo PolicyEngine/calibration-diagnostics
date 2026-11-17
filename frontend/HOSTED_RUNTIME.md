@@ -329,14 +329,19 @@ It reads two things besides its own webhook settings:
   dispatch. The webhook needs neither `MICROCOSM_TELEMETRY_READ_SECRET_VERSION` nor
   `MICROCOSM_TELEMETRY_GOOGLE_IDENTITY_PROVIDER`.
 - The deployment's Vercel OIDC token, read with `getVercelOidcToken()` (`@vercel/oidc`)
-  for each request and sent as `Authorization: Bearer`. Vercel adds it to each function
-  request while the project has OIDC turned on (see above); the route runs as a Node.js
-  function on every call (`runtime = "nodejs"`, `dynamic = "force-dynamic"`).
+  for each request and sent as `Authorization: Bearer`, whatever
+  `MICROCOSM_TELEMETRY_VERCEL_OIDC` says: that setting chooses only how the build
+  monitor reads the collector. Vercel adds the token to each function request while the
+  project has OIDC turned on (see above); the route runs as a Node.js function on every
+  call (`runtime = "nodejs"`, `dynamic = "force-dynamic"`).
 
 The Hugging Face webhook targets only the production domain, so only production
-deployments send these requests. The collector accepts one only from a Vercel project and
-environment it lists as a tree-build caller; that list is part of the collector's
-deployment, not this repository's, and is not verified here.
+deployments send these requests. The collector accepts one only with a token of the team
+its `TELEMETRY_VERCEL_OIDC_TEAM_SLUG` and `TELEMETRY_VERCEL_OIDC_TEAM_ID` name, from a
+Vercel project and environment its `TELEMETRY_VERCEL_OIDC_TREE_BUILD_CALLERS` lists, a
+list separate from the build monitor's `TELEMETRY_VERCEL_OIDC_READERS`; while that list
+is unset, it answers 404. These settings are part of the collector's deployment, not
+this repository's, and are not verified here.
 
 ## Hugging Face reads
 

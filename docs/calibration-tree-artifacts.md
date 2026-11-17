@@ -700,7 +700,9 @@ Content-Type: application/json
   whole request for a malformed one, so each is left out when it breaks the
   collector's pattern.
 - The token is read with `getVercelOidcToken()` (`@vercel/oidc`) for each
-  request, never when the server starts.
+  request, never when the server starts. It is sent whatever
+  `MICROCOSM_TELEMETRY_VERCEL_OIDC` says: that setting chooses only how the
+  build monitor reads the collector.
 - The request runs at the same time as the GitHub dispatch, after the
   `releases.json` reads, so a delivery answered 503 sends neither. One
   15-second deadline covers the token read, the request and its answer.
@@ -738,9 +740,13 @@ Until the publisher is removed, the GitHub dispatch alone decides the status:
 failed collector request is logged and never changes the status, so Hugging
 Face does not retry the delivery for it.
 
-The collector accepts the request only with a valid Vercel OIDC token from a
-project and environment it lists as a tree-build caller. Those settings belong
-to the collector's deployment
+The collector accepts the request only with a valid Vercel OIDC token of the
+team its `TELEMETRY_VERCEL_OIDC_TEAM_SLUG` and `TELEMETRY_VERCEL_OIDC_TEAM_ID`
+name, from a project and environment its
+`TELEMETRY_VERCEL_OIDC_TREE_BUILD_CALLERS` lists. That list is separate from
+the build monitor's readers, `TELEMETRY_VERCEL_OIDC_READERS`. While it is
+unset, the collector answers 404. Those settings belong to the collector's
+deployment
 ([PolicyEngine/microcosm-collector](https://github.com/PolicyEngine/microcosm-collector)),
 not to this repository.
 
