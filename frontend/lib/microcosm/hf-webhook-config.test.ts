@@ -112,6 +112,13 @@ test("tree builds need only the collector address, not the build monitor's read 
   const config = resolveHfWebhookConfig({ MICROCOSM_TELEMETRY_COLLECTOR_URL: "https://collector.example" });
 
   expect(config.treeBuildCollector).toEqual({ baseUrl: "https://collector.example" });
+  // The build monitor refuses this value of its Vercel OIDC setting; tree
+  // builds never read it.
+  const withInvalidOidcSetting = resolveHfWebhookConfig({
+    MICROCOSM_TELEMETRY_COLLECTOR_URL: "https://collector.example",
+    MICROCOSM_TELEMETRY_VERCEL_OIDC: "not-a-setting",
+  });
+  expect(withInvalidOidcSetting.treeBuildCollector).toEqual({ baseUrl: "https://collector.example" });
 });
 
 test("an invalid collector address is kept as a problem, never thrown, and the problem does not repeat it", () => {
