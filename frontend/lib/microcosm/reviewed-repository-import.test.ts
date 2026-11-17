@@ -10,10 +10,13 @@ const FIXTURE = `${import.meta.dir}/reviewed-repository-import.fixture.ts`;
 const SECRET = "fixture-webhook-secret";
 const OVERRIDES = ["POPULACE_HF_REPO", "POPULACE_HF_REVISION"] as const;
 // The Slack incoming webhook addresses that lib/slack.ts reads for release
-// alerts.
+// alerts: each country's variable and its former name, which it reads only
+// when the environment lacks the first.
 const SLACK_WEBHOOK_SETTINGS = [
-  "SLACK_WEBHOOK_POPULACE_US",
-  "SLACK_WEBHOOK_POPULACE_UK",
+  "SLACK_WEBHOOK_MICROCOSM_US",
+  "SLACK_WEBHOOK_MICROCOSM_UK",
+  "SLACK_WEBHOOK_POPULACE_US", // compat: populace alias, remove after 0.2.0
+  "SLACK_WEBHOOK_POPULACE_UK", // compat: populace alias, remove after 0.2.0
 ] as const;
 // The collector address, and the variables @vercel/oidc reads its token from
 // when no request header carries one.
@@ -43,7 +46,7 @@ function importedUnder(
   const env: Record<string, string | undefined> = { ...process.env };
   for (const name of OVERRIDES) delete env[name];
   // Never let a configured Slack webhook turn this fixture into a real post.
-  // Every SLACK_WEBHOOK_* variable is removed, and the two that lib/slack.ts
+  // Every SLACK_WEBHOOK_* variable is removed, and the four that lib/slack.ts
   // reads are then set empty, which it treats as no channel. Empty rather
   // than removed, so that Bun's loading of a .env file in the child cannot
   // set them either.
