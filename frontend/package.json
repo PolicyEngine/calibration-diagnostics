@@ -13,7 +13,8 @@
     "replay:build-run": "bun run scripts/replay-build-run.ts"
   },
   "dependencies": {
-    "@policyengine/calibration-tree": "0.1.0",
+    "@policyengine/calibration-tree": "0.1.2",
+    "@policyengine/microcosm-collector-client": "0.22.0",
     "@policyengine/ui-kit": "^0.9.0",
     "@tanstack/react-query": "^5.84.0",
     "@tanstack/react-query-devtools": "^5.83.0",

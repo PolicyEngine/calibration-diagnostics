@@ -16,8 +16,8 @@ const nextConfig: NextConfig = {
   ...(BASE_PATH ? { basePath: BASE_PATH } : {}),
   async redirects() {
     const apiAliases = [
-      ["/api/populace_variable", "/api/microcosm_variable"],
-      ["/api/populace/:path*", "/api/microcosm/:path*"],
+      ["/api/populace_variable", "/api/microcosm_variable"], // compat: populace alias, remove after 0.2.0
+      ["/api/populace/:path*", "/api/microcosm/:path*"], // compat: populace alias, remove after 0.2.0
     ].flatMap(([source, destination]) =>
       (BASE_PATH ? ["", BASE_PATH] : [""]).map((prefix) => ({
         source: `${prefix}${source}`,
@@ -29,7 +29,7 @@ const nextConfig: NextConfig = {
     if (!BASE_PATH) return apiAliases;
     // Backward-compat, two eras deep: the pre-mount URLs served at the app's
     // own domain root (`basePath: false` matches un-prefixed paths), and the
-    // pre-rename `/populace` slug both bare and under the mount.
+    // legacy UI slug both bare and under the mount.
     return [
       ...apiAliases,
       // The app's own domain root has nothing under it once mounted; send it
@@ -47,25 +47,25 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
       {
-        source: "/populace",
+        source: "/populace", // compat: populace alias, remove after 0.2.0
         destination: `${BASE_PATH}/microcosm`,
         basePath: false,
         permanent: false,
       },
       {
-        source: "/populace/:path*",
+        source: "/populace/:path*", // compat: populace alias, remove after 0.2.0
         destination: `${BASE_PATH}/microcosm/:path*`,
         basePath: false,
         permanent: false,
       },
       {
-        source: "/populace",
-        destination: `${BASE_PATH}/microcosm`,
+        source: "/populace", // compat: populace alias, remove after 0.2.0
+        destination: "/microcosm",
         permanent: false,
       },
       {
-        source: "/populace/:path*",
-        destination: `${BASE_PATH}/microcosm/:path*`,
+        source: "/populace/:path*", // compat: populace alias, remove after 0.2.0
+        destination: "/microcosm/:path*",
         permanent: false,
       },
       {

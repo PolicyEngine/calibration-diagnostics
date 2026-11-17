@@ -37,9 +37,11 @@ import {
   loadStagingRuns,
   loadStagingRunTelemetry,
 } from "@policyengine/calibration-tree/staging-artifact";
+import { onOffSetting } from "@/lib/microcosm/on-off-setting";
 import {
   CollectorRequestError,
   type CollectorRunSummary,
+  InvalidCollectorRunIdError,
   collectorConfigured,
   loadCollectorRun,
   loadCollectorRuns,
@@ -75,6 +77,16 @@ const COLLECTOR_LIST_WAIT_MS = 5_000;
 // polls. A list that answers after the wait is more than 15 seconds old at the
 // next poll, and that poll's own request may be as slow.
 const EARLIER_COLLECTOR_LIST_MAX_AGE_MS = 60_000;
+
+// `1` makes the Build progress tab read build telemetry only from the
+// collector: neither its run list nor a run's detail reads the run files
+// builds wrote to the Hugging Face staging repositories. Unset, empty or `0`
+// reads both.
+export const COLLECTOR_ONLY_ENV = "MICROCOSM_BUILD_MONITOR_COLLECTOR_ONLY";
+
+function collectorOnly(): boolean {
+  return onOffSetting(COLLECTOR_ONLY_ENV);
+}
 
 export interface BuildRunProblem {
   run_id: string;
@@ -262,7 +274,8 @@ export interface HostedRunLoaders {
 
 const hostedRunLoaders: HostedRunLoaders = {
   collectorConfigured,
-  hasStagingHistory: (country) => hasCapability(country, "staging"),
+  hasStagingHistory: (country) =>
+    !collectorOnly() && hasCapability(country, "staging"),
   loadCollector: loadCollectorRecord,
   loadHistory: async (runId, country) => ({
     ...(await loadStagingRunTelemetry(runId, 0, country)),
@@ -573,15 +586,27 @@ export function mergeHostedDocuments(
   return [...byId.values()];
 }
 
+const COLLECTOR_NOT_CONFIGURED =
+  "The telemetry collector is not configured on this server.";
+
 async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
+  const withoutRunFiles = collectorOnly();
   const hosted: LoadedRuns[] = [];
   const sourceProblems: BuildRunProblem[] = [];
   let collectorRunDocuments: BuildRunDocuments[] = [];
   let huggingFaceRunDocuments: BuildRunDocuments[] = [];
+  if (withoutRunFiles && !collectorConfigured()) {
+    return {
+      available: false,
+      detail: COLLECTOR_NOT_CONFIGURED,
+      documents: [],
+      problems: [],
+    };
+  }
   // The two sources are read at the same time.
   const [collector, huggingFace] = await Promise.allSettled([
     collectorConfigured() ? loadCollector(country) : Promise.resolve(null),
-    loadHuggingFaceStaging(country),
+    withoutRunFiles ? Promise.resolve(null) : loadHuggingFaceStaging(country),
   ]);
   if (collector.status === "rejected") {
     sourceProblems.push({
@@ -597,7 +622,7 @@ async function loadStaging(country: MicrocosmCountry): Promise<LoadedRuns> {
       run_id: "hugging-face-history",
       detail: message(huggingFace.reason),
     });
-  } else {
+  } else if (huggingFace.value) {
     hosted.push(huggingFace.value);
     huggingFaceRunDocuments = huggingFace.value.documents;
   }
@@ -661,8 +686,9 @@ function recordsAnything(documents: BuildRunDocuments): boolean {
 
 // What a run detail falls back to when neither source has a usable record:
 // the listed run; else, when the collector said it has no record of the run
-// (404) or was not asked, nothing, so the route answers "not found"; else the
-// collector's failure, which a missing Hugging Face copy does not explain.
+// (404), was not asked, or could not hold a run with that id, nothing, so the
+// route answers "not found"; else the collector's failure, which a missing
+// Hugging Face copy does not explain.
 function withoutAnyRecord(
   current: BuildTimeline | null,
   collectorError: unknown,
@@ -672,6 +698,7 @@ function withoutAnyRecord(
   if (collectorError instanceof CollectorRequestError && collectorError.status === 404) {
     return null;
   }
+  if (collectorError instanceof InvalidCollectorRunIdError) return null;
   throw collectorError;
 }
 

@@ -420,8 +420,8 @@ async function postMainUpdate(options: {
     throw new Error(`Unexpected URL ${url}`);
   };
   const originalFetch = globalThis.fetch;
-  const priorWebhook = process.env.SLACK_WEBHOOK_POPULACE_UK;
-  process.env.SLACK_WEBHOOK_POPULACE_UK = UK_SLACK_WEBHOOK;
+  const priorWebhook = process.env.SLACK_WEBHOOK_MICROCOSM_UK;
+  process.env.SLACK_WEBHOOK_MICROCOSM_UK = UK_SLACK_WEBHOOK;
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     if (String(input) !== UK_SLACK_WEBHOOK) throw new Error(`Unexpected URL ${String(input)}`);
     const payload = JSON.parse(String(init?.body));
@@ -465,8 +465,8 @@ async function postMainUpdate(options: {
     logged.mockRestore();
     warned.mockRestore();
     globalThis.fetch = originalFetch;
-    if (priorWebhook == null) delete process.env.SLACK_WEBHOOK_POPULACE_UK;
-    else process.env.SLACK_WEBHOOK_POPULACE_UK = priorWebhook;
+    if (priorWebhook == null) delete process.env.SLACK_WEBHOOK_MICROCOSM_UK;
+    else process.env.SLACK_WEBHOOK_MICROCOSM_UK = priorWebhook;
   }
 }
 
