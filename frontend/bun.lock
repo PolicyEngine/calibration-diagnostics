@@ -5,7 +5,7 @@
     "": {
       "name": "calibration-diagnostics-frontend",
       "dependencies": {
-        "@policyengine/calibration-tree": "0.1.0",
+        "@policyengine/calibration-tree": "0.1.2",
         "@policyengine/microcosm-collector-client": "0.22.0",
         "@policyengine/ui-kit": "^0.9.0",
         "@tanstack/react-query": "^5.84.0",
@@ -128,7 +128,7 @@
 
     "@next/swc-win32-x64-msvc": ["@next/swc-win32-x64-msvc@16.2.6", "", { "os": "win32", "cpu": "x64" }, "sha512-F0+4i0h9J6C4eE3EAPWsoCk7UW/dbzOjyzxY0qnDUOYFu6FFmdZ6l97/XdV3/Nz3VYyO7UWjyEJUXkGqcoXfMA=="],
 
-    "@policyengine/calibration-tree": ["@policyengine/calibration-tree@0.1.0", "", { "dependencies": { "@vercel/blob": "^2.6.1" } }, "sha512-xhSucI6Kd3DLGZr8tEISpeVIJ/79qYYstjYsfmI+6LpdpeXHOKKYJxUT8OEgEOAtaOvp18XifOG7m+ojX+66VA=="],
+    "@policyengine/calibration-tree": ["@policyengine/calibration-tree@0.1.2", "", { "dependencies": { "@vercel/blob": "^2.6.1" } }, "sha512-XZP8qcJwrvUCx/Q0zVK1q/Z7vZHcxlRHZt/dNCjQY1Vq00Kt2JztyD0k/E0huWEbzis1cMApfd7wPs/hg+GSpA=="],
 
     "@policyengine/microcosm-collector-client": ["@policyengine/microcosm-collector-client@0.22.0", "", {}, "sha512-N/ESqQAYQxxQwpueSQvMdgw58G+91wj1YIf8WoFDElk9jvDEFQ0vtdtIk8DLm1ZzzCXnrWNheqp5T2OJvQs3CQ=="],
 
