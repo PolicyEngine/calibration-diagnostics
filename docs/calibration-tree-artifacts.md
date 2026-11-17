@@ -744,9 +744,9 @@ The collector accepts the request only with a valid Vercel OIDC token of the
 team its `TELEMETRY_VERCEL_OIDC_TEAM_SLUG` and `TELEMETRY_VERCEL_OIDC_TEAM_ID`
 name, from a project and environment its
 `TELEMETRY_VERCEL_OIDC_TREE_BUILD_CALLERS` lists. That list is separate from
-the build monitor's readers, `TELEMETRY_VERCEL_OIDC_READERS`. While it is
-unset, the collector answers 404. Those settings belong to the collector's
-deployment
+the build monitor's readers, `TELEMETRY_VERCEL_OIDC_READERS`. While that list
+is unset, or while the collector's artifact intake is off, the collector
+answers 404. Those settings belong to the collector's deployment
 ([PolicyEngine/microcosm-collector](https://github.com/PolicyEngine/microcosm-collector)),
 not to this repository.
 

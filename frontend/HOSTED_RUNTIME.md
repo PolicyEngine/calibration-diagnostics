@@ -340,7 +340,7 @@ deployments send these requests. The collector accepts one only with a token of 
 its `TELEMETRY_VERCEL_OIDC_TEAM_SLUG` and `TELEMETRY_VERCEL_OIDC_TEAM_ID` name, from a
 Vercel project and environment its `TELEMETRY_VERCEL_OIDC_TREE_BUILD_CALLERS` lists, a
 list separate from the build monitor's `TELEMETRY_VERCEL_OIDC_READERS`; while that list
-is unset, it answers 404. These settings are part of the collector's deployment, not
+is unset, or while the collector's artifact intake is off, it answers 404. These settings are part of the collector's deployment, not
 this repository's, and are not verified here.
 
 ## Hugging Face reads

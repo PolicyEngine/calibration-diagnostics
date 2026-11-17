@@ -59,6 +59,10 @@ export interface HfWebhookHandlerDependencies {
    * The deployment's Vercel OIDC token, which the collector checks. Called
    * inside the request handler for each collector request, never when the
    * handler is created; getVercelOidcToken (@vercel/oidc) unless given.
+   * Called directly rather than through lib/server/vercel-oidc.ts, which
+   * imports "server-only": Next.js supplies that module and the test preload
+   * replaces it, but reviewed-repository-import.test.ts runs this route in a
+   * plain `bun run` child process, which could not load it.
    */
   vercelOidcToken: () => Promise<string>;
 }
