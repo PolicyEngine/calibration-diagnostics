@@ -35,7 +35,6 @@ export type TreeBuildCollectorAddress =
 
 export interface HfWebhookConfig {
   secret: string | undefined;
-  githubToken: string | undefined;
   /**
    * Reads a release repository's releases.json for the Slack release alerts
    * (the UK repository is private). Resolved by huggingFaceReadToken, as
@@ -52,8 +51,6 @@ export interface HfWebhookConfig {
    * only they can be answered 503 when the read fails.
    */
   releaseAlertCountries: ReadonlySet<MicrocosmCountry>;
-  githubRepository: string;
-  githubWorkflow: string;
   repositories: ReadonlyMap<string, WebhookRepositoryRegistration>;
   /**
    * The collector address for calibration-tree build requests, read once,
@@ -62,7 +59,8 @@ export interface HfWebhookConfig {
    * deployment. Absent when the setting is unset or empty: the webhook then
    * sends no request and answers tree_build "not_configured". An invalid
    * address is kept as its problem and never thrown here, so the webhook
-   * still dispatches; each delivery reports it as a failed request.
+   * still answers and posts its alerts; each delivery reports it as a failed
+   * request.
    */
   treeBuildCollector?: TreeBuildCollectorAddress;
 }
@@ -97,17 +95,10 @@ export function resolveHfWebhookConfig(
 
   return {
     secret: environment.HF_WEBHOOK_SECRET,
-    githubToken: environment.GITHUB_ACTIONS_DISPATCH_TOKEN?.trim(),
     huggingFaceToken: huggingFaceReadToken(environment),
     releaseAlertCountries: new Set(
       selectableCountries().filter((country) => hasReleaseAlertChannel(country, environment)),
     ),
-    githubRepository:
-      environment.CALIBRATION_TREE_GITHUB_REPOSITORY?.trim() ||
-      "PolicyEngine/calibration-diagnostics",
-    githubWorkflow:
-      environment.CALIBRATION_TREE_GITHUB_WORKFLOW?.trim() ||
-      "publish-calibration-tree.yml",
     repositories,
     treeBuildCollector: treeBuildCollectorAddress(
       environment.MICROCOSM_TELEMETRY_COLLECTOR_URL,

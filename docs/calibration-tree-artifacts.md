@@ -6,19 +6,17 @@ the hierarchy. Schemas 1 through 5 are unsupported.
 
 ## Code
 
-The builder, the schema-6 types, parsers and serializers, the Blob I/O, the
-release and staging readers the builder reads from, and the publisher
-(`src/publish-calibration-tree.ts`) are the npm package
+The builder, the schema-6 types, parsers and serializers, the Blob I/O and the
+release and staging readers are the npm package
 `@policyengine/calibration-tree`. Its source is `packages/calibration-tree` in
 [PolicyEngine/microcosm-collector](https://github.com/PolicyEngine/microcosm-collector),
 which publishes a new version whenever a merged change raises the package's
-version. The dashboard pins one published version in `frontend/package.json`,
+version. The dashboard pins one published version in `frontend/package.json` and
 imports it through its subpath exports, such as
-`@policyengine/calibration-tree/calibration-tree-bundle`, and runs the
-installed publisher, `node_modules/@policyengine/calibration-tree/src/publish-calibration-tree.ts`,
-with `bun run publish:calibration-tree`. The package ships TypeScript source,
-which Next.js compiles through `transpilePackages`. It imports only its own
-modules, Node built-ins and `@vercel/blob`, and its boundary test enforces that.
+`@policyengine/calibration-tree/calibration-tree-bundle`. The package ships
+TypeScript source, which Next.js compiles through `transpilePackages`. It imports
+only its own modules, Node built-ins and `@vercel/blob`, and its boundary test
+enforces that.
 
 The package's `src/fixtures/calibration-tree-golden.json` records the exact
 bytes the builder writes for representative inputs: US, UK and Belgium
@@ -27,7 +25,7 @@ and the manifest holding every recorded build. The golden tests require every
 change to reproduce it. Regenerate it only for an intended output change, as
 the package's `src/test-support/calibration-tree-golden-cases.ts` describes.
 
-To change the builder, the readers or the publisher, change the package in the
+To change the builder or the readers, change the package in the
 collector and raise its version, then raise the pinned version here. The
 dashboard's `bun run lint` typechecks the package modules it imports with the
 dashboard's own `tsconfig.json` (`target` ES2017), which can refuse syntax the
@@ -106,7 +104,7 @@ contains 8017 and reads offset 17. Summary and detail descriptor ranges each
 cover every target exactly once without gaps or overlaps. No per-target shard
 pointer is stored.
 
-The publisher preserves ordinal order and limits each summary file to 8,000,000
+The builder preserves ordinal order and limits each summary file to 8,000,000
 raw UTF-8 bytes and each detail file to 4,000,000 raw UTF-8 bytes. It measures
 the complete canonical JSON file, including metadata and punctuation.
 Publication fails when one target does not fit or when either file class would
@@ -146,44 +144,55 @@ removed targets read only the source side that exists.
 
 ## Publication flows
 
+The telemetry collector ([PolicyEngine/microcosm-collector](https://github.com/PolicyEngine/microcosm-collector))
+builds the calibration trees and writes their files and `manifest.json` to the
+Blob store the dashboard reads. The dashboard writes only the comparison bundles
+its own API creates. Two things start a build:
+
+- **A build submission.** A submission builds the tree of one
+  `releases/<release>/<build>` or `staged/<run_id>` folder.
+- **The Hugging Face webhook.** A delivery from a registered repository asks the
+  collector to queue one run for that country and kind. The run reads the
+  repository at its head and builds what the collector's store lacks.
+
+The webhook's request is the only automatic trigger for what no submission
+builds: staging runs whose diagnostics are only in a staging repository's
+`runs/<id>/`, and release builds whose submission was never made, failed or was
+rejected. Each release run also ends by pointing the country's latest release at
+the current build of `releases.json`'s default release. There is no scheduled
+run, so a build that a lost request would have covered waits for the next
+delivery for that country and kind, or for someone to run the collector's
+`reconcile-calibration-trees` command by hand. A release repository without
+`releases.json` gets no new tree from a run, which reports `no_releases_record`.
+
+A run treats a build its store holds as finished. It does not check that the
+stored tree's files are all present and does not restore missing ones, and
+nothing else does so automatically.
+
+The collector's README describes both paths, in "Building trees from
+submissions" and "Queuing calibration tree builds".
+
+`.github/workflows/publish-calibration-tree.yml` and the
+`publish:calibration-tree` script remain only for deployments from before the
+webhook stopped dispatching that workflow: such a deployment, whether it is being
+replaced or was restored by a rollback, answers Hugging Face with an error if the
+workflow is missing. Current code does not start it, and its job does nothing
+while the GitHub repository variable `CALIBRATION_TREE_BUILD_ENABLED` is `FALSE`.
+Both are removed once no deployment production could return to dispatches it.
+
 ### Release builds
 
 ```text
 release repository update
   -> POST <basePath>/api/hf-webhook
-  -> per webhook delivery, at the same time:
-     - one GitHub workflow_dispatch, which runs the steps below
-     - one POST /v1/calibration-tree-builds to the telemetry collector, kind
-       release (see "Calibration-tree builds in the collector" below)
-  -> read releases.json at the head of main; with it, enumerate the builds it
-     lists; without it, the union of release directories and immutable
-     repository tags
-  -> resolve every eligible release to an exact Hugging Face commit
-  -> audit the existing Blob build for each release
-  -> skip complete builds without downloading their diagnostics
-  -> build and upload only missing builds or missing files
-  -> update latestReleaseBuildArtifactId from releases.json's current build
-     of its default release, or, without releases.json, the upstream pointer
+  -> one POST /v1/calibration-tree-builds to the telemetry collector, kind
+     release (see "Calibration-tree builds in the collector" below)
+  -> one collector run, when the request's 10-minute window ends
+  -> read releases.json at the head of main and list the builds it names
+  -> skip builds the store holds and builds a submission is processing
+  -> build and store the others, the current default build first
+  -> point the country's latest release at releases.json's current build
 ```
-
-A release directory or tag without calibration diagnostics is reported as
-ineligible and is not treated as an error. A tag named `latest` is never a
-release and is left out of the report. The next repository webhook repeats
-the inventory check, so it also finds a historical release missed by an older
-webhook. There is no scheduled reconciliation.
-
-A release whose build cannot be published or repaired, for example because the
-schema 8 reader refuses its diagnostics, its tag moved to another commit, its
-commit cannot be read from Hugging Face (its tag's commit, or for a release
-folder without a tag, the newest commit behind the folder), or a repair's
-rebuilt index differs from the recorded digest, is reported as
-`failed` with the error. The remaining releases are still reconciled and the
-latest-release selection is still updated, unless the release the upstream
-pointer names is the one that failed; the workflow then fails. A failed release
-gets no new manifest entry (an entry it already had is left unchanged), unless
-the manifest write was stored and only its read-back check failed ("Calibration
-tree manifest verification failed."). The latest-release selection is never
-moved to a failed release.
 
 #### Slack release alerts
 
@@ -196,7 +205,7 @@ A country with neither gets none. A Slack failure is logged and never fails the
 delivery.
 
 - **New tags:** one "New Microcosm … release" message per new tag, as before,
-  after the reconciliation is dispatched.
+  after the collector request.
 - **`releases.json`:** for an update to the `main` of a release repository
   whose country has a Slack channel, the webhook first reads `releases.json`
   at the commits before and after the update (only after, for a new `main`),
@@ -205,7 +214,7 @@ delivery.
   countries have a channel are read when the server starts, so a change to
   `HF_TOKEN` or to either Slack webhook variable takes effect only with the
   next `Deploy production` run.
-  After dispatching, it posts one message for each change:
+  After the collector request, it posts one message for each change:
   - a newly published build: "New Microcosm UK build `<release>/<build>`: now
     current", or "...: published, not current (current stays `<build>`)";
   - a change of current build: "Microcosm UK `<release>`: current build
@@ -223,22 +232,26 @@ delivery.
 - **When `releases.json` cannot be read:**
   - A transient failure (Hugging Face answers 5xx or 429, or the request or
     its body fails or times out) is logged and the delivery is answered 503
-    before anything is dispatched or posted. Hugging Face retries the
-    delivery, so the dispatch, the tag alerts and the record alerts each
-    happen once, when a retry succeeds. A retry that comes late can post
-    after newer messages, so its "current stays `<build>`" may already be
-    out of date.
+    before the collector request and before anything is posted. Hugging Face
+    retries the delivery, so the collector request, the tag alerts and the
+    record alerts each happen once, when a retry succeeds. A retry that comes
+    late can post after newer messages, so its "current stays `<build>`" may
+    already be out of date.
   - Any other failure, such as a token that cannot read the repository, a
     missing revision or a record the release writer's rules refuse, on
     either side, is logged and named in the answer as
-    `release_record_problem`. The dispatch and the tag alerts go ahead, and
-    no record alert is posted for that update.
-  - One Hugging Face webhook serves all five watched datasets. If a long run
-    of 503 answers makes Hugging Face suspend it, deliveries stop for every
-    repository, release and staging alike. To recover, see "Hugging Face
-    webhook" below.
-- **Changes with no alert:** a deleted `releases.json` (its readers then read
-  tags and pointer files), a change of default release and a build that is
+    `release_record_problem`. The collector request and the tag alerts go
+    ahead, and no record alert is posted for that update.
+- **When the collector request fails in a way that may pass,** the delivery is
+  also answered 503 before anything is posted, with the same effect (see
+  "Calibration-tree builds in the collector" below). A lasting failure does not
+  stop the alerts.
+- One Hugging Face webhook serves all five watched datasets. If a long run of
+  503 answers makes Hugging Face suspend it, deliveries stop for every
+  repository, release and staging alike. To recover, see "Hugging Face webhook"
+  below.
+- **Changes with no alert:** a deleted `releases.json` (the release picker then
+  lists the repository's folders), a change of default release and a build that is
   no longer withdrawn are logged as warnings, and nothing is posted.
 
 #### Microcosm release lines
@@ -248,31 +261,18 @@ its files stay in one folder, `releases/<release id>/`, and each cut is an
 immutable tag named `<release id>-<YYYYMMDDTHHMMSSZ>-<attempt>`. The folder on
 `main` is a mutable copy of whichever cut was published last; a line published
 for inspection only, such as the UK dense local-area line, has no copy on
-`main` at all.
+`main` at all. The collector builds no tree from this layout. The rules below
+are how the dashboard reads the manifest entries already published from it.
 
 - A cut tag is a release build of its own. Its manifest entry has the tag as
   `releaseId` (and source ID) and records the folder as `releaseDirectory`.
   Readers fetch `releases/<releaseDirectory>/` at the entry's commit. Entries
   without `releaseDirectory` read `releases/<releaseId>/` as before.
-- A tag counts as a cut only when `releases/<release id>/release_manifest.json`
-  at the tag names it as `build.cut_tag`. Any other cut-shaped tag is
-  ineligible.
-- A line folder on `main` is not published again once its cuts are. A build
-  already published from the folder stays pinned at its own commit. Nor is the
-  folder published while the commit of a tag named
-  `<release id>-<YYYYMMDDTHHMMSSZ>-<attempt>` for it cannot be read. If the
-  folder has no build yet, it is then reported as `ineligible`, with a reason
-  naming that tag; the next run looks the tag up again.
-- A country registration may name a per-line pointer (`pointer_path`, for the
-  UK `latest-national.json`). Its `revision` names the current cut, which
-  becomes the country's latest release. Other countries keep `latest.json`.
 - The release picker adds every published cut beside the folders on `main` and
   hides a line folder unless the dashboard's latest release still points at it.
 
-These readers apply to a dataset repository with no `releases.json` (next
-section). The UK repository stays this way until Microcosm's switch commit
-writes `releases.json` and deletes its pointer files; the dashboard then reads
-it from `releases.json` with no change of its own.
+These rules apply to entries from a dataset repository with no `releases.json`
+(next section).
 
 #### Build folders and `releases.json`
 
@@ -298,44 +298,37 @@ reads `releases.json` and nothing else: no tags, no `latest*.json` pointer
 files and no listing of `releases/`.
 
 Every reader finds the layout the same way, whatever the country: it asks
-Hugging Face for `releases.json` (the tree publisher at the commit it
-publishes, the release picker and the Staging page at the configured
+Hugging Face for `releases.json` (the collector's run at the repository's head,
+the release picker and the Staging page at the configured
 revision). No country registration names the layout.
 
 - Only Hugging Face's 404 for the file means the repository has no
-  `releases.json`, and then the tags and pointer files are read. A 404 whose
+  `releases.json`. The release picker then lists the repository's folders under
+  `releases/` on `main` beside the tagged builds the manifest records, and a collector
+  run reports `no_releases_record`. A 404 whose
   error code (`X-Error-Code`) is `RepoNotFound` or `RevisionNotFound`, any
   other failure, and a record the writer's rules refuse are errors: the
-  release picker answers 502 for that country, reconciliation publishes
-  nothing and leaves the latest release as it was, and a local-area Staging
-  candidate has no comparison baseline. No reader falls back to tags or
-  pointer files.
+  release picker answers 502 for that country, the collector's run stores
+  nothing for that repository and leaves the latest release as it was, and a
+  local-area Staging candidate has no comparison baseline. No reader falls back
+  to the folder listing.
 
 - A build's release id is its folder, `<release>/<build>`. Its manifest entry
   records no separate `releaseDirectory`, and readers fetch
   `releases/<release>/<build>/` at the entry's commit.
-- Reconciliation reads `releases.json` at the head of `main` and publishes
-  every listed build whose folder holds `calibration_diagnostics.json` and
-  whose `release_manifest.json` names the same `release` and `build` in its
-  top-level fields. The build is pinned to the newest commit behind its
-  folder's files (the commit that wrote the folder) and dated by its
-  `published_at`, so a build copied into its folder later keeps its
-  original date. A build whose folder or release manifest cannot be read is
-  reported as `failed`, and the other builds are still reconciled.
-  A build the manifest already holds is not looked up again.
+- The collector's run reads `releases.json` at the head of `main` and builds
+  every listed build the store lacks, whose folder holds
+  `calibration_diagnostics.json` and whose `release_manifest.json` names the
+  same `release` and `build`. The build is pinned to the newest commit behind
+  its folder's files and dated by its `published_at`, so a build copied into
+  its folder later keeps its original date.
 - The latest release is the current build of the record's default release.
-  While the record names none, or that build cannot be published,
-  reconciliation publishes the other listed builds and fails without moving
-  the latest release, naming the reason.
-- `--latest` and `--release <release>/<build>` publish one listed build. The
-  promotion check that follows compares the build with the record's current
-  build by name, and reads that build's folder only when they match; if the
-  folder cannot be read then, the build stays published and the next
-  reconciliation moves the latest release.
+  While the record names none, or the store has no tree for that build, the
+  latest release stays as it was.
 - Entries published from tags or release folders stay in the manifest and
-  stay readable by their ids; reconciliation no longer repairs them, and the
+  stay readable by their ids. The collector does not rebuild them, and the
   picker no longer lists them. The one exception is the dashboard's latest
-  release: until reconciliation makes the record's current build the latest
+  release: until the collector makes the record's current build the latest
   release, the latest release is still such an entry, and the picker keeps
   it listed as the default dataset. The deployment's pre-promotion check
   requires the latest release to be listed.
@@ -351,57 +344,31 @@ revision). No country registration names the layout.
   `<release>/<build>`, including the Staging target-change view's; the
   "View on Hugging Face" link opens the folder at the build's pinned commit,
   since a build folder has no tag.
-- The timestamp migration leaves build-folder entries alone.
 
 ### Finalized staging builds
 
 ```text
 staging repository main-branch update
   -> POST <basePath>/api/hf-webhook
-  -> per webhook delivery, at the same time:
-     - one GitHub workflow_dispatch with event_kind=staging, which runs the
-       steps below
-     - one POST /v1/calibration-tree-builds to the telemetry collector, kind
-       staging (see "Calibration-tree builds in the collector" below)
-  -> scan the exact webhook commit for passed, published, and completed runs
-  -> audit the existing Blob build for each finalized run
-  -> skip complete builds before reading their diagnostics
-  -> resolve either direct staging diagnostics or a staged-dataset receipt
-  -> build and upload only missing builds or missing files
+  -> one POST /v1/calibration-tree-builds to the telemetry collector, kind
+     staging (see "Calibration-tree builds in the collector" below)
+  -> one collector run, when the request's 10-minute window ends
+  -> list the runs in the staging repository's runs/<id>/ folders at its head
+  -> skip runs the store holds and runs a submission is processing
+  -> build and store the passed, published and completed runs, newest first
 ```
 
-Active or failed staging runs remain on the live 30-second API path. Historical
-staging runs with no calibration diagnostics are reported as ineligible. A run
-whose build cannot be published or repaired, for example because a declared
-diagnostics file is missing or has the wrong digest, is reported as `failed`
-with the error. The remaining runs are still reconciled, and the workflow then
-fails.
+Active or failed staging runs remain on the live 30-second API path.
 
 A staged dataset's diagnostics are the `calibration_diagnostics.json` its
 receipt records or, failing that, the one `<dataset>.diagnostics.json` it
 records: Microcosm's UK local lane stages its outputs under the dataset's own
 stem. A receipt recording several stem files has no target view.
 
-US and UK staging use the same inventory, source-normalization, build,
-validation, and Blob publication functions. Country registration supplies the
-repository and credential name. UK staging reads use
+The dashboard's own staging reads take the repository and credential name from
+the country's registration. UK staging reads use
 `POPULACE_UK_STAGING_HF_TOKEN`; if a UK run points to a staged dataset in the UK
 release repository, that second read uses `HF_TOKEN`.
-
-For an existing manifest entry, the audit decompresses `index.json.gz`, checks
-its raw byte count and SHA-256 digest against the manifest, parses its country
-and build ID, and confirms that every file referenced by the index exists with
-the recorded compressed byte count. A missing index or referenced file is
-repairable. A changed index, malformed index, wrong identity, or compressed-size
-mismatch fails without overwriting immutable data.
-
-Set the GitHub repository variable `CALIBRATION_TREE_BUILD_ENABLED=FALSE` to
-disable both automated release and finalized-staging publication.
-
-GitHub serializes publication jobs across countries because all publishers
-update the same manifest pathname. Manifest writes first use the current ETag;
-after an ETag conflict, the publisher reads the manifest again, merges the
-entry, replaces the manifest, and verifies the stored entry.
 
 ## Browser loading
 
@@ -446,9 +413,7 @@ more than one geography level uses in a build carries its level, such as
 [Geography labels shared by several levels](calibration-map-hierarchy.md#geography-labels-shared-by-several-levels)).
 A tree keeps the labels it was published with. Its build ID derives from its
 inputs, not from the builder's code, so a tree published before that rule keeps
-one merged label for both areas, and a repair of it is refused because the
-rebuilt index differs from the recorded digest. For a staging build, the refusal
-is reported as that run's `failed` outcome.
+one merged label for both areas.
 
 Geography nodes group rows by geography ID, and a geography that rows spell
 more than one way is listed once (see
@@ -470,10 +435,8 @@ labels, postings and files are unchanged.
 
 A tree published before geographies were grouped by ID has one node and one
 posting per spelling. Its nodes and postings agree with each other and with
-each row's own spelling, so it still validates, and reconciliation finds it
-complete and leaves its files as they are. Rebuilding
-one whose rows spell a geography ID two ways would give a different index and
-filter index, so a repair of it is refused, like the trees above.
+each row's own spelling, so it still validates. The collector does not rebuild
+a tree its store already holds.
 
 The browser unions selected values within one category, intersects categories,
 filters hierarchy memberships, and recalculates visible metrics from compact
@@ -499,26 +462,6 @@ gzip receives server-decompressed JSON.
    succeeds.
 
 Never use a `NEXT_PUBLIC_` prefix for these values.
-
-### GitHub publication
-
-1. Store the Blob read-write token as the Actions secret
-   `BLOB_READ_WRITE_TOKEN`.
-2. Store the Hugging Face credential as `HF_TOKEN` when any source repository
-   is private.
-3. Store any country-specific staging credential under the registration's
-   `token_env` name in both GitHub Actions and Vercel. The UK registration uses
-   `POPULACE_UK_STAGING_HF_TOKEN`.
-4. Store `GITHUB_ACTIONS_DISPATCH_TOKEN` and `HF_WEBHOOK_SECRET` only in Vercel.
-
-To correct legacy release timestamps after PR #200, dispatch **Publish
-calibration tree** with country `uk`, event kind `migrate-timestamps`, and
-`dry_run: true`. Review the planned changes, then repeat with `dry_run: false`.
-The migration uses each manifest entry's recorded repository and immutable
-commit, and preserves build identity and the current latest-release selection.
-Use event kind `manual` separately to reconcile releases and align the
-dashboard's latest selection with the upstream pointer. Both operations use
-the existing Actions credentials and require no local secret download.
 
 ### Hugging Face webhook
 
@@ -551,7 +494,7 @@ is added to the country registry.
 
 The webhook secret must be the same high-entropy ASCII value stored as the
 sensitive Vercel Production variable `HF_WEBHOOK_SECRET`. Hugging Face sends it
-in `X-Webhook-Secret`; the browser and GitHub Actions do not receive it. When
+in `X-Webhook-Secret`; the browser does not receive it. When
 rotating the value, keep the webhook disabled, update Vercel, deploy and promote
 the application, then update the Hugging Face setting before re-enabling the
 webhook.
@@ -560,124 +503,146 @@ After enabling the webhook, replay a release-repository `main` update from the
 Hugging Face Activity page. Prefer a branch update that did not change
 `releases.json`, rather than a release tag or an update that published,
 promoted or withdrew a build, so the verification does not repeat a Slack
-release alert. Require an HTTP 200
-delivery whose answer has no `release_record_problem`: for a US or UK release
-repository, that shows the token can read its `releases.json` (a 404 for a
-repository without one counts as readable). If the webhook has no prior
-delivery to replay, send an authenticated
-release `main`-update payload containing the repository's current commit SHA.
-Require one `Publish calibration tree` workflow dispatch for the expected
-country and a successful workflow. Then send one authenticated staging
-`main`-update payload and require a successful `event_kind=staging` workflow.
-Both reconciliations are idempotent: complete Blob builds are audited and
-skipped. With `MICROCOSM_TELEMETRY_COLLECTOR_URL` set, also require each
-answer's `tree_build.status` to be `queued` or `already_queued`.
+release alert. Require an HTTP 200 delivery whose answer has no
+`release_record_problem`: for a US or UK release repository, that shows the
+token can read its `releases.json` (a 404 for a repository without one counts as
+readable). Also require its `tree_build.status` to be `queued` or
+`already_queued`. If the webhook has no prior delivery to replay, send an
+authenticated release `main`-update payload with the repository's current commit
+SHA as both `oldSha` and `newSha`, so that it announces nothing. Then send one
+authenticated staging `main`-update payload and require the same `tree_build`
+statuses. Both requests are safe to repeat: a run builds
+only what the collector's store lacks.
 
 Failure meanings and recovery:
 
 - `401` from the application means the Hugging Face and Vercel secrets differ.
 - A Vercel authentication response means the webhook targets a protected URL
   instead of the public production domain.
-- `502` from the application means GitHub rejected or did not receive the
-  workflow dispatch; check `GITHUB_ACTIONS_DISPATCH_TOKEN` and its Actions
-  permission. Its `tree_build` still reports the collector request.
-- A `tree_build` with `status: "failed"` (see "Calibration-tree builds in the
-  collector" below) means the collector did not queue the build; the dispatch
-  went ahead, and the function log names the cause. A 401
-  or 403 from the collector means it refused the deployment's Vercel OIDC
-  token or does not list the deployment as a tree-build caller; a 404 means
-  its tree-build endpoint is not enabled; a 422 `repo_not_registered` means
-  the dashboard's configured repository differs from the collector's; a 503
-  means it could not queue the build then (its worker queue or Vercel's token
-  signing keys were unavailable, or it was being deployed). Don't replay a
-  delivery answered 200 to retry its collector request: a replay posts its
-  Slack alerts again, the alert for each new tag and, for a US or UK release
-  repository's `main` update, its `releases.json` record alerts. Once the
-  cause is corrected, any of these queues a build of everything the
-  collector's store lacks for that country and kind, without a repeated
-  alert:
+- A `tree_build` with `status: "failed"` in a 200 answer (see "Calibration-tree
+  builds in the collector" below) means the collector did not queue the build,
+  for a reason a retry cannot change, and the delivery's Slack alerts were
+  posted. The function log names the cause. A 401 or 403 from the collector means
+  it refused the deployment's Vercel OIDC token or does not list the deployment
+  as a tree-build caller; a 404 means its tree-build endpoint is not enabled; a
+  422 `repo_not_registered` means the dashboard's configured repository differs
+  from the collector's. Don't replay a delivery answered 200 to retry its
+  collector request: a replay posts its Slack alerts again, the alert for each
+  new tag and, for a US or UK release repository's `main` update, its
+  `releases.json` record alerts. Once the cause is corrected, any of these queues
+  a build of everything the collector's store lacks for that country and kind,
+  without a repeated alert:
   1. Wait for the next delivery for that country and kind.
   2. For a staging repository, replay one of its `main`-update deliveries. A
      staging delivery posts no Slack alert.
   3. For a release repository, send one authenticated release payload whose
      only entry is a `refs/heads/main` update with the repository's current
-     head commit as both `oldSha` and `newSha`. It dispatches one
-     reconciliation (`event_kind=branch`) and queues a release build. It posts
-     no alert: it has no new tag, and `releases.json` is the same before and
-     after the update.
-
-  Steps 2 and 3 also repeat the GitHub dispatch, which is idempotent.
-- `503` from the application means a release repository's `releases.json`
-  could not be read for a reason that may pass (a Hugging Face 5xx or 429, or
-  a failed or timed-out request or body). Nothing was dispatched or posted,
-  and Hugging Face retries the delivery. Hugging Face documents no limit on
-  those retries and no guarantee that the Activity page shows an event's
-  last answer, so follow these steps whenever deliveries were answered 503,
-  whether or not the webhook was suspended. The function logs are the
-  record of each delivery's answer: each 503 logs "could not be read;
-  answering 503", and each delivery answered 200 logs nothing of the kind.
-  1. If the webhook is suspended, re-enable it.
-  2. For each repository, find the deliveries whose latest answer was 503
-     and that were never later answered 200. Replay every one of them,
+     head commit as both `oldSha` and `newSha`. It queues a release build and
+     posts no alert: it has no new tag, and `releases.json` is the same before
+     and after the update.
+- `503` from the application means a failure that may pass, and its `detail`
+  says which: "Unable to read releases.json; retry the delivery." (a Hugging Face
+  5xx or 429, or a failed or timed-out request or body) or "Unable to queue the
+  calibration tree build; retry the delivery." (the collector answered 5xx or
+  429, could not be reached, did not answer in time, or its 202 answer's body
+  could not be read). No Slack alert was posted, and Hugging Face retries the
+  delivery. Hugging Face documents no limit on those retries and no guarantee
+  that the Activity page shows an event's last answer, so follow these steps
+  whenever deliveries were answered 503, whether or not the webhook was
+  suspended. The function logs are the record of each answer: every delivery
+  that starts a build logs "Answered 503 to" or "Answered 200 to", followed by
+  its `Webhook-Id`, repository, ref and commit and, when it updates `main`, the
+  range of `main` commits it covered. A 200 entry ends with the `tree_build` status. A retry
+  or replay keeps the delivery's `Webhook-Id`, so the latest entry for an ID is
+  its latest answer. The 503 entries are at error level and the 200 entries at
+  info level, so do not filter the logs by level. Vercel keeps function logs for
+  a limited time that depends on the plan. For older deliveries step 3 has only
+  the Activity page's status codes to go on, which may not show an event's last
+  answer, so alerts can then be lost or repeated. Say so when reporting the
+  incident.
+  1. Correct the cause, and if the webhook is suspended, re-enable it.
+  2. Give Hugging Face's own retries time to run, then read the logs again. The
+     webhook keeps no record of the deliveries it has handled, so a replay that
+     overlaps a pending retry posts that delivery's alerts twice. Hugging Face
+     publishes no retry schedule and does not say whether a replay cancels a
+     retry, so this cannot be ruled out. A repeated alert is the lesser failure:
+     a delivery that is never answered 200 posts none.
+  3. Find the deliveries whose latest entry is "Answered 503 to". For a release
+     repository whose country has a Slack channel, replay every one of them,
      oldest first, from the Activity page. Each covers its own pair of
      commits, so replaying only the latest would lose the earlier updates'
      alerts. Don't replay a delivery once it has been answered 200: its
-     alerts were posted.
-  3. The repository's last delivered commit is now the `newSha` of its
-     latest delivery answered 200, counting step 2's replays. For updates
-     made after that commit (while the webhook was suspended, so never
-     delivered), send one authenticated release payload per affected
-     repository. Its `main` entry has that commit as `oldSha` and the
-     repository's current head as `newSha`; it announces their net change
-     once and dispatches one reconciliation. Add one `refs/tags/<tag>` entry,
-     with `oldSha` null and the tag's commit as `newSha`, for each tag created
-     in that time, or those tags get no tag alert. Send one staging
-     `main`-update payload per staging repository to redo the staging
-     dispatch.
+     alerts were posted. A staging repository, or a release repository whose
+     country has no Slack channel (Belgium today), has no alerts to lose, and
+     one request covers everything the store lacks: if no later delivery from
+     that repository was answered 200, replay only its newest such delivery.
+     A delivery that failed before reaching this code, such as a `401`, a Vercel
+     authentication response or a platform error, leaves no log entry. Find those
+     by their status on the Activity page and treat them the same way.
+  4. Cover the updates no delivery announced: those of failed deliveries that step
+     3 could not recover, and, if the webhook was suspended, those made during the
+     suspension. Assume Hugging Face delivered nothing for the latter: its
+     documentation does not say. Take the time of the suspension from Hugging
+     Face's notification email or the Activity page. For each release repository
+     with such updates, whether or not its country has a Slack channel, send one
+     authenticated release payload with the repository as `repo.name` and these
+     `updatedRefs`:
+     - a `main` entry, unless no such update moved `main`. Its `oldSha` is where the
+       earliest such update starts: the `oldSha` of that failed delivery, from its
+       log entry or its payload on the Activity page, or else the last `main` commit
+       before the suspension. Its `newSha` is the last `main` commit made before you
+       re-enabled the webhook, or the current head if the webhook was not suspended.
+       The first new delivery after re-enabling logs the commit it starts from,
+       which should be this `newSha`. The entry announces the net change once, so a
+       build both published and withdrawn in that range is announced only as
+       published;
+     - one `refs/tags/<tag>` entry, with `oldSha` null and the tag's commit as
+       `newSha`, for each tag in those failed deliveries and each tag created during
+       the suspension. A tag can be created without moving `main`. It has no creation
+       date and may point at a commit outside `main`'s history, so list the
+       repository's tags and use the date of each tag's commit. A tag placed on an
+       older commit cannot be found this way.
+
+     The payload also queues one build. For each staging repository with such
+     updates, send one `main`-update payload with its current head as both `oldSha`
+     and `newSha` to queue its build. Require a 200 whose `tree_build.status` is
+     `queued` or `already_queued` and that has no `release_record_problem`. Hugging
+     Face does not retry a payload sent by hand, so send it again after a 503. After
+     a `release_record_problem`, correct the cause and send only the `main` entry
+     again, because the tag alerts were posted. One payload covers one range, so
+     updates already announced inside it are announced again. Accept that, and never
+     start `oldSha` later than the earliest unannounced update: a repeated alert is
+     the lesser failure.
 - An answer with `release_record_problem` means `releases.json` could not be
   read for a lasting reason, such as a token without access or a record the
-  release writer's rules refuse. The dispatch and the tag alerts went ahead,
-  but no record alert was posted. Once the cause is corrected, replay that
-  delivery to post its record alerts. A replay also repeats any tag alert the
-  delivery carried, and runs the reconciliation again, which is idempotent.
-- A failed release workflow either stopped before reconciling any release (for
-  example, the manifest, the release listing or the repository's tags could
-  not be read, or one tag's folder or one folder's commit could not be
-  resolved), or printed a report in which at least one release is `failed`
-  or `latestReleaseFailure` says why the latest-release selection was not
-  updated. In the second case every release with another outcome was
-  reconciled, and the error names the failed releases. Every later release
-  workflow for that country retries them and fails again until their errors
-  are corrected. Rerunning does not correct a refused repair of a published
-  tree ("Rebuilt calibration index differs from immutable manifest entry") or
-  a release whose tag moved ("Released dataset … changed from … to …").
-- A failed staging workflow either stopped before reconciling any run (for
-  example, the staging repository was unavailable or listed incompatible
-  runs), or printed a report in which at least one run is `failed`. In the
-  second case every run with another outcome was reconciled, and the error
-  names the failed runs. Every later staging workflow for that country retries
-  them and fails again until their errors are corrected. Rerunning does not
-  correct a refused repair of a published tree ("Rebuilt staging index differs
-  from immutable manifest entry"): the same rebuild differs from the recorded
-  digest again, so that run keeps failing until the tree's missing files are
-  restored.
+  release writer's rules refuse. The collector request and the tag alerts went
+  ahead, but no record alert was posted. Once the cause is corrected, replay
+  that delivery to post its record alerts. A replay also repeats any tag alert
+  the delivery carried, and asks the collector for the build again, which is
+  safe to repeat.
+- A queued build that fails is reported by the collector, not by the webhook:
+  see the worker job's logs and the `calibration_tree_build_requests` table, which
+  the collector's README describes under "Queuing calibration tree builds".
 - Hugging Face retries non-2xx deliveries and can suspend a repeatedly failing
-  webhook. Correct the failure, re-enable the webhook, and replay the delivery;
-  see the [Hugging Face delivery and retry documentation](https://huggingface.co/docs/hub/webhooks#delivery-and-retries).
+  webhook. To recover, follow the steps for `503` above; see the
+  [Hugging Face delivery and retry documentation](https://huggingface.co/docs/hub/webhooks#delivery-and-retries).
+  It also limits each webhook to 1,000 triggers per 24 hours and does not say
+  whether retries or replays count, or what happens to events over the limit. A
+  UK staging build can make about one commit every 50 seconds, which would pass
+  that limit if it continued for a day. If the Activity tab shows that the limit
+  may have been reached, treat the time from the last event listed before the gap
+  to the first event after it as a suspension in step 4.
 
-There is no scheduled reconciliation. A later webhook delivery inventories all
-eligible versions and repairs a missed publication. Set the GitHub repository
-variable `CALIBRATION_TREE_BUILD_ENABLED=FALSE` to leave the webhook active but
-skip publication jobs intentionally. That variable does not affect the
-collector request; the collector's own settings decide whether it queues
-builds.
+There is no scheduled run. A later delivery for the same country and kind queues
+a run that builds everything the collector's store lacks. The collector's own
+settings decide whether it accepts these requests.
 
 #### Calibration-tree builds in the collector
 
-For each delivery that dispatches the publisher, under the same rules (a
-staging repository's last `main` update; a release repository's newest new
-tag, else its last `main` update), the webhook also asks the telemetry
-collector to queue a calibration-tree build of that country and kind:
+For each delivery that starts a build (a staging repository's last `main`
+update; a release repository's newest new tag, else its last `main` update), the
+webhook asks the telemetry collector to queue a calibration-tree build of that
+country and kind:
 
 ```text
 POST <MICROCOSM_TELEMETRY_COLLECTOR_URL>/v1/calibration-tree-builds
@@ -703,9 +668,9 @@ Content-Type: application/json
   request, never when the server starts. It is sent whatever
   `MICROCOSM_TELEMETRY_VERCEL_OIDC` says: that setting chooses only how the
   build monitor reads the collector.
-- The request runs at the same time as the GitHub dispatch, after the
-  `releases.json` reads, so a delivery answered 503 sends neither. One
-  15-second deadline covers the token read, the request and its answer.
+- The request runs after the `releases.json` reads, so a delivery they answer
+  503 sends none, and before the Slack alerts. One 15-second deadline covers the
+  token read, the request and its answer.
 - The collector queues one build of everything its store lacks for the country
   and kind, and answers 202 with `queued`, or with `already_queued` when the
   build of that country and kind for the current 10-minute window is already
@@ -716,7 +681,7 @@ setting, read when the server starts, with the build monitor's rules: HTTPS,
 except on `localhost` or `127.0.0.1`, no credentials, query or fragment, and
 any trailing slash removed. The webhook needs no read credential. Unset, the
 webhook sends no request. An invalid value does not stop the webhook: each
-delivery reports it as a failed request, and the dispatch runs as before.
+delivery reports it as a failed request, and its Slack alerts still post.
 
 The answer's `tree_build` reports the request:
 
@@ -734,11 +699,23 @@ The answer's `tree_build` reports the request:
 - `{"status": "not_configured"}` when `MICROCOSM_TELEMETRY_COLLECTOR_URL` is
   unset.
 
-A delivery that dispatches nothing has no `tree_build` and answers as before.
-Until the publisher is removed, the GitHub dispatch alone decides the status:
-200, or 502 when the dispatch fails, whose answer also carries `tree_build`. A
-failed collector request is logged and never changes the status, so Hugging
-Face does not retry the delivery for it.
+A delivery that starts no build has no `tree_build`. Otherwise the request's
+result decides the webhook's status:
+
+- **503, before any Slack alert,** when the failure may pass: the collector
+  answered 5xx or 429, could not be reached or did not answer within the
+  deadline, or the body of its 202 answer could not be read. The answer is
+  `{"detail": "Unable to queue the calibration tree build; retry the delivery.", "tree_build":
+  {...}}`, and the log entry says "answering 503". Hugging Face retries the
+  delivery, which requests the build again and then posts each alert once.
+- **200** otherwise: the build was queued, no address is configured, or the
+  failure is lasting (any other collector status, a 202 that is not a queued
+  build, an invalid address or a token that could not be read). A lasting failure
+  is logged and does not stop the alerts.
+
+Repeating the request is safe. Within one 10-minute window the collector answers
+`already_queued`, and a later request queues one more run, which builds only what
+its store still lacks.
 
 The collector accepts the request only with a valid Vercel OIDC token of the
 team its `TELEMETRY_VERCEL_OIDC_TEAM_SLUG` and `TELEMETRY_VERCEL_OIDC_TEAM_ID`
@@ -750,75 +727,12 @@ answers 404. Those settings belong to the collector's deployment
 ([PolicyEngine/microcosm-collector](https://github.com/PolicyEngine/microcosm-collector)),
 not to this repository.
 
-## Historical reconciliation
+## Checking what a run would build
 
-Reconciliation reads existing immutable Hugging Face artifacts; it does not
-rerun calibration. Use `--dry-run` to perform the inventory, audits, and any
-required in-memory builds without writing Blob data:
-
-```sh
-cd frontend
-bun run publish:calibration-tree -- --country us --reconcile-releases --dry-run
-bun run publish:calibration-tree -- --country uk --reconcile-releases --dry-run
-bun run publish:calibration-tree -- --country be --reconcile-releases --dry-run
-bun run publish:calibration-tree -- --country us --reconcile-staging --dry-run
-bun run publish:calibration-tree -- --country uk --reconcile-staging --dry-run
-```
-
-Remove `--dry-run` to publish. For staging, an automated invocation also passes
-`--sha <webhook-commit>` so inventory and source files come from one immutable
-repository state. The GitHub workflow exposes the same `dry_run` option for an
-authenticated verification using Actions secrets.
-
-Each outcome is `complete`, `published`, `repaired`, `ineligible`, or
-`failed`.
-`complete` means no bundle construction or source-diagnostics download occurred.
-`repaired` means the publisher deterministically rebuilt an existing identity
-and restored only missing files. Any reconstructed index must match the digest
-already recorded in the manifest.
-
-Release and staging reconciliation both record a source they cannot publish or
-repair as `failed`, with the error as its `reason`, and continue with the
-remaining sources; after printing the report the command exits with an error
-naming every failed source. One release or run that cannot be published
-therefore no longer leaves the sources after it unpublished on every later
-invocation. Errors before the per-source loop still stop reconciliation before
-any source and print no report: reading the manifest, listing releases, tags or
-staging runs, the first Blob listing, and, for releases, the Hugging Face
-lookups that build the release list (the folder probe and
-`release_manifest.json` of each tag the manifest does not already pin at its
-commit).
-An error in one of those lookups therefore stops every release, as one failed
-release did before.
-
-For a release, the steps that write run in this order: upload the bundle's
-files (the index last), list the stored files and audit the build against its
-own index, then add the manifest entry. An error at any step before the
-manifest write leaves a new release without a manifest entry, and leaves a
-release that already had an entry with that entry unchanged. Files a new
-release uploaded before the error stay under the build's ID, which is a digest
-of the country, the release ID and the source files' digests; no manifest entry
-refers to them, and the next reconciliation rebuilds the same ID and checks
-each existing file byte for byte before reusing it. Each manifest write reads
-the stored manifest, adds one entry, and writes it back on the condition that
-the stored manifest has not changed since that read (after a conflict it reads
-once more and writes without the condition). A failed release makes no
-manifest write, so the writes for the releases after it are the same as
-without it.
-
-After the releases, release reconciliation points `latestReleaseBuildArtifactId`
-at the release the upstream pointer names. It leaves the selection unchanged,
-and records why in the report's `latestReleaseFailure`, when that release
-failed in the same run, is not completely published, or the pointer cannot be
-read; the command then exits with an error. A dry run reads the pointer and
-reports the same `latestReleaseFailure` when the pointer cannot be read or names
-a release that failed in the same run; it does not check whether the named
-release is completely published, because it writes no manifest entries.
-
-`CALIBRATION_TREE_MAX_RAW_BYTES` defaults to 100,000,000 bytes per file, in
-addition to the fixed summary- and detail-shard limits.
-`CALIBRATION_TREE_MAX_GZIP_BYTES` can add a compressed-size limit. Any violation
-fails publication and therefore fails the GitHub Actions job.
+The collector's `reconcile-calibration-trees` operations command takes
+`--country <cc>`, optionally `--kind release|staging`, and `--dry-run`, which
+reports each build's outcome without writing to the store. The collector's README
+gives the command and how to run it, under "Queuing calibration tree builds".
 
 ## Verification
 
@@ -846,6 +760,10 @@ Then verify that:
 8. An uncached comparison persists both modes and a repeated request reuses
    them.
 9. Repeated exact-part requests report CDN reuse or a positive cache age.
+10. Selecting targets in the first, middle and last detail shards shows each
+    target's detail.
+11. A target-detail failure stays inside its panel and leaves the map and the
+    release selector in place.
 
 Do not use browser automation or screenshots for visual verification. Provide
 the local preview URL and ask a person to inspect build selection and map

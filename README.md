@@ -218,9 +218,8 @@ canonical model/data migration and deployment verification gates.
 See [the Chronicle update workflow](docs/chronicle-update-workflow.md) for the
 optional Microcosm and ACS inputs and the separate full-artifact command.
 See [calibration tree artifacts](docs/calibration-tree-artifacts.md) for the
-breadth-first folder schema, filtering indices, Hugging Face webhook
-publication, Vercel Blob authentication, one-time historical publication, and
-cache behavior.
+breadth-first folder schema, filtering indices, the Hugging Face webhook, Vercel
+Blob authentication and cache behavior.
 
 The US variable-calculation service uses its reviewed immutable release. Leave
 `POPULACE_HF_REPO` and `POPULACE_HF_REVISION` unset for that service; conflicting

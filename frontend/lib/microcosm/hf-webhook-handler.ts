@@ -35,23 +35,13 @@ interface WebhookPayload {
   updatedRefs?: UpdatedRef[];
 }
 
-interface TreeBuildDispatch {
-  country: MicrocosmCountry;
-  eventKind: "tag" | "branch" | "staging";
-  releaseId?: string;
-  hfCommitSha: string;
-}
-
 type FetchImplementation = (
   input: string | URL | Request,
   init?: RequestInit,
 ) => Promise<Response>;
 
 export interface HfWebhookHandlerDependencies {
-  /**
-   * GitHub dispatches, Hugging Face reads of releases.json and the
-   * collector's calibration-tree build requests.
-   */
+  /** Hugging Face reads of releases.json and the collector's calibration-tree build requests. */
   fetch: FetchImplementation;
   postReleaseAlert: typeof postReleaseAlert;
   postReleaseRecordAlert: typeof postReleaseRecordAlert;
@@ -85,6 +75,15 @@ type TreeBuildOutcome =
   | { status: "failed"; detail: string }
   | { status: "not_configured" };
 
+/**
+ * A collector request's outcome, and whether Hugging Face should retry the
+ * delivery for it: true for a failure that a later attempt may not repeat.
+ */
+interface TreeBuildResult {
+  outcome: TreeBuildOutcome;
+  retry: boolean;
+}
+
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
 const TREE_BUILDS_PATH = "/v1/calibration-tree-builds";
 // The collector's pattern for hf_ref. It only records hf_ref and hf_commit,
@@ -92,13 +91,14 @@ const TREE_BUILDS_PATH = "/v1/calibration-tree-builds";
 // for hf_commit), so a value that does is left out instead.
 const COLLECTOR_HF_REF = /^refs\/(heads|tags)\/[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/;
 const COLLECTOR_TIMEOUT_DETAIL = "The collector did not answer within 15 seconds.";
+const RETRY_LOG_NOTE = "answering 503 so that Hugging Face retries the delivery";
 const REPOSITORY_NAME = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
 /**
  * A failure that a later attempt may not repeat: Hugging Face answered 5xx
  * or 429, or the request or a 200's body failed or timed out. The webhook
- * answers 503 for it, before dispatching or posting anything, so Hugging
- * Face's retry of the delivery does each of them once.
+ * answers 503 for it, before requesting a tree build or posting anything, so
+ * Hugging Face's retry of the delivery does each of them once.
  */
 class TransientRecordReadError extends Error {}
 
@@ -187,8 +187,7 @@ async function compareReleaseRecords(
   if (failures.length > 0) {
     const reason = failures.map(errorMessage).join(" ");
     console.error(
-      `${RELEASES_RECORD_PATH} of ${repo} (${span}) could not be read; ` +
-        "answering 503 so that Hugging Face retries the delivery:",
+      `${RELEASES_RECORD_PATH} of ${repo} (${span}) could not be read; ${RETRY_LOG_NOTE}:`,
       reason,
     );
     return { kind: "retry", reason };
@@ -205,7 +204,7 @@ async function compareReleaseRecords(
 function logUnannounced(repo: string, update: UpdatedRef, change: UnannouncedRecordChange) {
   const span = `${update.oldSha ?? "none"} to ${update.newSha ?? "none"}`;
   const what = change.kind === "removed"
-    ? `${RELEASES_RECORD_PATH} was removed from ${repo}; its readers now read tags and pointer files`
+    ? `${RELEASES_RECORD_PATH} was removed from ${repo}; the release picker now lists its folders, and collector runs build no new release tree for it`
     : change.kind === "default_changed"
       ? `in ${repo}, the default release changed from ${change.from ?? "none"} to ${change.to ?? "none"}`
       : `in ${repo}, ${change.release}/${change.build} is no longer withdrawn`;
@@ -238,45 +237,26 @@ function secretOk(request: Request, expected: string | undefined): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-async function dispatchTreeBuild(
-  input: TreeBuildDispatch,
-  config: HfWebhookConfig,
-  fetchImplementation: FetchImplementation,
-): Promise<void> {
-  if (!config.githubToken) {
-    throw new Error("GITHUB_ACTIONS_DISPATCH_TOKEN is not configured.");
-  }
-  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(config.githubRepository)) {
-    throw new Error("CALIBRATION_TREE_GITHUB_REPOSITORY is invalid.");
-  }
-  const response = await fetchImplementation(
-    `https://api.github.com/repos/${config.githubRepository}/actions/workflows/${encodeURIComponent(config.githubWorkflow)}/dispatches`,
-    {
-      method: "POST",
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${config.githubToken}`,
-        "Content-Type": "application/json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-      body: JSON.stringify({
-        ref: "main",
-        inputs: {
-          country: input.country,
-          event_kind: input.eventKind,
-          release_id: input.releaseId ?? "",
-          hf_commit_sha: input.hfCommitSha,
-        },
-      }),
-      signal: AbortSignal.timeout(15_000),
-    },
+/**
+ * Names a delivery in the log of its answer. Hugging Face reuses a delivery's
+ * Webhook-Id for its retries and replays, so the latest entry for an ID is the
+ * delivery's latest answer. A delivery that updates main also names the range
+ * of main commits it covered.
+ */
+function describeDelivery(
+  request: Request,
+  repo: string,
+  trigger: UpdatedRef,
+  mainUpdate: UpdatedRef | undefined,
+): string {
+  const webhookId = request.headers.get("webhook-id");
+  const mainRange = mainUpdate
+    ? `, main from ${mainUpdate.oldSha ?? "none"} to ${mainUpdate.newSha}`
+    : "";
+  return (
+    `Hugging Face delivery ${webhookId ?? "without a Webhook-Id"} ` +
+    `for ${repo} ${trigger.ref} at ${trigger.newSha}${mainRange}`
   );
-  if (response.status !== 204) {
-    const body = await response.text();
-    throw new Error(
-      `GitHub workflow dispatch returned ${response.status}: ${body.slice(0, 200)}`,
-    );
-  }
 }
 
 function treeBuildRequestBody(
@@ -297,14 +277,20 @@ function treeBuildRequestBody(
 }
 
 /**
- * Logs a failed collector request and gives its tree_build. `detail` is a
- * fixed sentence for the answer; only the log carries the cause, which never
- * includes the token.
+ * Logs a failed collector request and gives its result. `detail` is a fixed
+ * sentence for the answer; only the log carries the cause, which never
+ * includes the token. `retry` says that the failure may pass, so the webhook
+ * answers 503 for it.
  */
-function failedTreeBuild(detail: string, cause: string): TreeBuildOutcome {
-  console.error(`Calibration tree build request to the collector failed: ${cause}`);
-  return { status: "failed", detail };
+function failedTreeBuild(detail: string, cause: string, retry = false): TreeBuildResult {
+  console.error(
+    `Calibration tree build request to the collector failed${retry ? `; ${RETRY_LOG_NOTE}` : ""}: ${cause}`,
+  );
+  return { outcome: { status: "failed", detail }, retry };
 }
+
+/** The statuses that may pass, as for Hugging Face's answers to releases.json reads. */
+const statusMayPass = (status: number) => status >= 500 || status === 429;
 
 /**
  * An error's message, followed by its cause's. Node's fetch throws
@@ -332,8 +318,8 @@ const isTimeout = (error: unknown) =>
   error !== null &&
   (error as { name?: unknown }).name === "TimeoutError";
 
-/** The tree_build of the collector's 202 answer, or null when it is not one. */
-function queuedTreeBuild(text: string): TreeBuildOutcome | null {
+/** The result of the collector's 202 answer, or null when it is not a queued build. */
+function queuedTreeBuild(text: string): TreeBuildResult | null {
   let answer: unknown;
   try {
     answer = JSON.parse(text);
@@ -345,7 +331,7 @@ function queuedTreeBuild(text: string): TreeBuildOutcome | null {
   if (status !== "queued" && status !== "already_queued") return null;
   if (typeof taskId !== "string" || !taskId) return null;
   if (typeof notBefore !== "string" || !notBefore) return null;
-  return { status, task_id: taskId, not_before: notBefore };
+  return { outcome: { status, task_id: taskId, not_before: notBefore }, retry: false };
 }
 
 /** A promise that rejects with the signal's reason once it aborts. */
@@ -363,15 +349,19 @@ function rejectionOnAbort(signal: AbortSignal): Promise<never> {
  * answer, so a token read that never settles holds the webhook's answer no
  * longer than a slow collector would.
  * Never throws: a request that cannot be sent or is not answered 202 is
- * logged and gives a failed tree_build.
+ * logged and gives a failed tree_build. The failure may pass, and is retried,
+ * when the collector answers 5xx or 429, cannot be reached, or does not finish
+ * answering within the deadline, and when the body of a 202 cannot be read.
+ * The others are lasting: a refusal, an answer that is not a queued build, an
+ * invalid address and a token that cannot be read.
  */
 async function requestTreeBuild(
   body: TreeBuildRequestBody,
   collector: TreeBuildCollectorAddress | undefined,
   readVercelOidcToken: () => Promise<string>,
   fetchImplementation: FetchImplementation,
-): Promise<TreeBuildOutcome> {
-  if (!collector) return { status: "not_configured" };
+): Promise<TreeBuildResult> {
+  if (!collector) return { outcome: { status: "not_configured" }, retry: false };
   if ("problem" in collector) {
     return failedTreeBuild(
       "MICROCOSM_TELEMETRY_COLLECTOR_URL is invalid.",
@@ -407,6 +397,7 @@ async function requestTreeBuild(
     return failedTreeBuild(
       isTimeout(error) ? COLLECTOR_TIMEOUT_DETAIL : "The collector could not be reached.",
       messageWithCause(error),
+      true,
     );
   }
   // The deadline also covers the answer's body.
@@ -419,12 +410,14 @@ async function requestTreeBuild(
         ? COLLECTOR_TIMEOUT_DETAIL
         : `The collector's HTTP ${response.status} answer could not be read.`,
       `the collector's ${response.status} answer could not be read: ${messageWithCause(error)}`,
+      response.status === 202 || statusMayPass(response.status),
     );
   }
   if (response.status !== 202) {
     return failedTreeBuild(
       `The collector answered HTTP ${response.status}.`,
       `the collector answered ${response.status}: ${text.slice(0, 200)}`,
+      statusMayPass(response.status),
     );
   }
   return (
@@ -484,77 +477,61 @@ export function createHfWebhookHandler(
     );
 
     if (!registration || (newTags.length === 0 && mainUpdates.length === 0)) {
-      return NextResponse.json({ ok: true, dispatched: [], alerted: [] });
+      return NextResponse.json({ ok: true, alerted: [] });
     }
 
     const { country } = registration;
-    // The update that starts this delivery's calibration-tree builds, the
-    // GitHub dispatch and the collector request: a staging repository's last
-    // main update; a release repository's newest new tag, else its last main
-    // update. Without one, the delivery starts neither.
+    // The update that starts this delivery's calibration-tree build: a staging
+    // repository's last main update; a release repository's newest new tag,
+    // else its last main update. Without one, the delivery starts none.
     const mainUpdate = mainUpdates.at(-1);
     const tagUpdate = registration.kind === "release" ? newTagRefs.at(-1) : undefined;
     const trigger = registration.kind === "staging" ? mainUpdate : tagUpdate ?? mainUpdate;
-    const dispatches: TreeBuildDispatch[] = trigger
-      ? [
-          {
-            country,
-            eventKind: registration.kind === "staging" ? "staging" : tagUpdate ? "tag" : "branch",
-            ...(tagUpdate ? { releaseId: tagUpdate.ref.slice(TAG_PREFIX.length) } : {}),
-            hfCommitSha: trigger.newSha!,
-          },
-        ]
-      : [];
+    const deliveryDescription = trigger
+      ? describeDelivery(request, registration.repo, trigger, mainUpdate)
+      : null;
 
-    // releases.json is read before anything is dispatched or posted. A
+    // releases.json is read before anything is requested or posted. A
     // transient failure then answers 503 with nothing done, and Hugging
     // Face's retry of the delivery does everything once.
     // Only a release repository whose country has a Slack channel can get
-    // record alerts, so only its record is read and only it risks a 503.
+    // record alerts, so only its record is read and only it risks a 503 here.
     const comparison =
       registration.kind === "release" && mainUpdate && config.releaseAlertCountries.has(country)
         ? await compareReleaseRecords(repo, mainUpdate, config, fetchImplementation)
         : null;
     if (comparison?.kind === "retry") {
+      console.error(`Answered 503 to ${deliveryDescription}.`);
       return NextResponse.json(
         { detail: `Unable to read ${RELEASES_RECORD_PATH}; retry the delivery.` },
         { status: 503 },
       );
     }
 
-    // The GitHub dispatch and the collector's calibration-tree build request
-    // run at the same time, each with its own 15-second timeout, and neither
-    // failing stops the other. The dispatch alone decides the answer's status;
-    // the collector request's outcome is reported as tree_build.
-    const [dispatched, treeBuildRequested] = await Promise.allSettled([
-      (async () => {
-        for (const dispatch of dispatches) {
-          await dispatchTreeBuild(dispatch, config, fetchImplementation);
-        }
-      })(),
-      trigger
-        ? requestTreeBuild(
-            treeBuildRequestBody(registration, trigger),
-            config.treeBuildCollector,
-            readVercelOidcToken,
-            fetchImplementation,
-          )
-        : Promise.resolve(null),
-    ]);
-    const treeBuild =
-      treeBuildRequested.status === "fulfilled"
-        ? treeBuildRequested.value
-        : failedTreeBuild(
-            "The collector request failed.",
-            errorMessage(treeBuildRequested.reason),
-          );
-    // A delivery that starts no build answers as before, without tree_build.
-    const treeBuildAnswer = treeBuild ? { tree_build: treeBuild } : {};
-    if (dispatched.status === "rejected") {
-      console.error("Calibration tree workflow dispatch failed:", dispatched.reason);
+    // The collector request comes before the Slack alerts, which a repeat would
+    // post twice. A failure that may pass then answers 503 with nothing posted,
+    // and Hugging Face's retry requests the build and posts each alert once.
+    // Repeating the request is safe: the collector answers already_queued
+    // within its 10-minute window, and a later run builds only what is missing.
+    // A lasting failure is logged, reported as tree_build, and stops no alert.
+    const treeBuild = trigger
+      ? await requestTreeBuild(
+          treeBuildRequestBody(registration, trigger),
+          config.treeBuildCollector,
+          readVercelOidcToken,
+          fetchImplementation,
+        )
+      : null;
+    // A delivery that starts no build answers without tree_build.
+    const treeBuildAnswer = treeBuild ? { tree_build: treeBuild.outcome } : {};
+    if (treeBuild?.retry) {
+      console.error(`Answered 503 to ${deliveryDescription}.`);
       return NextResponse.json(
-        { detail: "Unable to start calibration tree publication.", ...treeBuildAnswer },
-        { status: 502 },
+        {
+          detail: "Unable to queue the calibration tree build; retry the delivery.",
+          ...treeBuildAnswer,
+        },
+        { status: 503 },
       );
     }
 
@@ -592,14 +569,14 @@ export function createHfWebhookHandler(
       recordAlerted = posted;
     }
 
+    if (deliveryDescription) {
+      console.info(
+        `Answered 200 to ${deliveryDescription} (tree build: ${treeBuild?.outcome.status}).`,
+      );
+    }
     return NextResponse.json({
       ok: true,
       country,
-      dispatched: dispatches.map((dispatch) => ({
-        event_kind: dispatch.eventKind,
-        release_id: dispatch.releaseId ?? null,
-        hf_commit_sha: dispatch.hfCommitSha,
-      })),
       ...treeBuildAnswer,
       alerted,
       ...(recordAlerted ? { release_record_alerted: recordAlerted } : {}),

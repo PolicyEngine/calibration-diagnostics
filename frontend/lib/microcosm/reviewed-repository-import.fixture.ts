@@ -50,13 +50,10 @@ async function releaseTag(repo: string): Promise<string> {
   const route = (await ROUTES["hf-webhook"]()) as {
     POST: (request: Request) => Promise<Response>;
   };
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    if (String(input).startsWith("https://api.github.com/")) {
-      return new Response(null, { status: 204 });
-    }
-    return originalFetch(input);
-  }) as typeof fetch;
+  // The webhook logs its answer with console.info, which would otherwise join
+  // this script's JSON on standard output.
+  const originalInfo = console.info;
+  console.info = () => {};
   try {
     const response = await route.POST(
       new Request("https://fixture.example/api/hf-webhook", {
@@ -75,7 +72,7 @@ async function releaseTag(repo: string): Promise<string> {
     );
     return `${response.status}:${JSON.stringify(await response.json())}`;
   } finally {
-    globalThis.fetch = originalFetch;
+    console.info = originalInfo;
   }
 }
 
