@@ -7,12 +7,31 @@ import {
 } from "@policyengine/calibration-tree/countries";
 import { huggingFaceReadToken } from "@policyengine/calibration-tree/latest-artifact";
 
+import { telemetryCollectorBaseUrl } from "@/lib/server/microcosm/telemetry-collector-url";
 import { hasReleaseAlertChannel } from "@/lib/slack";
 
 export interface WebhookRepositoryRegistration {
   country: MicrocosmCountry;
   kind: "release" | "staging";
+  /**
+   * The repository's name as configured, in its configured letter case. The
+   * map of registrations is keyed by its lower-case form, so a delivery that
+   * spells the name differently still finds it; the collector's
+   * calibration-tree build request names the repository this way, since the
+   * collector compares names exactly.
+   */
+  repo: string;
 }
+
+/**
+ * Where the webhook asks the telemetry collector to queue calibration-tree
+ * builds: the base address from MICROCOSM_TELEMETRY_COLLECTOR_URL, or, for a
+ * value that breaks the address rules (telemetryCollectorBaseUrl), the
+ * problem, a fixed sentence that never repeats the value.
+ */
+export type TreeBuildCollectorAddress =
+  | { baseUrl: string }
+  | { problem: string };
 
 export interface HfWebhookConfig {
   secret: string | undefined;
@@ -36,6 +55,16 @@ export interface HfWebhookConfig {
   githubRepository: string;
   githubWorkflow: string;
   repositories: ReadonlyMap<string, WebhookRepositoryRegistration>;
+  /**
+   * The collector address for calibration-tree build requests, read once,
+   * when the server module starts, like the rest of this configuration: a
+   * changed MICROCOSM_TELEMETRY_COLLECTOR_URL takes effect with the next
+   * deployment. Absent when the setting is unset or empty: the webhook then
+   * sends no request and answers tree_build "not_configured". An invalid
+   * address is kept as its problem and never thrown here, so the webhook
+   * still dispatches; each delivery reports it as a failed request.
+   */
+  treeBuildCollector?: TreeBuildCollectorAddress;
 }
 
 export type HfWebhookEnvironment = RepositoryEnvironment;
@@ -50,6 +79,7 @@ export function resolveHfWebhookConfig(
     repositories.set(releaseRepository.repo.toLowerCase(), {
       country,
       kind: "release",
+      repo: releaseRepository.repo,
     });
 
     const stagingRepository = resolveRegisteredStagingRepository(
@@ -60,6 +90,7 @@ export function resolveHfWebhookConfig(
       repositories.set(stagingRepository.repo.toLowerCase(), {
         country,
         kind: "staging",
+        repo: stagingRepository.repo,
       });
     }
   }
@@ -78,7 +109,29 @@ export function resolveHfWebhookConfig(
       environment.CALIBRATION_TREE_GITHUB_WORKFLOW?.trim() ||
       "publish-calibration-tree.yml",
     repositories,
+    treeBuildCollector: treeBuildCollectorAddress(
+      environment.MICROCOSM_TELEMETRY_COLLECTOR_URL,
+    ),
   };
+}
+
+function treeBuildCollectorAddress(
+  value: string | undefined,
+): TreeBuildCollectorAddress | undefined {
+  const rawUrl = value?.trim();
+  if (!rawUrl) return undefined;
+  try {
+    return { baseUrl: telemetryCollectorBaseUrl(rawUrl) };
+  } catch (error) {
+    // The rule's own errors are fixed sentences. The TypeError of `new URL`
+    // can repeat the value, so it is replaced by one.
+    return {
+      problem:
+        error instanceof TypeError || !(error instanceof Error)
+          ? "Telemetry collector URL is not a valid URL."
+          : error.message,
+    };
+  }
 }
 
 export function loadHfWebhookConfig(): HfWebhookConfig {
