@@ -163,16 +163,27 @@ naming the requested code in place of the page, and the selector shows no
 dataset. The deployment smoke check asserts that an unregistered code is
 refused this way.
 
-Registering a country before its first release fails the deployment smoke
-check, which requires every selectable `calibration` country to serve a
-release, until the collector has written that country's manifest entry. Add the
-country to the collector first. Merge the pull request that raises the package
-to the version with the registration, and have the collector build the country's
-release, from a new build submission or, for a release already on Hugging Face,
-by running its `reconcile-calibration-trees` command by hand. Then re-run the
-deployment. The Hugging Face webhook cannot do this step: production has no
-registration for the country until that deployment is promoted, so it ignores
-the repository's deliveries.
+A new country's first release takes three steps, in this order, because two
+checks depend on it. The deployment smoke check requires every selectable
+`calibration` country to serve a release, and the manifest reader refuses a
+manifest that names a country the deployed package does not know, which would
+break the manifest-backed routes for every country.
+
+1. Register the country in the package without the `calibration` capability,
+   raise the pinned version here, and let that deployment reach production. The
+   smoke check skips the country, and production can now read a manifest that
+   names it.
+2. Add the country to the collector, and have the collector build its release.
+   The release repository needs a `releases.json` whose default release has a
+   current build: without it a run reports `no_releases_record` and builds
+   nothing, and the country gets no latest release. A new build submission, a
+   Hugging Face webhook delivery or the collector's
+   `reconcile-calibration-trees` command run by hand can start the build.
+3. Add the `calibration` capability, release the package, and raise the pinned
+   version here. The smoke check now requires the release that step 2 built.
+
+Do not roll production back past step 1 once the collector has written the
+country's manifest entry.
 
 ### Presentation
 

@@ -304,7 +304,7 @@ revision). No country registration names the layout.
 
 - Only Hugging Face's 404 for the file means the repository has no
   `releases.json`. The release picker then lists the repository's folders under
-  `releases/` on `main` beside the builds the manifest records, and a collector
+  `releases/` on `main` beside the tagged builds the manifest records, and a collector
   run reports `no_releases_record`. A 404 whose
   error code (`X-Error-Code`) is `RepoNotFound` or `RevisionNotFound`, any
   other failure, and a record the writer's rules refuse are errors: the
@@ -508,9 +508,10 @@ release alert. Require an HTTP 200 delivery whose answer has no
 token can read its `releases.json` (a 404 for a repository without one counts as
 readable). Also require its `tree_build.status` to be `queued` or
 `already_queued`. If the webhook has no prior delivery to replay, send an
-authenticated release `main`-update payload containing the repository's current
-commit SHA. Then send one authenticated staging `main`-update payload and require
-the same `tree_build` statuses. Both requests are safe to repeat: a run builds
+authenticated release `main`-update payload with the repository's current commit
+SHA as both `oldSha` and `newSha`, so that it announces nothing. Then send one
+authenticated staging `main`-update payload and require the same `tree_build`
+statuses. Both requests are safe to repeat: a run builds
 only what the collector's store lacks.
 
 Failure meanings and recovery:
@@ -550,10 +551,21 @@ Failure meanings and recovery:
   whenever deliveries were answered 503, whether or not the webhook was
   suspended. The function logs are the record of each answer: every delivery
   that starts a build logs "Answered 503 to" or "Answered 200 to", followed by
-  its `Webhook-Id`, repository, ref and commit. A retry or replay keeps the
-  delivery's `Webhook-Id`, so the latest entry for an ID is its latest answer.
+  its `Webhook-Id`, repository, ref and commit and, when a new tag started the
+  build, its `main` commit. A 200 entry ends with the `tree_build` status. A retry
+  or replay keeps the delivery's `Webhook-Id`, so the latest entry for an ID is
+  its latest answer. The 503 entries are at error level and the 200 entries at
+  info level, so do not filter the logs by level. Vercel keeps function logs for
+  a limited time that depends on the plan. For older deliveries only the Activity
+  page remains, and alerts can then be lost or repeated.
   1. Correct the cause, and if the webhook is suspended, re-enable it.
-  2. Find the deliveries whose latest entry is "Answered 503 to". For a release
+  2. Give Hugging Face's own retries time to run, then read the logs again. The
+     webhook keeps no record of the deliveries it has handled, so a replay that
+     overlaps a pending retry posts that delivery's alerts twice. Hugging Face
+     publishes no retry schedule and does not say whether a replay cancels a
+     retry, so this cannot be ruled out. A repeated alert is the lesser failure:
+     a delivery that is never answered 200 posts none.
+  3. Find the deliveries whose latest entry is "Answered 503 to". For a release
      repository whose country has a Slack channel, replay every one of them,
      oldest first, from the Activity page. Each covers its own pair of
      commits, so replaying only the latest would lose the earlier updates'
@@ -562,9 +574,10 @@ Failure meanings and recovery:
      country has no Slack channel (Belgium today), has no alerts to lose, and
      one request covers everything the store lacks: if no later delivery from
      that repository was answered 200, replay only its newest such delivery.
-  3. The repository's last delivered commit is now the `newSha` of its
-     latest delivery answered 200, counting step 2's replays. For updates
-     made after that commit (while the webhook was suspended, so never
+  4. The repository's last delivered commit is now the newest `main` commit,
+     by the repository's history and not by the order of the log entries, among
+     the deliveries whose latest entry is "Answered 200 to", counting step 3's
+     replays. For updates made after that commit (while the webhook was suspended, so never
      delivered), send one authenticated release payload per affected
      repository. Its `main` entry has that commit as `oldSha` and the
      repository's current head as `newSha`; it announces their net change
@@ -583,8 +596,11 @@ Failure meanings and recovery:
   see the worker job's logs and the `calibration_tree_build_requests` table, which
   the collector's README describes under "Queuing calibration tree builds".
 - Hugging Face retries non-2xx deliveries and can suspend a repeatedly failing
-  webhook. Correct the failure, re-enable the webhook, and replay the delivery;
-  see the [Hugging Face delivery and retry documentation](https://huggingface.co/docs/hub/webhooks#delivery-and-retries).
+  webhook. To recover, follow the steps for `503` above; see the
+  [Hugging Face delivery and retry documentation](https://huggingface.co/docs/hub/webhooks#delivery-and-retries).
+  It also limits each webhook to 1,000 triggers per 24 hours and does not say
+  whether retries or replays count. A UK staging build can make about one commit
+  every 50 seconds, which would pass that limit if it continued for a day.
 
 There is no scheduled run. A later delivery for the same country and kind queues
 a run that builds everything the collector's store lacks. The collector's own
@@ -713,6 +729,10 @@ Then verify that:
 8. An uncached comparison persists both modes and a repeated request reuses
    them.
 9. Repeated exact-part requests report CDN reuse or a positive cache age.
+10. Selecting targets in the first, middle and last detail shards shows each
+    target's detail.
+11. A target-detail failure stays inside its panel and leaves the map and the
+    release selector in place.
 
 Do not use browser automation or screenshots for visual verification. Provide
 the local preview URL and ask a person to inspect build selection and map
