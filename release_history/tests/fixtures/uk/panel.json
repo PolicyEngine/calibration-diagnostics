@@ -1,0 +1,369 @@
+{
+  "country": "uk",
+  "definition": {
+    "baseline": [
+      {
+        "id": "income_tax",
+        "kind": "tax",
+        "stat": "sum",
+        "variable": "income_tax"
+      },
+      {
+        "id": "national_insurance",
+        "kind": "tax",
+        "stat": "sum",
+        "variables": [
+          "national_insurance",
+          "ni_employer"
+        ]
+      },
+      {
+        "id": "vat",
+        "kind": "tax",
+        "stat": "sum",
+        "variable": "vat"
+      },
+      {
+        "id": "council_tax",
+        "kind": "tax",
+        "stat": "sum",
+        "variable": "council_tax"
+      },
+      {
+        "id": "capital_gains_tax",
+        "kind": "tax",
+        "stat": "sum",
+        "variable": "capital_gains_tax"
+      },
+      {
+        "id": "universal_credit",
+        "kind": "benefit",
+        "stat": "sum",
+        "variable": "universal_credit"
+      },
+      {
+        "id": "child_benefit",
+        "kind": "benefit",
+        "stat": "sum",
+        "variable": "child_benefit"
+      },
+      {
+        "id": "state_pension",
+        "kind": "benefit",
+        "stat": "sum",
+        "variable": "state_pension"
+      },
+      {
+        "id": "pension_credit",
+        "kind": "benefit",
+        "stat": "sum",
+        "variable": "pension_credit"
+      },
+      {
+        "id": "housing_benefit",
+        "kind": "benefit",
+        "stat": "sum",
+        "variable": "housing_benefit"
+      },
+      {
+        "entity": "benunit",
+        "id": "universal_credit_caseload",
+        "kind": "caseload",
+        "stat": "count",
+        "variable": "universal_credit"
+      },
+      {
+        "entity": "person",
+        "id": "state_pension_caseload",
+        "kind": "caseload",
+        "stat": "count",
+        "variable": "state_pension"
+      },
+      {
+        "entity": "benunit",
+        "id": "pension_credit_caseload",
+        "kind": "caseload",
+        "stat": "count",
+        "variable": "pension_credit"
+      },
+      {
+        "entity": "benunit",
+        "id": "housing_benefit_caseload",
+        "kind": "caseload",
+        "stat": "count",
+        "variable": "housing_benefit"
+      },
+      {
+        "entity": "household",
+        "id": "households",
+        "kind": "population",
+        "stat": "population"
+      },
+      {
+        "entity": "person",
+        "id": "people",
+        "kind": "population",
+        "stat": "population"
+      },
+      {
+        "entity": "person",
+        "id": "children",
+        "kind": "population",
+        "stat": "population",
+        "where": "is_hbai_dependent_child"
+      },
+      {
+        "id": "employment_income",
+        "kind": "input",
+        "stat": "sum",
+        "variable": "employment_income"
+      },
+      {
+        "id": "self_employment_income",
+        "kind": "input",
+        "stat": "sum",
+        "variable": "self_employment_income"
+      },
+      {
+        "id": "private_pension_income",
+        "kind": "input",
+        "stat": "sum",
+        "variable": "private_pension_income"
+      },
+      {
+        "id": "property_income",
+        "kind": "input",
+        "stat": "sum",
+        "variable": "property_income"
+      },
+      {
+        "id": "savings_interest_income",
+        "kind": "input",
+        "stat": "sum",
+        "variable": "savings_interest_income"
+      },
+      {
+        "id": "dividend_income",
+        "kind": "input",
+        "stat": "sum",
+        "variable": "dividend_income"
+      },
+      {
+        "id": "household_net_income_total",
+        "kind": "income",
+        "stat": "sum",
+        "variable": "household_net_income"
+      },
+      {
+        "entity": "person",
+        "id": "absolute_poverty_bhc_all",
+        "kind": "rate",
+        "stat": "mean",
+        "variable": "in_poverty_bhc"
+      },
+      {
+        "entity": "person",
+        "id": "absolute_poverty_ahc_all",
+        "kind": "rate",
+        "stat": "mean",
+        "variable": "in_poverty_ahc"
+      },
+      {
+        "entity": "person",
+        "id": "relative_poverty_bhc_all",
+        "kind": "rate",
+        "stat": "mean",
+        "variable": "in_relative_poverty_bhc"
+      },
+      {
+        "entity": "person",
+        "id": "relative_poverty_ahc_all",
+        "kind": "rate",
+        "stat": "mean",
+        "variable": "in_relative_poverty_ahc"
+      },
+      {
+        "entity": "person",
+        "id": "absolute_poverty_bhc_children",
+        "kind": "rate",
+        "stat": "mean",
+        "variable": "in_poverty_bhc",
+        "where": "is_hbai_dependent_child"
+      },
+      {
+        "entity": "person",
+        "id": "absolute_poverty_ahc_children",
+        "kind": "rate",
+        "stat": "mean",
+        "variable": "in_poverty_ahc",
+        "where": "is_hbai_dependent_child"
+      },
+      {
+        "entity": "person",
+        "id": "relative_poverty_bhc_children",
+        "kind": "rate",
+        "stat": "mean",
+        "variable": "in_relative_poverty_bhc",
+        "where": "is_hbai_dependent_child"
+      },
+      {
+        "entity": "person",
+        "id": "relative_poverty_ahc_children",
+        "kind": "rate",
+        "stat": "mean",
+        "variable": "in_relative_poverty_ahc",
+        "where": "is_hbai_dependent_child"
+      },
+      {
+        "by": "income_decile",
+        "entity": "household",
+        "id": "household_net_income_mean",
+        "kind": "income",
+        "stat": "mean",
+        "unit": "currency",
+        "variable": "household_net_income"
+      }
+    ],
+    "country": "uk",
+    "currency": "GBP",
+    "disclosure": {
+      "min_source_households": 3,
+      "policy": "source_household_small_cells",
+      "source_id_columns": [
+        "household_source_id",
+        "source_household_id",
+        "source_household_key"
+      ]
+    },
+    "engine": {
+      "model_package": "policyengine-uk",
+      "module": "uk",
+      "simulation_options": {}
+    },
+    "household_entity": "household",
+    "outputs": [
+      "targets",
+      "budget",
+      "distribution",
+      "poverty"
+    ],
+    "period_label": "fiscal_year",
+    "periods": [
+      2026
+    ],
+    "reforms": [
+      {
+        "add": {
+          "gov.hmrc.income_tax.rates.uk[0].rate": 0.01
+        },
+        "id": "basic_rate_plus_1p",
+        "targets": [
+          "income_tax"
+        ]
+      },
+      {
+        "add": {
+          "gov.hmrc.income_tax.rates.uk[1].rate": 0.01
+        },
+        "id": "higher_rate_plus_1p",
+        "targets": [
+          "income_tax"
+        ]
+      },
+      {
+        "add": {
+          "gov.hmrc.income_tax.rates.uk[2].rate": 0.01
+        },
+        "id": "additional_rate_plus_1p",
+        "targets": [
+          "income_tax"
+        ]
+      },
+      {
+        "add": {
+          "gov.hmrc.income_tax.allowances.personal_allowance.amount": 100
+        },
+        "id": "personal_allowance_plus_100",
+        "targets": [
+          "income_tax"
+        ]
+      },
+      {
+        "add": {
+          "gov.hmrc.national_insurance.class_1.rates.employee.main": 0.01
+        },
+        "id": "employee_nics_main_rate_plus_1pp",
+        "targets": [
+          "national_insurance"
+        ]
+      },
+      {
+        "add": {
+          "gov.hmrc.child_benefit.amount.additional": 1
+        },
+        "id": "child_benefit_subsequent_child_plus_1",
+        "targets": [
+          "child_benefit"
+        ]
+      },
+      {
+        "add": {
+          "gov.hmrc.vat.standard_rate": 0.01
+        },
+        "id": "vat_standard_rate_plus_1pp",
+        "targets": [
+          "vat"
+        ]
+      }
+    ],
+    "variables": {
+      "behaviour": {},
+      "budget": {
+        "plus": [
+          "gov_balance"
+        ]
+      },
+      "groups": {
+        "all": null,
+        "children": "is_hbai_dependent_child"
+      },
+      "household_net_income": "household_net_income",
+      "income_decile": "household_income_decile",
+      "poverty": {
+        "absolute_ahc": "in_poverty_ahc",
+        "absolute_bhc": "in_poverty_bhc",
+        "relative_ahc": "in_relative_poverty_ahc",
+        "relative_bhc": "in_relative_poverty_bhc"
+      }
+    }
+  },
+  "digest_algorithm": "sha256-json-sort-keys-compact-ascii-escaped-utf8",
+  "engine": {
+    "bundle_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "core": {
+      "name": "policyengine-core",
+      "version": "3.33.3"
+    },
+    "model": {
+      "name": "policyengine-uk",
+      "version": "1.0.0",
+      "wheel_sha256": null
+    },
+    "policyengine": "6.16.1"
+  },
+  "format_version": 1,
+  "kind": "release_history.panel",
+  "panel_id": "af35ceddec5f1c3724605fdf2c5301f8c1e0953d4a166a1436cced4f787e4a65",
+  "panel_key": {
+    "core": "policyengine-core==3.33.3",
+    "country": "uk",
+    "model": "policyengine-uk==1.0.0",
+    "point_format_version": 1,
+    "policyengine": "6.16.1",
+    "producer_version": "1",
+    "spec_sha256": "22ce4922f89de8f7910d9af5c627e4857d510e8fbed343b8ca2fc58d9d6db787"
+  },
+  "point_format_version": 1,
+  "producer_version": "1",
+  "spec_sha256": "22ce4922f89de8f7910d9af5c627e4857d510e8fbed343b8ca2fc58d9d6db787"
+}
