@@ -13,30 +13,34 @@ test("resolves the registered release and staging repositories without ambient s
     ["policyengine/populace-uk-staging", { country: "uk", kind: "staging", repo: "policyengine/populace-uk-staging" }],
     ["policyengine/populace-be-private", { country: "be", kind: "release", repo: "policyengine/populace-be-private" }],
   ]);
-  expect(config).toMatchObject({
-    secret: undefined,
-    githubToken: undefined,
-    githubRepository: "PolicyEngine/calibration-diagnostics",
-    githubWorkflow: "publish-calibration-tree.yml",
-  });
+  expect(config.secret).toBeUndefined();
 });
 
-test("applies repository and GitHub overrides from an explicit environment", () => {
+test("the former GitHub dispatch settings are not part of the webhook's configuration", () => {
+  // They stay in the deployment's environment until they are deleted by hand.
+  for (const environment of [
+    {},
+    {
+      GITHUB_ACTIONS_DISPATCH_TOKEN: "former-dispatch-token",
+      CALIBRATION_TREE_GITHUB_REPOSITORY: "example/dashboard",
+      CALIBRATION_TREE_GITHUB_WORKFLOW: "publish.yml",
+    },
+  ]) {
+    const config = resolveHfWebhookConfig(environment);
+    expect(config).not.toHaveProperty("githubToken");
+    expect(config).not.toHaveProperty("githubRepository");
+    expect(config).not.toHaveProperty("githubWorkflow");
+  }
+});
+
+test("applies the webhook secret and repository overrides from an explicit environment", () => {
   const config = resolveHfWebhookConfig({
     HF_WEBHOOK_SECRET: "configured-secret",
-    GITHUB_ACTIONS_DISPATCH_TOKEN: "  github-token  ",
-    CALIBRATION_TREE_GITHUB_REPOSITORY: "  example/dashboard  ",
-    CALIBRATION_TREE_GITHUB_WORKFLOW: "  publish.yml  ",
     POPULACE_UK_HF_REPO: "example/uk-release",
     POPULACE_UK_STAGING_HF_REPO: "example/uk-staging",
   });
 
-  expect(config).toMatchObject({
-    secret: "configured-secret",
-    githubToken: "github-token",
-    githubRepository: "example/dashboard",
-    githubWorkflow: "publish.yml",
-  });
+  expect(config.secret).toBe("configured-secret");
   expect(config.repositories.get("example/uk-release")).toEqual({
     country: "uk",
     kind: "release",
@@ -136,7 +140,7 @@ test("an invalid collector address is kept as a problem, never thrown, and the p
     expect(config.treeBuildCollector).toEqual({ problem: expect.stringContaining(reason) });
     expect(JSON.stringify(config.treeBuildCollector)).not.toContain(value);
     expect(JSON.stringify(config.treeBuildCollector)).not.toContain("secret-password");
-    // The rest of the configuration still resolves, so the webhook keeps dispatching.
+    // The rest of the configuration still resolves, so the webhook keeps answering.
     expect(config.repositories.size).toBe(5);
   }
 });

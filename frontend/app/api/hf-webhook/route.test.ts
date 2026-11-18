@@ -30,20 +30,17 @@ function webhookConfig(
 ): HfWebhookConfig {
   return {
     secret: "test-webhook-secret",
-    githubToken: "test-github-token",
     huggingFaceToken: undefined,
     // The countries whose Slack channel is configured, as in production.
     releaseAlertCountries: new Set(["us", "uk"]),
-    githubRepository: "PolicyEngine/calibration-diagnostics",
-    githubWorkflow: "publish-calibration-tree.yml",
     repositories: new Map(TEST_REPOSITORIES),
     ...overrides,
   };
 }
 
-// The dispatch tests' repositories have no releases.json: the webhook's reads
-// of it get Hugging Face's "entry not found" 404 and never reach the test's
-// own fetch, which sees only the GitHub dispatch.
+// These tests' repositories have no releases.json: the webhook's reads of it
+// get Hugging Face's "entry not found" 404 and never reach the test's own
+// fetch, which sees every other request.
 function handler(
   fetchImplementation: HfWebhookHandlerDependencies["fetch"],
   overrides: Partial<HfWebhookConfig> = {},
@@ -89,7 +86,7 @@ function testSha(index: number): string {
   return (index + 1).toString(16).padStart(40, "0");
 }
 
-test("webhook rejects invalid authentication before dispatching", async () => {
+test("webhook rejects invalid authentication before sending any request", async () => {
   let fetched = false;
   const POST = handler(async () => {
     fetched = true;
@@ -136,7 +133,7 @@ test("webhook accepts the documented query-parameter secret", async () => {
   expect(fetched).toBe(false);
 });
 
-test("webhook acknowledges unrelated repositories without dispatching", async () => {
+test("webhook acknowledges unrelated repositories without sending any request", async () => {
   let fetched = false;
   const POST = handler(async () => {
     fetched = true;
@@ -160,133 +157,7 @@ test("webhook acknowledges unrelated repositories without dispatching", async ()
   expect(fetched).toBe(false);
 });
 
-test("webhook coalesces tag and main-branch changes into one reconciliation", async () => {
-  const calls: Array<{ url: string; init: RequestInit }> = [];
-  const POST = handler(async (input, init) => {
-    calls.push({ url: String(input), init: init ?? {} });
-    return new Response(null, { status: 204 });
-  });
-  const tagSha = "1".repeat(40);
-  const branchSha = "2".repeat(40);
-
-  const response = await POST(
-    request({
-      repo: { name: REPOSITORIES.usRelease },
-      updatedRefs: [
-        {
-          ref: "refs/tags/microcosm-us-release",
-          oldSha: null,
-          newSha: tagSha,
-        },
-        {
-          ref: "refs/heads/main",
-          oldSha: "3".repeat(40),
-          newSha: branchSha,
-        },
-      ],
-    }),
-  );
-
-  expect(response.status).toBe(200);
-  expect(calls).toHaveLength(1);
-  expect(calls[0].url).toContain(
-    "/PolicyEngine/calibration-diagnostics/actions/workflows/publish-calibration-tree.yml/dispatches",
-  );
-  expect(calls[0].init.headers).toMatchObject({
-    Authorization: "Bearer test-github-token",
-  });
-  const dispatch = JSON.parse(String(calls[0].init.body));
-  expect(dispatch).toMatchObject({
-    ref: "main",
-    inputs: {
-      country: "us",
-      event_kind: "tag",
-      release_id: "microcosm-us-release",
-      hf_commit_sha: tagSha,
-    },
-  });
-  expect(dispatch.inputs).not.toHaveProperty("backfill");
-});
-
-test("release updates dispatch every configured release repository", async () => {
-  const calls: Array<{ url: string; init: RequestInit }> = [];
-  const POST = handler(async (input, init) => {
-    calls.push({ url: String(input), init: init ?? {} });
-    return new Response(null, { status: 204 });
-  });
-  const releases = Array.from(TEST_REPOSITORIES.entries()).filter(
-    ([, registration]) => registration.kind === "release",
-  );
-
-  for (const [index, [repo, registration]] of releases.entries()) {
-    const sha = testSha(index);
-    const response = await POST(
-      request({
-        repo: { name: repo },
-        updatedRefs: [
-          {
-            ref: "refs/heads/main",
-            oldSha: "3".repeat(40),
-            newSha: sha,
-          },
-        ],
-      }),
-    );
-    expect(response.status).toBe(200);
-    expect(JSON.parse(String(calls.at(-1)?.init.body))).toMatchObject({
-      ref: "main",
-      inputs: {
-        country: registration.country,
-        event_kind: "branch",
-        release_id: "",
-        hf_commit_sha: sha,
-      },
-    });
-  }
-
-  expect(calls).toHaveLength(releases.length);
-});
-
-test("staging updates dispatch every configured staging repository", async () => {
-  const calls: Array<{ url: string; init: RequestInit }> = [];
-  const POST = handler(async (input, init) => {
-    calls.push({ url: String(input), init: init ?? {} });
-    return new Response(null, { status: 204 });
-  });
-  const stagingRepositories = Array.from(TEST_REPOSITORIES.entries()).filter(
-    ([, registration]) => registration.kind === "staging",
-  );
-
-  for (const [index, [repo, registration]] of stagingRepositories.entries()) {
-    const sha = testSha(index + 8);
-    const response = await POST(
-      request({
-        repo: { name: repo },
-        updatedRefs: [
-          {
-            ref: "refs/heads/main",
-            oldSha: "3".repeat(40),
-            newSha: sha,
-          },
-        ],
-      }),
-    );
-    expect(response.status).toBe(200);
-    expect(JSON.parse(String(calls.at(-1)?.init.body))).toMatchObject({
-      ref: "main",
-      inputs: {
-        country: registration.country,
-        event_kind: "staging",
-        release_id: "",
-        hf_commit_sha: sha,
-      },
-    });
-  }
-
-  expect(calls).toHaveLength(stagingRepositories.length);
-});
-
-test("staging tag updates are acknowledged without dispatching", async () => {
+test("staging tag updates are acknowledged without a tree build request", async () => {
   let fetched = false;
   const POST = handler(async () => {
     fetched = true;
@@ -308,30 +179,7 @@ test("staging tag updates are acknowledged without dispatching", async () => {
 
   expect(response.status).toBe(200);
   expect(fetched).toBe(false);
-  expect(await response.json()).toMatchObject({ dispatched: [] });
-});
-
-test("webhook returns a retriable server error when GitHub rejects dispatch", async () => {
-  const POST = handler(async () => new Response("forbidden", { status: 403 }));
-
-  const response = await POST(
-    request({
-      repo: { name: REPOSITORIES.usRelease },
-      updatedRefs: [
-        {
-          ref: "refs/heads/main",
-          oldSha: "1".repeat(40),
-          newSha: "2".repeat(40),
-        },
-      ],
-    }),
-  );
-
-  expect(response.status).toBe(502);
-  expect(await response.json()).toEqual({
-    detail: "Unable to start calibration tree publication.",
-    tree_build: { status: "not_configured" },
-  });
+  expect(await response.json()).toEqual({ ok: true, country: "us", alerted: [] });
 });
 
 // -- Slack alerts from releases.json -----------------------------------------
@@ -397,7 +245,7 @@ async function postMainUpdate(options: {
   const oldSha = "oldSha" in options ? options.oldSha ?? null : BEFORE_SHA;
   const token = "token" in options ? options.token : "test-hf-token";
   const hfRequests: Array<{ url: string; headers: HeadersInit | undefined }> = [];
-  const dispatches: string[] = [];
+  const treeBuildRequests: string[] = [];
   const tagAlerts: string[] = [];
   const slackPayloads: Array<{ text: string; blocks: unknown[] }> = [];
   const answer = (value: RecordAnswer) =>
@@ -408,9 +256,9 @@ async function postMainUpdate(options: {
         : Response.json(value);
   const fetchImplementation: HfWebhookHandlerDependencies["fetch"] = async (input, init) => {
     const url = String(input);
-    if (url.startsWith("https://api.github.com/")) {
-      dispatches.push(url);
-      return new Response(null, { status: 204 });
+    if (url === TREE_BUILDS_URL) {
+      treeBuildRequests.push(String(init?.body));
+      return queuedTreeBuild("queued", "uk", "release")();
     }
     const revision = /\/resolve\/([0-9a-f]{40})\/releases\.json$/.exec(url)?.[1];
     if (revision) {
@@ -433,9 +281,13 @@ async function postMainUpdate(options: {
   const warned = spyOn(console, "warn").mockImplementation(() => {});
   try {
     const response = await createHfWebhookHandler(
-      webhookConfig({ huggingFaceToken: token }),
+      webhookConfig({
+        huggingFaceToken: token,
+        treeBuildCollector: { baseUrl: COLLECTOR_URL },
+      }),
       {
         fetch: fetchImplementation,
+        vercelOidcToken: async () => OIDC_TOKEN,
         postReleaseAlert: async ({ releaseId }) => {
           tagAlerts.push(releaseId);
           return true;
@@ -454,7 +306,7 @@ async function postMainUpdate(options: {
       status: response.status,
       body: await response.json(),
       hfRequests,
-      dispatches,
+      treeBuildRequests,
       tagAlerts,
       slackPayloads,
       slackTexts: slackPayloads.map((payload) => payload.text),
@@ -488,8 +340,8 @@ test("a newly published build that becomes current is announced as now current",
   expect(context).toContain(REPOSITORIES.ukRelease);
   expect(context).toContain(`published ${PUBLISHED_AT[NEWEST]}`);
   expect(context).toContain("calibration diagnostics");
-  // The tree publication is still dispatched first.
-  expect(result.dispatches).toHaveLength(1);
+  // The collector is asked to queue a tree build as well.
+  expect(result.treeBuildRequests).toHaveLength(1);
 });
 
 test("a newly published build that does not become current names the build that stays current", async () => {
@@ -592,13 +444,13 @@ test("a releases.json that cannot be read for a lasting reason is logged, and no
     expect(result.status).toBe(200);
     expect(result.slackTexts).toEqual([]);
     expect(result.logged.some((line) => line.includes("releases.json"))).toBe(true);
-    // Retrying would not help, so the dispatch and the tag alert go ahead.
-    expect(result.dispatches).toHaveLength(1);
+    // Retrying would not help, so the collector request and the tag alert go ahead.
+    expect(result.treeBuildRequests).toHaveLength(1);
     expect(result.tagAlerts).toHaveLength(1);
   }
 });
 
-test("a transient failure reading releases.json answers 503 before dispatching or posting anything, so Hugging Face's retry posts each alert once", async () => {
+test("a transient failure reading releases.json answers 503 before requesting a tree build or posting anything, so Hugging Face's retry posts each alert once", async () => {
   const before = nationalRecord(CURRENT, [OLDER, CURRENT]);
   const after = nationalRecord(NEWEST, [OLDER, CURRENT, NEWEST]);
   const newTag = `${NATIONAL}-20261104T101500Z-0e0e0e0e`;
@@ -615,7 +467,7 @@ test("a transient failure reading releases.json answers 503 before dispatching o
   for (const failure of transient) {
     const result = await postMainUpdate({ before, after: failure, newTag });
     expect(result.status).toBe(503);
-    expect(result.dispatches).toEqual([]);
+    expect(result.treeBuildRequests).toEqual([]);
     expect(result.tagAlerts).toEqual([]);
     expect(result.slackTexts).toEqual([]);
     expect(result.logged.some((line) => line.includes("releases.json"))).toBe(true);
@@ -623,7 +475,7 @@ test("a transient failure reading releases.json answers 503 before dispatching o
   // The retried delivery, once Hugging Face answers, does everything once.
   const retried = await postMainUpdate({ before, after, newTag });
   expect(retried.status).toBe(200);
-  expect(retried.dispatches).toHaveLength(1);
+  expect(retried.treeBuildRequests).toHaveLength(1);
   expect(retried.tagAlerts).toEqual([newTag]);
   expect(retried.slackTexts).toEqual([`New Microcosm UK build \`${NATIONAL}/${NEWEST}\`: now current`]);
 });
@@ -642,7 +494,7 @@ test("a connection that fails while the body of releases.json is read is transie
   const result = await postMainUpdate({ before, after: failingBody, newTag: `${NATIONAL}-20261104T101500Z-0e0e0e0e` });
 
   expect(result.status).toBe(503);
-  expect(result.dispatches).toEqual([]);
+  expect(result.treeBuildRequests).toEqual([]);
   expect(result.tagAlerts).toEqual([]);
   expect(result.slackTexts).toEqual([]);
 });
@@ -657,7 +509,7 @@ test("when one side fails for a lasting reason and the other transiently, the la
   });
 
   expect(result.status).toBe(200);
-  expect(result.dispatches).toHaveLength(1);
+  expect(result.treeBuildRequests).toHaveLength(1);
   expect(result.slackTexts).toEqual([]);
   expect(result.body.release_record_problem ?? "").toContain("is withdrawn");
 });
@@ -685,7 +537,7 @@ test("a release repository whose country has no Slack channel reads no releases.
 
   expect(result.status).toBe(200);
   expect(result.hfRequests).toEqual([]);
-  expect(result.dispatches).toHaveLength(1);
+  expect(result.treeBuildRequests).toHaveLength(1);
   expect(result.body).not.toHaveProperty("release_record_alerted");
 });
 
@@ -789,9 +641,6 @@ test("a delivery without a main update answers as before, naming no releases.jso
   expect(await response.json()).toEqual({
     ok: true,
     country: "uk",
-    dispatched: [
-      { event_kind: "tag", release_id: "microcosm-uk-release", hf_commit_sha: "1".repeat(40) },
-    ],
     alerted: [],
     tree_build: { status: "not_configured" },
   });
@@ -808,12 +657,11 @@ test("a main update's answer lists the releases.json alerts it posted", async ()
 
 // -- Calibration-tree builds queued in the collector -------------------------
 //
-// Each delivery that dispatches the GitHub workflow also asks the telemetry
-// collector to queue a calibration-tree build of the country and kind,
-// `POST /v1/calibration-tree-builds` (microcosm-collector#66), at the same
-// time as the dispatch. All values are synthetic: the collector is a
-// placeholder address answered by a fake, and the Vercel OIDC token is a fake
-// value.
+// Each delivery that starts a build asks the telemetry collector to queue a
+// calibration-tree build of the country and kind,
+// `POST /v1/calibration-tree-builds` (microcosm-collector#66). All values are
+// synthetic: the collector is a placeholder address answered by a fake, and
+// the Vercel OIDC token is a fake value.
 
 const COLLECTOR_URL = "https://collector.example";
 const TREE_BUILDS_URL = `${COLLECTOR_URL}/v1/calibration-tree-builds`;
@@ -821,6 +669,7 @@ const OIDC_TOKEN = "test-vercel-oidc-token";
 const NOT_BEFORE = "2026-11-13T12:10:00+00:00";
 // Text of a collector error answer, which must never reach the webhook's answer.
 const COLLECTOR_REFUSAL = "collector-refusal-detail";
+const RETRY_DETAIL = "Unable to queue the calibration tree build; retry the delivery.";
 
 /** The collector's answer to one request, given the request's options. */
 type CollectorAnswer = (init: RequestInit) => Response | Promise<Response>;
@@ -872,16 +721,15 @@ function newTag(name: string, newSha: string): UpdatedRefPayload {
 }
 
 /**
- * A webhook whose fetch serves the GitHub dispatch (204 unless `dispatch` is
- * given), releases.json (Hugging Face's 404 unless `releasesRecord` is given,
- * which receives the read's URL) and the collector (a 202 "queued" unless
- * `collector` is given), and records the dispatches and collector requests.
- * The collector address is configured unless `config` overrides it. The
- * Slack alert senders post nothing and return false unless given.
+ * A webhook whose fetch serves releases.json (Hugging Face's 404 unless
+ * `releasesRecord` is given, which receives the read's URL) and the collector
+ * (a 202 "queued" unless `collector` is given), records the collector
+ * requests, and refuses every other address. The collector address is
+ * configured unless `config` overrides it. The Slack alert senders post
+ * nothing and return false unless given.
  */
 function treeBuildWebhook(options: {
   collector?: CollectorAnswer;
-  dispatch?: () => Response | Promise<Response>;
   releasesRecord?: (url: string) => Response;
   config?: Partial<HfWebhookConfig>;
   vercelOidcToken?: () => Promise<string>;
@@ -889,14 +737,9 @@ function treeBuildWebhook(options: {
   postReleaseRecordAlert?: HfWebhookHandlerDependencies["postReleaseRecordAlert"];
 } = {}) {
   const collectorRequests: CapturedRequest[] = [];
-  const dispatches: CapturedRequest[] = [];
   let tokenReads = 0;
   const fetchImplementation: HfWebhookHandlerDependencies["fetch"] = async (input, init) => {
     const url = String(input);
-    if (url.startsWith("https://api.github.com/")) {
-      dispatches.push({ url, init: init ?? {} });
-      return options.dispatch?.() ?? new Response(null, { status: 204 });
-    }
     if (url.endsWith("/releases.json")) {
       return options.releasesRecord?.(url) ?? missingReleasesRecord();
     }
@@ -920,7 +763,7 @@ function treeBuildWebhook(options: {
         }),
     },
   );
-  return { POST, collectorRequests, dispatches, tokenReads: () => tokenReads };
+  return { POST, collectorRequests, tokenReads: () => tokenReads };
 }
 
 /** One delivery to a new treeBuildWebhook, with console.error captured. */
@@ -938,7 +781,6 @@ async function deliver(
       text,
       body: JSON.parse(text),
       collectorRequests: webhook.collectorRequests,
-      dispatches: webhook.dispatches,
       tokenReads: webhook.tokenReads(),
       logged: logged.mock.calls.map((call) => call.map(String).join(" ")),
     };
@@ -962,11 +804,7 @@ function expectOneTreeBuildRequest(
   expect(JSON.parse(String(sent.init.body))).toEqual(body);
 }
 
-function dispatchInputs(dispatches: CapturedRequest[]) {
-  return dispatches.map((dispatch) => JSON.parse(String(dispatch.init.body)).inputs);
-}
-
-test("a staging repository's main update also asks the collector to queue a staging calibration-tree build", async () => {
+test("a staging repository's main update asks the collector to queue a staging calibration-tree build", async () => {
   for (const [repo, country] of [
     [REPOSITORIES.usStaging, "us"],
     [REPOSITORIES.ukStaging, "uk"],
@@ -982,13 +820,10 @@ test("a staging repository's main update also asks the collector to queue a stag
       hf_ref: "refs/heads/main",
       hf_commit: commit,
     });
-    expect(dispatchInputs(result.dispatches)).toEqual([
-      { country, event_kind: "staging", release_id: "", hf_commit_sha: commit },
-    ]);
   }
 });
 
-test("a release repository's new tag also asks the collector to queue a release calibration-tree build, naming the tag", async () => {
+test("a release repository's new tag and main update in one delivery ask the collector for one release calibration-tree build, naming the tag", async () => {
   const tagCommit = testSha(41);
   const result = await deliver(
     delivery(REPOSITORIES.usRelease, [
@@ -1006,17 +841,9 @@ test("a release repository's new tag also asks the collector to queue a release 
     hf_ref: "refs/tags/microcosm-us-2026-11-13",
     hf_commit: tagCommit,
   });
-  expect(dispatchInputs(result.dispatches)).toEqual([
-    {
-      country: "us",
-      event_kind: "tag",
-      release_id: "microcosm-us-2026-11-13",
-      hf_commit_sha: tagCommit,
-    },
-  ]);
 });
 
-test("a release repository's main update without a new tag also asks the collector to queue a release calibration-tree build", async () => {
+test("a release repository's main update without a new tag asks the collector to queue a release calibration-tree build", async () => {
   const commit = testSha(43);
   const result = await deliver(delivery(REPOSITORIES.ukRelease, [mainUpdate(commit)]), {
     collector: queuedTreeBuild("queued", "uk", "release"),
@@ -1030,9 +857,6 @@ test("a release repository's main update without a new tag also asks the collect
     hf_ref: "refs/heads/main",
     hf_commit: commit,
   });
-  expect(dispatchInputs(result.dispatches)).toEqual([
-    { country: "uk", event_kind: "branch", release_id: "", hf_commit_sha: commit },
-  ]);
 });
 
 test("a Belgian release asks the collector to queue a release calibration-tree build for be", async () => {
@@ -1050,7 +874,33 @@ test("a Belgian release asks the collector to queue a release calibration-tree b
     hf_ref: "refs/tags/microcosm-be-2026-11-13",
     hf_commit: tagCommit,
   });
-  expect(result.dispatches).toHaveLength(1);
+});
+
+test("a deployment that still holds the former GitHub dispatch settings sends its only request to the collector", async () => {
+  // The settings are deleted by hand after this change is deployed, so a
+  // deployment can run this code with them still present. Any request to
+  // another address fails the fake's fetch.
+  const repo = "policyengine/populace-us-staging";
+  const commit = testSha(75);
+  const result = await deliver(delivery(repo, [mainUpdate(commit)]), {
+    config: resolveHfWebhookConfig({
+      HF_WEBHOOK_SECRET: "test-webhook-secret",
+      MICROCOSM_TELEMETRY_COLLECTOR_URL: COLLECTOR_URL,
+      GITHUB_ACTIONS_DISPATCH_TOKEN: "former-dispatch-token",
+      CALIBRATION_TREE_GITHUB_REPOSITORY: "example/dashboard",
+      CALIBRATION_TREE_GITHUB_WORKFLOW: "publish.yml",
+    }),
+  });
+
+  expect(result.status).toBe(200);
+  expectOneTreeBuildRequest(result.collectorRequests, {
+    country: "us",
+    kind: "staging",
+    hf_repo: repo,
+    hf_ref: "refs/heads/main",
+    hf_commit: commit,
+  });
+  expect(result.text).not.toContain("former-dispatch-token");
 });
 
 test("the collector request names the repository as configured, not as the delivery spells it", async () => {
@@ -1087,7 +937,6 @@ test("a malformed ref or commit is left out of the collector request, which is s
       hf_repo: REPOSITORIES.beRelease,
       hf_commit: commit,
     });
-    expect(result.dispatches).toHaveLength(1);
   }
 
   // Commits that are not 40 lower-case hexadecimal characters.
@@ -1101,9 +950,6 @@ test("a malformed ref or commit is left out of the collector request, which is s
       hf_repo: REPOSITORIES.usStaging,
       hf_ref: "refs/heads/main",
     });
-    expect(dispatchInputs(result.dispatches)).toEqual([
-      { country: "us", event_kind: "staging", release_id: "", hf_commit_sha: commit },
-    ]);
   }
 });
 
@@ -1128,32 +974,9 @@ test("the Vercel OIDC token is read for each collector request, never when the h
   ).toEqual(["Bearer first-oidc-token", "Bearer second-oidc-token"]);
 });
 
-test("the collector request and the GitHub dispatch run at the same time", async () => {
-  const events: string[] = [];
-  const pause = () => new Promise((resolve) => setTimeout(resolve, 20));
-  const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(49))]), {
-    dispatch: async () => {
-      events.push("dispatch started");
-      await pause();
-      events.push("dispatch finished");
-      return new Response(null, { status: 204 });
-    },
-    collector: async () => {
-      events.push("collector request started");
-      await pause();
-      events.push("collector request finished");
-      return queuedTreeBuild()();
-    },
-  });
-
-  expect(result.status).toBe(200);
-  expect(events.slice(0, 2).sort()).toEqual(["collector request started", "dispatch started"]);
-});
-
-test("a 202 from the collector answers 200 with its queued or already_queued tree build, and dispatches as before", async () => {
+test("a 202 from the collector answers 200 with its queued or already_queued tree build", async () => {
   for (const outcome of ["queued", "already_queued"] as const) {
-    const commit = testSha(50);
-    const result = await deliver(delivery(REPOSITORIES.ukStaging, [mainUpdate(commit)]), {
+    const result = await deliver(delivery(REPOSITORIES.ukStaging, [mainUpdate(testSha(50))]), {
       collector: queuedTreeBuild(outcome, "uk", "staging"),
     });
 
@@ -1161,7 +984,6 @@ test("a 202 from the collector answers 200 with its queued or already_queued tre
     expect(result.body).toEqual({
       ok: true,
       country: "uk",
-      dispatched: [{ event_kind: "staging", release_id: null, hf_commit_sha: commit }],
       alerted: [],
       tree_build: {
         status: outcome,
@@ -1169,18 +991,27 @@ test("a 202 from the collector answers 200 with its queued or already_queued tre
         not_before: NOT_BEFORE,
       },
     });
-    expect(dispatchInputs(result.dispatches)).toEqual([
-      { country: "uk", event_kind: "staging", release_id: "", hf_commit_sha: commit },
-    ]);
     expect(result.logged).toEqual([]);
   }
 });
 
-function expectFailedTreeBuild(result: Awaited<ReturnType<typeof deliver>>) {
-  // The GitHub dispatch decides the answer, as before.
-  expect(result.status).toBe(200);
-  expect(result.dispatches).toHaveLength(1);
-  expect(result.body.dispatched).toHaveLength(1);
+/**
+ * A failed collector request. A failure that may pass answers 503, so that
+ * Hugging Face retries the delivery; a lasting one answers 200.
+ */
+function expectFailedTreeBuild(
+  result: Awaited<ReturnType<typeof deliver>>,
+  expectedStatus: 200 | 503,
+) {
+  expect(result.status).toBe(expectedStatus);
+  if (expectedStatus === 503) {
+    expect(result.body.detail).toBe(RETRY_DETAIL);
+    expect(result.body).not.toHaveProperty("ok");
+    expect(result.logged.some((entry) => entry.includes("answering 503"))).toBe(true);
+  } else {
+    expect(result.body.ok).toBe(true);
+    expect(result.logged.some((entry) => entry.includes("answering 503"))).toBe(false);
+  }
   expect(result.body.tree_build).toMatchObject({ status: "failed" });
   expect(Object.keys(result.body.tree_build).sort()).toEqual(["detail", "status"]);
   expect(typeof result.body.tree_build.detail).toBe("string");
@@ -1192,19 +1023,34 @@ function expectFailedTreeBuild(result: Awaited<ReturnType<typeof deliver>>) {
   expect(result.logged.join("\n")).not.toContain(OIDC_TOKEN);
 }
 
-test("a collector error answer is a failed tree build: logged with its status, and the dispatch still answers 200", async () => {
-  for (const code of [401, 403, 404, 422, 503]) {
+test("a collector refusal that a retry cannot change is a failed tree build: logged with its status, and the delivery answers 200", async () => {
+  for (const code of [401, 403, 404, 413, 422]) {
     const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(51))]), {
       collector: () => Response.json({ detail: COLLECTOR_REFUSAL }, { status: code }),
     });
 
-    expectFailedTreeBuild(result);
+    expectFailedTreeBuild(result, 200);
     expect(result.body.tree_build.detail).toContain(String(code));
     expect(result.logged.some((entry) => entry.includes(String(code)))).toBe(true);
   }
 });
 
-test("a network failure or a timeout reaching the collector is a failed tree build, and the dispatch still answers 200", async () => {
+test("a collector answer that may pass is a failed tree build answered 503, so Hugging Face retries the delivery", async () => {
+  for (const code of [429, 500, 502, 503, 504]) {
+    const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(51))]), {
+      collector: () => Response.json({ detail: COLLECTOR_REFUSAL }, { status: code }),
+    });
+
+    expectFailedTreeBuild(result, 503);
+    expect(result.body).toEqual({
+      detail: RETRY_DETAIL,
+      tree_build: { status: "failed", detail: `The collector answered HTTP ${code}.` },
+    });
+    expect(result.logged.some((entry) => entry.includes(String(code)))).toBe(true);
+  }
+});
+
+test("a network failure or a timeout reaching the collector is a failed tree build answered 503", async () => {
   const failures: Array<[CollectorAnswer, string]> = [
     [() => { throw new TypeError("fetch failed"); }, "could not be reached"],
     [() => { throw new DOMException("The operation timed out.", "TimeoutError"); }, "15 seconds"],
@@ -1214,16 +1060,16 @@ test("a network failure or a timeout reaching the collector is a failed tree bui
       collector: failure,
     });
 
-    expectFailedTreeBuild(result);
+    expectFailedTreeBuild(result, 503);
     expect(result.body.tree_build.detail).toContain(detail);
     expect(result.collectorRequests).toHaveLength(1);
     expect(result.collectorRequests[0].init.signal).toBeInstanceOf(AbortSignal);
   }
 });
 
-// A collector that answers an error status, one that cannot be reached, and
-// one that does not answer within the time limit.
-const COLLECTOR_FAILURES: CollectorAnswer[] = [
+// Failures that may pass: an error status, a collector that cannot be reached,
+// and one that does not answer within the time limit.
+const COLLECTOR_FAILURES_THAT_MAY_PASS: CollectorAnswer[] = [
   () => Response.json({ detail: COLLECTOR_REFUSAL }, { status: 503 }),
   () => {
     throw new TypeError("fetch failed");
@@ -1233,9 +1079,29 @@ const COLLECTOR_FAILURES: CollectorAnswer[] = [
   },
 ];
 
-test("a failed collector request still lets a release repository's new tag post its Slack alert: the answer is 200, names the tag in alerted and reports a failed tree build", async () => {
+// Failures a retry cannot change: refusals, and a 202 that is not a queued build.
+const LASTING_COLLECTOR_FAILURES: CollectorAnswer[] = [
+  () => Response.json({ detail: COLLECTOR_REFUSAL }, { status: 403 }),
+  () => Response.json({ detail: COLLECTOR_REFUSAL }, { status: 404 }),
+  () => Response.json({ detail: COLLECTOR_REFUSAL }, { status: 422 }),
+  () => new Response(COLLECTOR_REFUSAL, { status: 202 }),
+];
+
+function ukRecordsWithdrawingOlder(before: string, after: string) {
+  const records: Record<string, Record<string, unknown>> = {
+    [before]: nationalRecord(CURRENT, [OLDER, CURRENT]),
+    [after]: nationalRecord(CURRENT, [OLDER, CURRENT], [OLDER]),
+  };
+  return (url: string) => {
+    const revision = /\/resolve\/([0-9a-f]{40})\/releases\.json$/.exec(url)?.[1];
+    if (!revision || !(revision in records)) throw new Error(`Unexpected URL ${url}`);
+    return Response.json(records[revision]);
+  };
+}
+
+test("a lasting collector failure still lets a release repository's new tag post its Slack alert: the answer is 200, names the tag in alerted and reports a failed tree build", async () => {
   const tag = "microcosm-us-2026-11-14";
-  for (const collector of COLLECTOR_FAILURES) {
+  for (const collector of LASTING_COLLECTOR_FAILURES) {
     const posted: string[] = [];
     const result = await deliver(delivery(REPOSITORIES.usRelease, [newTag(tag, testSha(72))]), {
       collector,
@@ -1245,44 +1111,72 @@ test("a failed collector request still lets a release repository's new tag post 
       },
     });
 
-    expectFailedTreeBuild(result);
+    expectFailedTreeBuild(result, 200);
     expect(result.collectorRequests).toHaveLength(1);
     expect(posted).toEqual([tag]);
     expect(result.body.alerted).toEqual([tag]);
   }
 });
 
-test("a failed collector request still lets a UK main update post its releases.json alerts: the answer is 200, names them in release_record_alerted and reports a failed tree build", async () => {
+test("a lasting collector failure still lets a UK main update post its releases.json alerts: the answer is 200, names them in release_record_alerted and reports a failed tree build", async () => {
   const before = testSha(73);
   const after = testSha(74);
-  const records: Record<string, Record<string, unknown>> = {
-    [before]: nationalRecord(CURRENT, [OLDER, CURRENT]),
-    [after]: nationalRecord(CURRENT, [OLDER, CURRENT], [OLDER]),
-  };
-  for (const collector of COLLECTOR_FAILURES) {
+  for (const collector of LASTING_COLLECTOR_FAILURES) {
     const posted: string[] = [];
     const result = await deliver(delivery(REPOSITORIES.ukRelease, [mainUpdate(after, before)]), {
       collector,
-      releasesRecord: (url) => {
-        const revision = /\/resolve\/([0-9a-f]{40})\/releases\.json$/.exec(url)?.[1];
-        if (!revision || !(revision in records)) throw new Error(`Unexpected URL ${url}`);
-        return Response.json(records[revision]);
-      },
+      releasesRecord: ukRecordsWithdrawingOlder(before, after),
       postReleaseRecordAlert: async ({ alert }) => {
         posted.push(alert.kind);
         return true;
       },
     });
 
-    expectFailedTreeBuild(result);
+    expectFailedTreeBuild(result, 200);
     expect(result.collectorRequests).toHaveLength(1);
     expect(posted).toEqual(["withdrawn"]);
     expect(result.body.release_record_alerted).toEqual([`withdrawn ${NATIONAL}/${OLDER}`]);
   }
 });
 
-/** A 202 whose body read fails with `error`. */
-function bodyReadFailure(error: Error): CollectorAnswer {
+test("a collector failure that may pass answers 503 before any Slack alert, and the retried delivery posts each alert once", async () => {
+  const tag = "microcosm-uk-2026-11-14";
+  const before = testSha(76);
+  const after = testSha(77);
+  const update = delivery(REPOSITORIES.ukRelease, [newTag(tag, after), mainUpdate(after, before)]);
+  for (const collector of COLLECTOR_FAILURES_THAT_MAY_PASS) {
+    const tagAlerts: string[] = [];
+    const recordAlerts: string[] = [];
+    const senders = {
+      releasesRecord: ukRecordsWithdrawingOlder(before, after),
+      postReleaseAlert: async ({ releaseId }: { releaseId: string }) => {
+        tagAlerts.push(releaseId);
+        return true;
+      },
+      postReleaseRecordAlert: async ({ alert }: { alert: { kind: string } }) => {
+        recordAlerts.push(alert.kind);
+        return true;
+      },
+    };
+
+    const failed = await deliver(update, { ...senders, collector });
+    expectFailedTreeBuild(failed, 503);
+    expect(tagAlerts).toEqual([]);
+    expect(recordAlerts).toEqual([]);
+
+    const retried = await deliver(update, {
+      ...senders,
+      collector: queuedTreeBuild("already_queued", "uk", "release"),
+    });
+    expect(retried.status).toBe(200);
+    expect(retried.collectorRequests).toHaveLength(1);
+    expect(tagAlerts).toEqual([tag]);
+    expect(recordAlerts).toEqual(["withdrawn"]);
+  }
+});
+
+/** An answer of the given status whose body read fails with `error`. */
+function bodyReadFailure(error: Error, status = 202): CollectorAnswer {
   return () =>
     new Response(
       new ReadableStream({
@@ -1290,7 +1184,7 @@ function bodyReadFailure(error: Error): CollectorAnswer {
           controller.error(error);
         },
       }),
-      { status: 202 },
+      { status },
     );
 }
 
@@ -1333,7 +1227,7 @@ test("a network failure's log names its cause, never the request's headers or th
       collector: failure.collector,
     });
 
-    expectFailedTreeBuild(result);
+    expectFailedTreeBuild(result, 503);
     expect(result.body.tree_build.detail).toBe(failure.detail);
     const logged = result.logged.join("\n");
     expect(logged).toContain(failure.cause);
@@ -1344,7 +1238,7 @@ test("a network failure's log names its cause, never the request's headers or th
   }
 });
 
-test("a 202 whose body is not the collector's queued answer is a failed tree build", async () => {
+test("a 202 whose body is not the collector's queued answer is a failed tree build answered 200", async () => {
   const unreadable: CollectorAnswer[] = [
     () => new Response(COLLECTOR_REFUSAL, { status: 202 }),
     () => Response.json({ status: COLLECTOR_REFUSAL, task_id: "x", not_before: NOT_BEFORE }, { status: 202 }),
@@ -1355,7 +1249,7 @@ test("a 202 whose body is not the collector's queued answer is a failed tree bui
       collector: answer,
     });
 
-    expectFailedTreeBuild(result);
+    expectFailedTreeBuild(result, 200);
   }
 });
 
@@ -1370,7 +1264,7 @@ test("the collector's answer is logged with at most 200 characters of its body",
       collector: answer,
     });
 
-    expectFailedTreeBuild(result);
+    expectFailedTreeBuild(result, 200);
     const logged = result.logged.join("\n");
     expect(logged).toContain("z".repeat(200));
     expect(logged).not.toContain("z".repeat(201));
@@ -1378,14 +1272,26 @@ test("the collector's answer is logged with at most 200 characters of its body",
   }
 });
 
-test("a 202 whose body cannot be read is a failed tree build", async () => {
+test("a 202 whose body cannot be read is a failed tree build answered 503", async () => {
   const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(68))]), {
     collector: bodyReadFailure(new TypeError("terminated")),
   });
 
-  expectFailedTreeBuild(result);
+  expectFailedTreeBuild(result, 503);
   expect(result.body.tree_build.detail).toBe("The collector's HTTP 202 answer could not be read.");
   expect(result.logged.some((entry) => entry.includes("terminated"))).toBe(true);
+});
+
+test("when an error answer's body cannot be read, its status decides whether the delivery is retried", async () => {
+  const cases: Array<[number, 200 | 503]> = [[404, 200], [503, 503]];
+  for (const [code, expectedStatus] of cases) {
+    const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(78))]), {
+      collector: bodyReadFailure(new TypeError("terminated"), code),
+    });
+
+    expectFailedTreeBuild(result, expectedStatus);
+    expect(result.body.tree_build.detail).toBe(`The collector's HTTP ${code} answer could not be read.`);
+  }
 });
 
 const TREE_BUILD_TIME_LIMIT_MS = 15_000;
@@ -1478,7 +1384,6 @@ async function deliverAtTimeLimit(
       text,
       body: JSON.parse(text),
       collectorRequests: webhook.collectorRequests,
-      dispatches: webhook.dispatches,
       tokenReads: webhook.tokenReads(),
       logged: logged.mock.calls.map((call) => call.map(String).join(" ")),
     };
@@ -1487,19 +1392,19 @@ async function deliverAtTimeLimit(
   }
 }
 
-test("the 15-second time limit covers the Vercel OIDC token read: a read that never settles is a failed tree build, and the dispatch still answers 200", async () => {
+test("the 15-second time limit covers the Vercel OIDC token read: a read that never settles is a failed tree build answered 200", async () => {
   const result = await deliverAtTimeLimit(
     delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(69))]),
     { readToken: () => new Promise<string>(() => {}) },
   );
 
   expect(result.answeredBeforeLimit).toBe(false);
-  expectFailedTreeBuild(result);
+  expectFailedTreeBuild(result, 200);
   expect(result.body.tree_build.detail).toBe("The Vercel OIDC token could not be read.");
   expect(result.collectorRequests).toEqual([]);
 });
 
-test("one 15-second time limit covers the token read and the collector's 202 answer together: after a 5-second token read, a body that never arrives is a failed tree build", async () => {
+test("one 15-second time limit covers the token read and the collector's 202 answer together: after a 5-second token read, a body that never arrives is a failed tree build answered 503", async () => {
   const result = await deliverAtTimeLimit(
     delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(70))]),
     {
@@ -1515,12 +1420,12 @@ test("one 15-second time limit covers the token read and the collector's 202 ans
   // The answer comes 15 seconds after the token read began, not 15 seconds
   // after the request was sent.
   expect(result.answeredBeforeLimit).toBe(false);
-  expectFailedTreeBuild(result);
+  expectFailedTreeBuild(result, 503);
   expect(result.body.tree_build.detail).toBe("The collector did not answer within 15 seconds.");
   expect(result.collectorRequests).toHaveLength(1);
 });
 
-test("a failed Vercel OIDC token read is a failed tree build: no collector request, and the dispatch still answers 200", async () => {
+test("a failed Vercel OIDC token read is a failed tree build answered 200, with no collector request", async () => {
   const failedReads: Array<() => Promise<string>> = [
     async () => {
       throw new Error("The 'x-vercel-oidc-token' header is missing from the request.");
@@ -1533,11 +1438,11 @@ test("a failed Vercel OIDC token read is a failed tree build: no collector reque
     });
 
     expect(result.collectorRequests).toEqual([]);
-    expectFailedTreeBuild(result);
+    expectFailedTreeBuild(result, 200);
   }
 });
 
-test("an invalid collector address is a failed tree build on every delivery, and the dispatch still answers 200", async () => {
+test("an invalid collector address is a failed tree build answered 200 on every delivery", async () => {
   const invalidAddress = "http://collector.example";
   const { treeBuildCollector } = resolveHfWebhookConfig({
     MICROCOSM_TELEMETRY_COLLECTOR_URL: invalidAddress,
@@ -1553,11 +1458,9 @@ test("an invalid collector address is a failed tree build on every delivery, and
       const body = JSON.parse(text);
 
       expect(response.status).toBe(200);
-      expect(body.dispatched).toHaveLength(1);
       expect(body.tree_build).toMatchObject({ status: "failed" });
       expect(text).not.toContain(invalidAddress);
     }
-    expect(webhook.dispatches).toHaveLength(2);
     expect(webhook.collectorRequests).toEqual([]);
     expect(webhook.tokenReads()).toBe(0);
     expect(logged.mock.calls).toHaveLength(2);
@@ -1567,8 +1470,7 @@ test("an invalid collector address is a failed tree build on every delivery, and
 });
 
 test("without a collector address, no collector request is sent and the answer's tree build is not_configured", async () => {
-  const commit = testSha(57);
-  const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(commit)]), {
+  const result = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(57))]), {
     config: { treeBuildCollector: undefined },
   });
 
@@ -1578,34 +1480,13 @@ test("without a collector address, no collector request is sent and the answer's
   expect(result.body).toEqual({
     ok: true,
     country: "us",
-    dispatched: [{ event_kind: "staging", release_id: null, hf_commit_sha: commit }],
     alerted: [],
     tree_build: { status: "not_configured" },
   });
-  expect(result.dispatches).toHaveLength(1);
   expect(result.logged).toEqual([]);
 });
 
-test("a failed GitHub dispatch still answers 502, after sending the collector request, with its tree build", async () => {
-  const result = await deliver(delivery(REPOSITORIES.beRelease, [mainUpdate(testSha(58))]), {
-    dispatch: () => new Response("forbidden", { status: 403 }),
-    collector: queuedTreeBuild("queued", "be", "release"),
-  });
-
-  expect(result.status).toBe(502);
-  expect(result.collectorRequests).toHaveLength(1);
-  expect(result.body).toEqual({
-    detail: "Unable to start calibration tree publication.",
-    tree_build: {
-      status: "queued",
-      task_id: treeBuildTaskId("be", "release"),
-      not_before: NOT_BEFORE,
-    },
-  });
-  expect(result.logged.some((entry) => entry.includes("dispatch failed"))).toBe(true);
-});
-
-test("a transient releases.json failure answers 503 before the dispatch and the collector request, and the retried delivery sends each once", async () => {
+test("a transient releases.json failure answers 503 before the collector request, and the retried delivery sends it once", async () => {
   const update = delivery(REPOSITORIES.ukRelease, [mainUpdate(testSha(59))]);
   const unavailable = await deliver(update, {
     releasesRecord: () => new Response("unavailable", { status: 503 }),
@@ -1615,7 +1496,6 @@ test("a transient releases.json failure answers 503 before the dispatch and the 
   expect(unavailable.body).toEqual({
     detail: "Unable to read releases.json; retry the delivery.",
   });
-  expect(unavailable.dispatches).toEqual([]);
   expect(unavailable.collectorRequests).toEqual([]);
   expect(unavailable.tokenReads).toBe(0);
 
@@ -1623,17 +1503,16 @@ test("a transient releases.json failure answers 503 before the dispatch and the 
     collector: queuedTreeBuild("already_queued", "uk", "release"),
   });
   expect(retried.status).toBe(200);
-  expect(retried.dispatches).toHaveLength(1);
   expect(retried.collectorRequests).toHaveLength(1);
 });
 
-test("deliveries that dispatch nothing send no collector request and answer exactly as before", async () => {
+test("deliveries that start no build send no collector request", async () => {
   const webhook = treeBuildWebhook();
-  const nothingDispatched: Array<[unknown, Record<string, unknown>]> = [
+  const noBuild: Array<[unknown, Record<string, unknown>]> = [
     // An unregistered repository.
     [
       delivery("someone/unregistered", [mainUpdate(testSha(60))]),
-      { ok: true, dispatched: [], alerted: [] },
+      { ok: true, alerted: [] },
     ],
     // No new tag and no main update.
     [
@@ -1641,25 +1520,24 @@ test("deliveries that dispatch nothing send no collector request and answer exac
         { ref: "refs/heads/other", oldSha: testSha(61), newSha: testSha(62) },
         { ref: "refs/tags/moved", oldSha: testSha(63), newSha: testSha(64) },
       ]),
-      { ok: true, dispatched: [], alerted: [] },
+      { ok: true, alerted: [] },
     ],
     // A staging repository's new tag starts no build.
     [
       delivery(REPOSITORIES.usStaging, [newTag("not-a-finalized-run", testSha(65))]),
-      { ok: true, country: "us", dispatched: [], alerted: [] },
+      { ok: true, country: "us", alerted: [] },
     ],
   ];
-  for (const [payload, answer] of nothingDispatched) {
+  for (const [payload, answer] of noBuild) {
     const response = await webhook.POST(request(payload));
     expect(response.status).toBe(200);
     expect(await response.text()).toBe(JSON.stringify(answer));
   }
-  expect(webhook.dispatches).toEqual([]);
   expect(webhook.collectorRequests).toEqual([]);
   expect(webhook.tokenReads()).toBe(0);
 
-  // The same webhook sends one for a delivery that dispatches, so the checks
-  // above are not met merely because it never sends any.
+  // The same webhook sends one for a delivery that starts a build, so the
+  // checks above are not met merely because it never sends any.
   await webhook.POST(request(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(66))])));
   expect(webhook.collectorRequests).toHaveLength(1);
 });

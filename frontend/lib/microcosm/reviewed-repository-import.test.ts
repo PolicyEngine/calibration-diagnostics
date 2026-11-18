@@ -33,12 +33,11 @@ const ROUTES_IMPORTED = {
   variable: "ok",
   microcosm_variable: "ok",
 };
-const NOT_ALLOWLISTED =
-  '200:{"ok":true,"dispatched":[],"alerted":[]}';
-// Without a collector address, a delivery that dispatches reports its
+const NOT_ALLOWLISTED = '200:{"ok":true,"alerted":[]}';
+// Without a collector address, a delivery that starts a build reports its
 // calibration-tree build request as not configured.
-const DISPATCHED_TAG =
-  '200:{"ok":true,"country":"uk","dispatched":[{"event_kind":"tag","release_id":"fixture-release","hf_commit_sha":"fixture"}],"tree_build":{"status":"not_configured"},"alerted":[]}';
+const UK_TAG_WITHOUT_COLLECTOR =
+  '200:{"ok":true,"country":"uk","tree_build":{"status":"not_configured"},"alerted":[]}';
 
 function importedUnder(
   overrides: Partial<Record<(typeof OVERRIDES)[number], string>>,
@@ -66,7 +65,6 @@ function importedUnder(
       ...env,
       ...overrides,
       HF_WEBHOOK_SECRET: SECRET,
-      GITHUB_ACTIONS_DISPATCH_TOKEN: "fixture-dispatch-token",
     },
     stdout: "pipe",
     stderr: "pipe",
@@ -95,7 +93,7 @@ test("a US repository override changes dashboard discovery without breaking impo
     route_imports: ROUTES_IMPORTED,
     // The refused country is left out of the alert allowlist; the others stay.
     reviewed_us_tag: NOT_ALLOWLISTED,
-    uk_tag: DISPATCHED_TAG,
+    uk_tag: UK_TAG_WITHOUT_COLLECTOR,
   });
 });
 
@@ -113,7 +111,7 @@ test("the default deployment discovers releases from each registered branch", ()
     be_geography: `ok:${COUNTRY_REGISTRY.be.geography}`,
     route_imports: ROUTES_IMPORTED,
     reviewed_us_tag:
-      '200:{"ok":true,"country":"us","dispatched":[{"event_kind":"tag","release_id":"fixture-release","hf_commit_sha":"fixture"}],"tree_build":{"status":"not_configured"},"alerted":[]}',
-    uk_tag: DISPATCHED_TAG,
+      '200:{"ok":true,"country":"us","tree_build":{"status":"not_configured"},"alerted":[]}',
+    uk_tag: UK_TAG_WITHOUT_COLLECTOR,
   });
 });

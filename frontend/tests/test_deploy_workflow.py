@@ -369,6 +369,29 @@ def test_calibration_smoke_invocation_reads_only_the_words_before_the_script():
         assert invocation.group("bun_words").split() == bun_words, command
 
 
+def test_no_workflow_publishes_calibration_trees_or_reads_the_publishers_settings():
+    workflow_files = sorted((ROOT / ".github/workflows").glob("*.y*ml"))
+    assert workflow_files
+    assert [
+        workflow_file.name
+        for workflow_file in workflow_files
+        if workflow_file.stem == "publish-calibration-tree"
+    ] == []
+    former_publisher_references = (
+        "publish:calibration-tree",
+        "secrets.BLOB_READ_WRITE_TOKEN",
+        "secrets.HF_TOKEN",
+        "secrets.POPULACE_UK_STAGING_HF_TOKEN",
+        "vars.CALIBRATION_TREE_BUILD_ENABLED",
+    )
+    assert [
+        (workflow_file.name, reference)
+        for workflow_file in workflow_files
+        for reference in former_publisher_references
+        if reference in workflow_file.read_text()
+    ] == []
+
+
 def test_timestamp_migration_can_run_through_the_publication_workflow():
     workflow = yaml.load(
         (ROOT / ".github/workflows/publish-calibration-tree.yml").read_text(),
