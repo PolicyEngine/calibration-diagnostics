@@ -1199,8 +1199,9 @@ test("the log records each answer to a delivery that starts a build, with its We
   const webhookId = "test-webhook-delivery";
   const commit = testSha(79);
   const update = delivery(REPOSITORIES.ukRelease, [mainUpdate(commit)]);
+  const mainRange = `main from ${testSha(30)} to ${commit}`;
   const described =
-    `Hugging Face delivery ${webhookId} for ${REPOSITORIES.ukRelease} refs/heads/main at ${commit}`;
+    `Hugging Face delivery ${webhookId} for ${REPOSITORIES.ukRelease} refs/heads/main at ${commit}, ${mainRange}`;
 
   const collectorFailure = await deliver(
     update,
@@ -1234,11 +1235,32 @@ test("the log records each answer to a delivery that starts a build, with its We
 
   const withoutId = await deliver(update);
   expect(withoutId.answersLogged).toEqual([
-    `Answered 200 to Hugging Face delivery without a Webhook-Id for ${REPOSITORIES.ukRelease} refs/heads/main at ${commit} (tree build: queued).`,
+    `Answered 200 to Hugging Face delivery without a Webhook-Id for ${REPOSITORIES.ukRelease} refs/heads/main at ${commit}, ${mainRange} (tree build: queued).`,
   ]);
 });
 
-test("the log of a delivery started by a new tag also names its main commit, which the recovery steps start from", async () => {
+test("the log shows the main range a delivery covered, so that a payload announcing nothing can be told apart", async () => {
+  const head = testSha(85);
+  const result = await deliver(
+    delivery(REPOSITORIES.ukRelease, [mainUpdate(head, head)]),
+    { collector: queuedTreeBuild("queued", "uk", "release") },
+    "same-commit-delivery",
+  );
+  expect(result.answersLogged).toEqual([
+    `Answered 200 to Hugging Face delivery same-commit-delivery for ${REPOSITORIES.ukRelease} refs/heads/main at ${head}, main from ${head} to ${head} (tree build: queued).`,
+  ]);
+
+  const newMain = await deliver(
+    delivery(REPOSITORIES.ukRelease, [mainUpdate(head, null)]),
+    { collector: queuedTreeBuild("queued", "uk", "release") },
+    "new-main-delivery",
+  );
+  expect(newMain.answersLogged).toEqual([
+    `Answered 200 to Hugging Face delivery new-main-delivery for ${REPOSITORIES.ukRelease} refs/heads/main at ${head}, main from none to ${head} (tree build: queued).`,
+  ]);
+});
+
+test("the log of a delivery started by a new tag also names the main range it covered, when it has one", async () => {
   const tagCommit = testSha(82);
   const mainCommit = testSha(83);
   const result = await deliver(
@@ -1248,7 +1270,7 @@ test("the log of a delivery started by a new tag also names its main commit, whi
   );
 
   expect(result.answersLogged).toEqual([
-    `Answered 200 to Hugging Face delivery tag-delivery for ${REPOSITORIES.usRelease} refs/tags/microcosm-us-2026-11-18 at ${tagCommit}, main at ${mainCommit} (tree build: queued).`,
+    `Answered 200 to Hugging Face delivery tag-delivery for ${REPOSITORIES.usRelease} refs/tags/microcosm-us-2026-11-18 at ${tagCommit}, main from ${testSha(30)} to ${mainCommit} (tree build: queued).`,
   ]);
 
   const tagOnly = await deliver(
@@ -1269,7 +1291,7 @@ test("the log of a staging delivery names its repository and commit", async () =
   }, "staging-delivery");
 
   expect(result.answersLogged).toEqual([
-    `Answered 200 to Hugging Face delivery staging-delivery for ${REPOSITORIES.ukStaging} refs/heads/main at ${commit} (tree build: not_configured).`,
+    `Answered 200 to Hugging Face delivery staging-delivery for ${REPOSITORIES.ukStaging} refs/heads/main at ${commit}, main from ${testSha(30)} to ${commit} (tree build: not_configured).`,
   ]);
 });
 
