@@ -1222,7 +1222,7 @@ test("the log records each answer to a delivery that starts a build, with its We
   // A retry or replay reuses the Webhook-Id, so its 200 follows the 503s above.
   const retried = await deliver(update, {}, webhookId);
   expect(retried.status).toBe(200);
-  expect(retried.answersLogged).toEqual([`Answered 200 to ${described}.`]);
+  expect(retried.answersLogged).toEqual([`Answered 200 to ${described} (tree build: queued).`]);
 
   const lastingFailure = await deliver(
     update,
@@ -1230,11 +1230,46 @@ test("the log records each answer to a delivery that starts a build, with its We
     webhookId,
   );
   expect(lastingFailure.status).toBe(200);
-  expect(lastingFailure.answersLogged).toEqual([`Answered 200 to ${described}.`]);
+  expect(lastingFailure.answersLogged).toEqual([`Answered 200 to ${described} (tree build: failed).`]);
 
   const withoutId = await deliver(update);
   expect(withoutId.answersLogged).toEqual([
-    `Answered 200 to Hugging Face delivery without a Webhook-Id for ${REPOSITORIES.ukRelease} refs/heads/main at ${commit}.`,
+    `Answered 200 to Hugging Face delivery without a Webhook-Id for ${REPOSITORIES.ukRelease} refs/heads/main at ${commit} (tree build: queued).`,
+  ]);
+});
+
+test("the log of a delivery started by a new tag also names its main commit, which the recovery steps start from", async () => {
+  const tagCommit = testSha(82);
+  const mainCommit = testSha(83);
+  const result = await deliver(
+    delivery(REPOSITORIES.usRelease, [newTag("microcosm-us-2026-11-18", tagCommit), mainUpdate(mainCommit)]),
+    { collector: queuedTreeBuild("queued", "us", "release") },
+    "tag-delivery",
+  );
+
+  expect(result.answersLogged).toEqual([
+    `Answered 200 to Hugging Face delivery tag-delivery for ${REPOSITORIES.usRelease} refs/tags/microcosm-us-2026-11-18 at ${tagCommit}, main at ${mainCommit} (tree build: queued).`,
+  ]);
+
+  const tagOnly = await deliver(
+    delivery(REPOSITORIES.beRelease, [newTag("microcosm-be-2026-11-18", tagCommit)]),
+    { collector: queuedTreeBuild("already_queued", "be", "release") },
+    "belgian-delivery",
+  );
+  expect(tagOnly.answersLogged).toEqual([
+    `Answered 200 to Hugging Face delivery belgian-delivery for ${REPOSITORIES.beRelease} refs/tags/microcosm-be-2026-11-18 at ${tagCommit} (tree build: already_queued).`,
+  ]);
+});
+
+test("the log of a staging delivery names its repository and commit", async () => {
+  const commit = testSha(84);
+  const result = await deliver(delivery(REPOSITORIES.ukStaging, [mainUpdate(commit)]), {
+    collector: queuedTreeBuild("queued", "uk", "staging"),
+    config: { treeBuildCollector: undefined },
+  }, "staging-delivery");
+
+  expect(result.answersLogged).toEqual([
+    `Answered 200 to Hugging Face delivery staging-delivery for ${REPOSITORIES.ukStaging} refs/heads/main at ${commit} (tree build: not_configured).`,
   ]);
 });
 
