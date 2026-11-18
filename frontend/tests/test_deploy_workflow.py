@@ -290,7 +290,7 @@ def test_bun_script_detection_covers_repository_scripts_but_not_package_runners(
         "bun run lint",
         "bun test",
         "bun --no-install frontend/scripts/replay-build-run.ts",
-        'set -e\nbun run publish:calibration-tree -- "${args[@]}"',
+        'set -e\nbun run replay:build-run -- "${args[@]}"',
     ):
         assert BUN_SCRIPT_COMMAND.search(command), command
     for command in (
@@ -390,92 +390,6 @@ def test_no_workflow_publishes_calibration_trees_or_reads_the_publishers_setting
         for reference in former_publisher_references
         if reference in workflow_file.read_text()
     ] == []
-
-
-def test_timestamp_migration_can_run_through_the_publication_workflow():
-    workflow = yaml.load(
-        (ROOT / ".github/workflows/publish-calibration-tree.yml").read_text(),
-        Loader=yaml.BaseLoader,
-    )
-    inputs = workflow["on"]["workflow_dispatch"]["inputs"]
-    assert "migrate-timestamps" in inputs["event_kind"]["options"]
-    script = next(
-        step["run"]
-        for step in workflow["jobs"]["publish"]["steps"]
-        if step.get("name") == "Build, validate, and publish"
-    )
-    assert "--migrate-release-timestamps" in script
-
-
-@pytest.mark.parametrize(
-    ("event_kind", "expected_mode", "include_sha"),
-    [
-        ("manual", "--reconcile-releases", False),
-        ("staging", "--reconcile-staging", True),
-        ("migrate-timestamps", "--migrate-release-timestamps", False),
-    ],
-)
-def test_publication_dispatch_preserves_dry_run_and_selects_one_mode(
-    tmp_path, event_kind, expected_mode, include_sha
-):
-    workflow = yaml.load(
-        (ROOT / ".github/workflows/publish-calibration-tree.yml").read_text(),
-        Loader=yaml.BaseLoader,
-    )
-    script = next(
-        step["run"]
-        for step in workflow["jobs"]["publish"]["steps"]
-        if step.get("name") == "Build, validate, and publish"
-    )
-    for name, value in {
-        "country": "uk",
-        "event_kind": event_kind,
-        "hf_commit_sha": "a" * 40,
-        "dry_run": "true",
-    }.items():
-        script = script.replace("${{ inputs." + name + " }}", value)
-    arguments_file = tmp_path / "arguments.json"
-    stub = tmp_path / "bun"
-    stub.write_text(
-        "#!/usr/bin/env python3\n"
-        "import json, os, sys\n"
-        "from pathlib import Path\n"
-        "Path(os.environ['ARGUMENTS_FILE']).write_text(json.dumps(sys.argv[1:]))\n"
-    )
-    stub.chmod(0o755)
-    result = subprocess.run(
-        ["bash", "-c", script],
-        env={
-            **os.environ,
-            "PATH": f"{tmp_path}:{os.environ['PATH']}",
-            "ARGUMENTS_FILE": str(arguments_file),
-        },
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0
-    expected = [
-        "run",
-        "publish:calibration-tree",
-        "--",
-        "--country",
-        "uk",
-        expected_mode,
-    ]
-    if include_sha:
-        expected.extend(["--sha", "a" * 40])
-    expected.append("--dry-run")
-    assert json.loads(arguments_file.read_text()) == expected
-
-
-def test_publisher_retains_its_separate_write_credential():
-    workflow = yaml.load(
-        (ROOT / ".github/workflows/publish-calibration-tree.yml").read_text(),
-        Loader=yaml.BaseLoader,
-    )
-    publisher = workflow["jobs"]["publish"]
-    assert publisher["env"]["HF_TOKEN"] == "${{ secrets.HF_TOKEN }}"
 
 
 @pytest.mark.parametrize("exit_code", [0, 17])
