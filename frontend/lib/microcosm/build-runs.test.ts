@@ -616,9 +616,10 @@ describe("unfinished Candidate tab runs older than the collector's list", () => 
         await settlePendingWork();
         jest.advanceTimersByTime(5_000);
         const first = await pending;
+        // The record arrives after the wait; real timers let its answer land.
+        jest.useRealTimers();
         answerRecord();
-        await Bun.sleep(0);
-        await settlePendingWork();
+        await Bun.sleep(1);
         return [first, await poll()];
       }),
     );

@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 
 import { requestedCountry } from "@/lib/api/request-country";
 import {
+  type CollectorTimelineOptions,
   type CollectorTimelines,
   loadCollectorTimelines,
 } from "@/lib/microcosm/build-runs";
 import {
   type CalibrationEpoch,
   candidateRunState,
+  huggingFaceRecordsAnEnd,
   type HuggingFaceRunState,
 } from "@/lib/microcosm/staging-run-state";
 import {
@@ -35,6 +37,7 @@ export interface StagingRunRouteDependencies {
     country: MicrocosmCountry,
     runIds: readonly string[],
     nowMs: number,
+    options: CollectorTimelineOptions,
   ): Promise<CollectorTimelines>;
   now(): number;
 }
@@ -96,12 +99,15 @@ export function createStagingRunHandler(
         });
       }
       const nowMs = dependencies.now();
-      const collector = await dependencies.loadCollectorTimelines(country, [runId], nowMs);
+      const huggingFace = huggingFaceRunState(detail);
+      const collector = await dependencies.loadCollectorTimelines(country, [runId], nowMs, {
+        unfinishedRunIds: huggingFaceRecordsAnEnd(huggingFace.status) ? [] : [runId],
+      });
       return NextResponse.json(
         scrub({
           ...detail,
           state: candidateRunState(
-            huggingFaceRunState(detail),
+            huggingFace,
             collector.timelines.get(runId),
             nowMs,
           ),

@@ -166,6 +166,23 @@ const answeredCollectorLists = new Map<
 // Counts `clear()` calls, so that a request made before one keeps no answer.
 let collectorListsGeneration = 0;
 
+// What the collector answered for a run older than its list: the run's
+// documents, or null when it has no record of the run.
+type OlderRunRecord = BuildRunDocuments | null;
+
+// The latest answer for each older run, by `country:run id`, and the request
+// in flight for it. They follow the rules of the list above: a request in
+// flight is shared for `COLLECTOR_LIST_WAIT_MS`, a late answer serves later
+// polls, and a failed request is dropped so the next poll asks again.
+const olderRunRecords = new Map<
+  string,
+  { record: OlderRunRecord; requestedAt: number; answeredAt: number }
+>();
+const olderRunRequests = new Map<
+  string,
+  { record: Promise<OlderRunRecord>; requestedAt: number }
+>();
+
 export const collectorRunLists = {
   recent(country: MicrocosmCountry): Promise<CollectorRunSummary[]> {
     const now = Date.now();
@@ -218,10 +235,13 @@ export const collectorRunLists = {
       ? answered.runs
       : null;
   },
+  // Also forgets the records read for runs older than the list.
   clear(): void {
     collectorListsGeneration += 1;
     collectorLists.clear();
     answeredCollectorLists.clear();
+    olderRunRecords.clear();
+    olderRunRequests.clear();
   },
 };
 
@@ -469,6 +489,70 @@ async function loadCollector(country: MicrocosmCountry): Promise<LoadedRuns> {
   return { available: true, detail: null, documents, problems };
 }
 
+function requestOlderRunRecord(
+  country: MicrocosmCountry,
+  runId: string,
+  key: string,
+): Promise<OlderRunRecord> {
+  const generation = collectorListsGeneration;
+  const requestedAt = Date.now();
+  const record = loadCollectorRun(runId, country).catch((error: unknown) => {
+    if (
+      error instanceof InvalidCollectorRunIdError ||
+      (error instanceof CollectorRequestError && error.status === 404)
+    ) {
+      return null;
+    }
+    throw error;
+  });
+  const request = { record, requestedAt };
+  olderRunRequests.set(key, request);
+  const finishRequest = () => {
+    if (olderRunRequests.get(key) === request) olderRunRequests.delete(key);
+  };
+  record.then((answered) => {
+    finishRequest();
+    const latest = olderRunRecords.get(key);
+    if (
+      generation === collectorListsGeneration &&
+      (!latest || latest.requestedAt <= requestedAt)
+    ) {
+      olderRunRecords.set(key, {
+        record: answered,
+        requestedAt,
+        answeredAt: Date.now(),
+      });
+    }
+  }, finishRequest);
+  return record;
+}
+
+// The collector's record of a run older than its list. An answer is reused
+// for `UNFINISHED_RECORD_REUSE_MS`. Past `waitMs` the latest earlier answer
+// stands in, however old; with none, the wait is reported as a failure and
+// the request's answer serves a later poll.
+async function loadOlderRunRecord(
+  country: MicrocosmCountry,
+  runId: string,
+  waitMs: number,
+): Promise<OlderRunRecord> {
+  const key = `${country}:${runId}`;
+  const now = Date.now();
+  const latest = olderRunRecords.get(key);
+  if (latest && now - latest.answeredAt < UNFINISHED_RECORD_REUSE_MS) {
+    return latest.record;
+  }
+  const inFlight = olderRunRequests.get(key);
+  const record =
+    inFlight && now - inFlight.requestedAt < COLLECTOR_LIST_WAIT_MS
+      ? inFlight.record
+      : requestOlderRunRecord(country, runId, key);
+  const answered = await settledWithin(record, waitMs);
+  if (answered !== WAIT_OVER) return answered;
+  if (latest) return latest.record;
+  throw new Error(`no answer within ${waitMs / 1000} seconds`);
+}
+
 export interface CollectorTimelines {
   // The build monitor's timeline of each requested run the collector has a
   // record of, by run id.
@@ -481,16 +565,28 @@ export interface CollectorTimelines {
 const HUGGING_FACE_FALLBACK =
   "run states come from the Hugging Face staging repository";
 
+export interface CollectorTimelineOptions {
+  // The requested runs whose Hugging Face copy records no end. Those older
+  // than the collector's list are read one by one: only the collector can say
+  // how they ended. A run with a recorded end needs no such read.
+  unfinishedRunIds?: readonly string[];
+  // How long to wait for the list, and then for the runs read one by one.
+  waitMs?: number;
+}
+
 // The collector's state for runs the Candidate tab lists from Hugging Face.
 // It reads the same records the Build progress tab does (the country's 60
-// most recent collector runs, from the shared list) and derives each state
-// with the same `buildTimeline`, so the two tabs agree on every run the
-// collector knows. It waits at most `waitMs` for the list.
+// most recent collector runs, from the shared list), plus the unfinished runs
+// older than that list, and derives each state with the same `buildTimeline`,
+// so the two tabs agree on every run the collector knows.
 export async function loadCollectorTimelines(
   country: MicrocosmCountry,
   runIds: readonly string[],
   nowMs: number = Date.now(),
-  waitMs: number = COLLECTOR_LIST_WAIT_MS,
+  {
+    unfinishedRunIds = [],
+    waitMs = COLLECTOR_LIST_WAIT_MS,
+  }: CollectorTimelineOptions = {},
 ): Promise<CollectorTimelines> {
   const timelines = new Map<string, BuildTimeline>();
   if (!runIds.length) return { timelines, note: null };
@@ -529,9 +625,17 @@ export async function loadCollectorTimelines(
     };
   }
   const requested = new Set(runIds);
+  const listed = new Set(summaries.map((summary) => summary.run_id));
+  // A list shorter than its limit holds every run the collector has.
+  const olderRunIds =
+    summaries.length < STAGING_RUN_LIMIT
+      ? []
+      : unfinishedRunIds.filter(
+          (runId) => requested.has(runId) && !listed.has(runId),
+        );
   const problems: BuildRunProblem[] = [];
-  await Promise.all(
-    summaries
+  await Promise.all([
+    ...summaries
       .filter((summary) => requested.has(summary.run_id))
       .map(async (summary) => {
         try {
@@ -541,7 +645,15 @@ export async function loadCollectorTimelines(
           problems.push({ run_id: summary.run_id, detail: message(error) });
         }
       }),
-  );
+    ...olderRunIds.map(async (runId) => {
+      try {
+        const documents = await loadOlderRunRecord(country, runId, waitMs);
+        if (documents) timelines.set(runId, buildTimeline(documents, nowMs));
+      } catch (error) {
+        problems.push({ run_id: runId, detail: message(error) });
+      }
+    }),
+  ]);
   if (!problems.length) return { timelines, note: null };
   const unreadable = problems
     .map((problem) => `${problem.run_id} (${problem.detail})`)

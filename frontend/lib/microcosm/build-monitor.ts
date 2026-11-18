@@ -328,7 +328,11 @@ export function runState(
   return "running";
 }
 
-const FINAL_RUN_STATES: ReadonlySet<BuildRunState> = new Set(["passed", "blocked", "failed"]);
+export const FINAL_RUN_STATES: ReadonlySet<BuildRunState> = new Set([
+  "passed",
+  "blocked",
+  "failed",
+]);
 
 export interface RecordedRunState {
   state: BuildRunState | null;

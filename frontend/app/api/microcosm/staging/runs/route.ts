@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 
 import { requestedCountry } from "@/lib/api/request-country";
 import {
+  type CollectorTimelineOptions,
   type CollectorTimelines,
   loadCollectorTimelines,
 } from "@/lib/microcosm/build-runs";
-import { overlayRunSummary } from "@/lib/microcosm/staging-run-state";
+import {
+  huggingFaceRecordsAnEnd,
+  overlayRunSummary,
+} from "@/lib/microcosm/staging-run-state";
 import type { MicrocosmCountry } from "@policyengine/calibration-tree/countries";
 import { loadStagingRuns } from "@policyengine/calibration-tree/staging-artifact";
 import { scrub } from "@policyengine/calibration-tree/latest-artifact";
@@ -26,6 +30,7 @@ export interface StagingRunsRouteDependencies {
     country: MicrocosmCountry,
     runIds: readonly string[],
     nowMs: number,
+    options: CollectorTimelineOptions,
   ): Promise<CollectorTimelines>;
   now(): number;
 }
@@ -52,6 +57,11 @@ export function createStagingRunsHandler(
             country,
             list.runs.map((run) => run.run_id),
             nowMs,
+            {
+              unfinishedRunIds: list.runs
+                .filter((run) => !huggingFaceRecordsAnEnd(run.status))
+                .map((run) => run.run_id),
+            },
           )
         : { timelines: new Map(), note: null };
       return NextResponse.json(
