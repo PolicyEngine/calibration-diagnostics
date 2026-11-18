@@ -1429,6 +1429,7 @@ async function deliverAtTimeLimit(
     },
   });
   const logged = spyOn(console, "error").mockImplementation(() => {});
+  const answerLog = spyOn(console, "info").mockImplementation(() => {});
   jest.useFakeTimers();
   let restored = false;
   // Runs once, from the finally block or from afterEach, whichever comes
@@ -1439,6 +1440,7 @@ async function deliverAtTimeLimit(
     if (restoreAfterTimeLimitDelivery === restore) restoreAfterTimeLimitDelivery = null;
     jest.useRealTimers();
     logged.mockRestore();
+    answerLog.mockRestore();
   };
   restoreAfterTimeLimitDelivery = restore;
   try {
@@ -1466,6 +1468,7 @@ async function deliverAtTimeLimit(
       collectorRequests: webhook.collectorRequests,
       tokenReads: webhook.tokenReads(),
       logged: logged.mock.calls.map((call) => call.map(String).join(" ")),
+      answersLogged: answerLog.mock.calls.map((call) => call.map(String).join(" ")),
     };
   } finally {
     restore();
