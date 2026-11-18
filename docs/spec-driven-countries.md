@@ -172,12 +172,16 @@ break the manifest-backed routes for every country.
 1. Register the country in the package without the `calibration` capability,
    raise the pinned version here, and let that deployment reach production. The
    smoke check skips the country, and production can now read a manifest that
-   names it.
-2. Add the country to the collector, and have the collector build its release.
-   The release repository needs a `releases.json` whose default release has a
-   current build: without it a run reports `no_releases_record` and builds
-   nothing, and the country gets no latest release. A new build submission, a
-   Hugging Face webhook delivery or the collector's
+   names it. Add the country's repositories to the Hugging Face webhook's watched
+   datasets (see [Hugging Face webhook](calibration-tree-artifacts.md#hugging-face-webhook)),
+   or it gets no webhook-triggered builds. A private repository must also be
+   readable with the dashboard's `HF_RELEASE_READ_TOKEN`.
+2. Add the country to the collector: its repository lists, its dataset list and
+   what its Hugging Face read token may read. Then have the collector build the
+   release. The release repository needs a `releases.json`: without the file a
+   run reports `no_releases_record` and builds nothing. Its default release needs
+   a current build, or the country gets no latest release. A new build
+   submission, a Hugging Face webhook delivery or the collector's
    `reconcile-calibration-trees` command run by hand can start the build.
 3. Add the `calibration` capability, release the package, and raise the pinned
    version here. The smoke check now requires the release that step 2 built.

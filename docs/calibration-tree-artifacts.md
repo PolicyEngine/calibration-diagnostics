@@ -551,8 +551,8 @@ Failure meanings and recovery:
   whenever deliveries were answered 503, whether or not the webhook was
   suspended. The function logs are the record of each answer: every delivery
   that starts a build logs "Answered 503 to" or "Answered 200 to", followed by
-  its `Webhook-Id`, repository, ref and commit and, when a new tag started the
-  build, its `main` commit. A 200 entry ends with the `tree_build` status. A retry
+  its `Webhook-Id`, repository, ref and commit and, when it updates `main`, the
+  range of `main` commits it covered. A 200 entry ends with the `tree_build` status. A retry
   or replay keeps the delivery's `Webhook-Id`, so the latest entry for an ID is
   its latest answer. The 503 entries are at error level and the 200 entries at
   info level, so do not filter the logs by level. Vercel keeps function logs for
@@ -574,17 +574,20 @@ Failure meanings and recovery:
      country has no Slack channel (Belgium today), has no alerts to lose, and
      one request covers everything the store lacks: if no later delivery from
      that repository was answered 200, replay only its newest such delivery.
-  4. The repository's last delivered commit is now the newest `main` commit,
-     by the repository's history and not by the order of the log entries, among
-     the deliveries whose latest entry is "Answered 200 to", counting step 3's
-     replays. For updates made after that commit (while the webhook was suspended, so never
-     delivered), send one authenticated release payload per affected
-     repository. Its `main` entry has that commit as `oldSha` and the
-     repository's current head as `newSha`; it announces their net change
-     once and queues one build. Add one `refs/tags/<tag>` entry, with
-     `oldSha` null and the tag's commit as `newSha`, for each tag created in
-     that time, or those tags get no tag alert. Send one staging `main`-update
-     payload per staging repository to queue its build.
+  4. Find the updates no delivery announced. For each release repository whose
+     country has a Slack channel, take the `main` ranges ("main from <commit> to
+     <commit>") of the deliveries whose latest entry is "Answered 200 to",
+     counting step 3's replays. Leave out entries with no range and ranges whose
+     two commits are the same, which announce nothing. Put the ranges in the
+     order of the repository's history, not of the log. A gap is a place where a
+     range does not start at the commit the one before it ends at, and the time
+     from the last range to the repository's current head is one too. For each
+     gap, send one authenticated release payload. Its `main` entry has the commit
+     before the gap as `oldSha` and the commit after it as `newSha`; it announces
+     their net change once and queues one build. Add one `refs/tags/<tag>` entry,
+     with `oldSha` null and the tag's commit as `newSha`, for each tag created in
+     that gap, or those tags get no tag alert. Send one `main`-update payload per
+     staging repository to queue its build.
 - An answer with `release_record_problem` means `releases.json` could not be
   read for a lasting reason, such as a token without access or a record the
   release writer's rules refuse. The collector request and the tag alerts went
