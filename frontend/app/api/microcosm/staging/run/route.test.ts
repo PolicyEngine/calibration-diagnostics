@@ -119,6 +119,30 @@ test("a collector failure returns the Hugging Face state with a note", async () 
   });
 });
 
+test("the collector is told whether the selected run's Hugging Face copy records an end", async () => {
+  async function unfinishedRunIdsFor(status: string) {
+    const requested: (readonly string[] | undefined)[] = [];
+    const detail = huggingFaceDetail();
+    const get = createStagingRunHandler({
+      loadRun: async () => ({
+        ...detail,
+        progress: { ...detail.progress, status },
+      }),
+      loadCollectorTimelines: async (_country, _runIds, _nowMs, options) => {
+        requested.push(options?.unfinishedRunIds);
+        return { timelines: new Map(), note: null };
+      },
+      now: () => INVESTIGATION_NOW_MS,
+    });
+    await loadRun(get);
+    return requested;
+  }
+
+  expect(await unfinishedRunIdsFor("running")).toEqual([[US_FAILED_RUN_ID]]);
+  expect(await unfinishedRunIdsFor("failed")).toEqual([[]]);
+  expect(await unfinishedRunIdsFor("completed")).toEqual([[]]);
+});
+
 test("a run the collector does not know keeps its Hugging Face state without a note", async () => {
   const { get } = handler(async () => ({ timelines: new Map(), note: null }));
 

@@ -480,6 +480,181 @@ describe("loadCollectorTimelines for the Candidate tab", () => {
   });
 });
 
+describe("unfinished Candidate tab runs older than the collector's list", () => {
+  // The list holds the 60 newest runs, so this collector's 71st is outside it.
+  function collectorWithOlderRun() {
+    const collector = fakeTelemetryCollector({ countryCode: "AM", runCount: 80 });
+    return { collector, olderRunId: collector.runs[70].run_id };
+  }
+
+  function readsOf(
+    collector: ReturnType<typeof fakeTelemetryCollector>,
+    runId: string,
+  ): number {
+    return collector.documentRequests.filter((requested) => requested === runId).length;
+  }
+
+  async function withFakeTimers<T>(body: () => Promise<T>): Promise<T> {
+    jest.useFakeTimers();
+    try {
+      return await body();
+    } finally {
+      jest.useRealTimers();
+    }
+  }
+
+  async function settlePendingWork(): Promise<void> {
+    for (let turn = 0; turn < 200; turn += 1) await Promise.resolve();
+  }
+
+  test("an unfinished run takes the state of its own collector record", async () => {
+    const { collector, olderRunId } = collectorWithOlderRun();
+
+    const loaded = await withCollector(collector.fetch, () =>
+      loadCollectorTimelines("am", [olderRunId], NOW, {
+        unfinishedRunIds: [olderRunId],
+      }),
+    );
+
+    expect(loaded.note).toBeNull();
+    expect(loaded.timelines.get(olderRunId)?.state).toBe("passed");
+    expect(readsOf(collector, olderRunId)).toBe(1);
+  });
+
+  test("a run Hugging Face records as ended is not read on its own", async () => {
+    const { collector, olderRunId } = collectorWithOlderRun();
+    const endedRunId = collector.runs[71].run_id;
+
+    const loaded = await withCollector(collector.fetch, () =>
+      loadCollectorTimelines("am", [olderRunId, endedRunId], NOW, {
+        unfinishedRunIds: [olderRunId],
+      }),
+    );
+
+    expect([...loaded.timelines.keys()]).toEqual([olderRunId]);
+    expect(readsOf(collector, endedRunId)).toBe(0);
+  });
+
+  test("a run the collector has no record of stays on Hugging Face, without a note or a second request", async () => {
+    const { collector } = collectorWithOlderRun();
+    const unknownRunId = "hugging-face-only-run";
+    const poll = () =>
+      loadCollectorTimelines("am", [unknownRunId], NOW, {
+        unfinishedRunIds: [unknownRunId],
+      });
+
+    const [first, second] = await withCollector(collector.fetch, async () => [
+      await poll(),
+      await poll(),
+    ]);
+
+    expect(first).toEqual({ timelines: new Map(), note: null });
+    expect(second).toEqual({ timelines: new Map(), note: null });
+    expect(readsOf(collector, unknownRunId)).toBe(1);
+  });
+
+  test("a list shorter than its limit holds every run, so nothing is read on its own", async () => {
+    const collector = fakeTelemetryCollector({ countryCode: "AM", runCount: 30 });
+    const unknownRunId = "hugging-face-only-run";
+
+    const loaded = await withCollector(collector.fetch, () =>
+      loadCollectorTimelines("am", [unknownRunId], NOW, {
+        unfinishedRunIds: [unknownRunId],
+      }),
+    );
+
+    expect(loaded).toEqual({ timelines: new Map(), note: null });
+    expect(collector.documentRequests).toEqual([]);
+  });
+
+  test("a failed read adds a note and is tried again at the next poll", async () => {
+    const { collector, olderRunId } = collectorWithOlderRun();
+    let failing = true;
+    const failingOnce = (async (input: RequestInfo | URL) => {
+      if (failing && String(input).endsWith(`/v1/runs/${olderRunId}`)) {
+        return Response.json({ detail: "Internal error." }, { status: 500 });
+      }
+      return collector.fetch(input);
+    }) as typeof fetch;
+    const poll = () =>
+      loadCollectorTimelines("am", [olderRunId], NOW, {
+        unfinishedRunIds: [olderRunId],
+      });
+
+    const [failed, recovered] = await withCollector(failingOnce, async () => {
+      const first = await poll();
+      failing = false;
+      return [first, await poll()];
+    });
+
+    expect(failed.timelines.size).toBe(0);
+    expect(failed.note).toContain(olderRunId);
+    expect(failed.note).toContain("500");
+    expect(recovered.note).toBeNull();
+    expect(recovered.timelines.get(olderRunId)?.state).toBe("passed");
+  });
+
+  test("the tab waits at most 5 seconds for the record, and a late answer serves the next poll", async () => {
+    const { collector, olderRunId } = collectorWithOlderRun();
+    let answerRecord!: () => void;
+    const recordAnswer = new Promise<void>((resolve) => {
+      answerRecord = resolve;
+    });
+    const slowRecord = (async (input: RequestInfo | URL) => {
+      if (String(input).endsWith(`/v1/runs/${olderRunId}`)) await recordAnswer;
+      return collector.fetch(input);
+    }) as typeof fetch;
+    const poll = () =>
+      loadCollectorTimelines("am", [olderRunId], NOW, {
+        unfinishedRunIds: [olderRunId],
+      });
+
+    const [firstPoll, nextPoll] = await withFakeTimers(() =>
+      withCollector(slowRecord, async () => {
+        await collectorRunLists.recent("am");
+        const pending = poll();
+        await settlePendingWork();
+        jest.advanceTimersByTime(5_000);
+        const first = await pending;
+        answerRecord();
+        await Bun.sleep(0);
+        await settlePendingWork();
+        return [first, await poll()];
+      }),
+    );
+
+    expect(firstPoll.timelines.size).toBe(0);
+    expect(firstPoll.note).toContain(olderRunId);
+    expect(firstPoll.note).toContain("no answer within 5 seconds");
+    expect(nextPoll.note).toBeNull();
+    expect(nextPoll.timelines.get(olderRunId)?.state).toBe("passed");
+    expect(readsOf(collector, olderRunId)).toBe(1);
+  });
+
+  test("the record is read again once its copy is 5 minutes old", async () => {
+    const { collector, olderRunId } = collectorWithOlderRun();
+    const poll = () =>
+      loadCollectorTimelines("am", [olderRunId], NOW, {
+        unfinishedRunIds: [olderRunId],
+      });
+    const reads: number[] = [];
+
+    await withFakeTimers(() =>
+      withCollector(collector.fetch, async () => {
+        await poll();
+        jest.advanceTimersByTime(4 * 60_000);
+        await poll();
+        reads.push(readsOf(collector, olderRunId));
+        jest.advanceTimersByTime(60_000 + 1);
+        await poll();
+        reads.push(readsOf(collector, olderRunId));
+      }),
+    );
+
+    expect(reads).toEqual([1, 2]);
+  });
+});
+
 describe("uploads to Hugging Face for runs the collector records", () => {
   // The collector never learns whether a run's files reached Hugging Face, so
   // the monitor reads the uploads from the run's Hugging Face copy.

@@ -200,6 +200,28 @@ test("a UK list overlays the collector's record and keeps Hugging Face-only runs
   });
 });
 
+test("the collector is told which listed runs Hugging Face records no end for", async () => {
+  async function unfinishedRunIdsOf(country: string, runs: StagingRunSummary[]) {
+    const requested: (readonly string[] | undefined)[] = [];
+    const get = createStagingRunsHandler({
+      loadRuns: async () => huggingFaceList(runs),
+      loadCollectorTimelines: async (_country, _runIds, _nowMs, options) => {
+        requested.push(options?.unfinishedRunIds);
+        return { timelines: new Map(), note: null };
+      },
+      now: () => INVESTIGATION_NOW_MS,
+    });
+    await listRuns(get, country);
+    return requested;
+  }
+
+  expect(await unfinishedRunIdsOf("us", usHuggingFaceRuns())).toEqual([
+    [US_RUNNING_RUN_ID, US_FAILED_RUN_ID, US_ABANDONED_HUGGING_FACE_RUN_ID],
+  ]);
+  // Every UK fixture run records its end: one blocked, one completed.
+  expect(await unfinishedRunIdsOf("uk", ukHuggingFaceRuns())).toEqual([[]]);
+});
+
 test("an unreadable staging repository asks the collector nothing", async () => {
   const { get, collectorRequests } = handler(
     { ...huggingFaceList([]), available: false },
