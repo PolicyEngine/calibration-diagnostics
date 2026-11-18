@@ -61,12 +61,17 @@ function missingReleasesRecord(): Response {
   });
 }
 
-function request(payload: unknown, secret = "test-webhook-secret") {
+function request(
+  payload: unknown,
+  secret = "test-webhook-secret",
+  extraHeaders: Record<string, string> = {},
+) {
   return new Request("https://dashboard.example/api/hf-webhook", {
     method: "POST",
     headers: {
       "content-type": "application/json",
       "x-webhook-secret": secret,
+      ...extraHeaders,
     },
     body: JSON.stringify(payload),
   });
@@ -279,6 +284,7 @@ async function postMainUpdate(options: {
   }) as typeof fetch;
   const logged = spyOn(console, "error").mockImplementation(() => {});
   const warned = spyOn(console, "warn").mockImplementation(() => {});
+  const answerLog = spyOn(console, "info").mockImplementation(() => {});
   try {
     const response = await createHfWebhookHandler(
       webhookConfig({
@@ -316,6 +322,7 @@ async function postMainUpdate(options: {
   } finally {
     logged.mockRestore();
     warned.mockRestore();
+    answerLog.mockRestore();
     globalThis.fetch = originalFetch;
     if (priorWebhook == null) delete process.env.SLACK_WEBHOOK_MICROCOSM_UK;
     else process.env.SLACK_WEBHOOK_MICROCOSM_UK = priorWebhook;
@@ -528,7 +535,7 @@ test("a lasting failure is named in the answer, and a record that did not change
   expect(unchanged.body).not.toHaveProperty("release_record_problem");
 });
 
-test("a release repository whose country has no Slack channel reads no releases.json and is never answered 503", async () => {
+test("a release repository whose country has no Slack channel reads no releases.json, so that read cannot answer 503", async () => {
   const result = await postMainUpdate({
     before: nationalRecord(CURRENT, [OLDER, CURRENT]),
     after: () => new Response("unavailable", { status: 503 }),
@@ -546,6 +553,10 @@ test("a deleted releases.json, a change of default release and an un-withdrawal 
   const deleted = await postMainUpdate({ before: record, after: null });
   expect(deleted.slackTexts).toEqual([]);
   expect(deleted.warned.join("\n")).toContain(`releases.json was removed from ${REPOSITORIES.ukRelease}`);
+  // Only the release picker's folder listing takes its place: no reader goes
+  // to tags or pointer files, and the collector builds no new release tree.
+  expect(deleted.warned.join("\n")).toContain("lists its folders");
+  expect(deleted.warned.join("\n")).not.toContain("pointer files");
 
   const otherDefault = nationalRecord(CURRENT, [OLDER, CURRENT], [OLDER]);
   (otherDefault.releases as Record<string, unknown>)[DENSE] = {
@@ -766,15 +777,22 @@ function treeBuildWebhook(options: {
   return { POST, collectorRequests, tokenReads: () => tokenReads };
 }
 
-/** One delivery to a new treeBuildWebhook, with console.error captured. */
+/**
+ * One delivery to a new treeBuildWebhook, with console.error and console.info
+ * captured, sent with `webhookId` as its Webhook-Id header when given.
+ */
 async function deliver(
   payload: unknown,
   options: Parameters<typeof treeBuildWebhook>[0] = {},
+  webhookId?: string,
 ) {
   const webhook = treeBuildWebhook(options);
   const logged = spyOn(console, "error").mockImplementation(() => {});
+  const answerLog = spyOn(console, "info").mockImplementation(() => {});
   try {
-    const response = await webhook.POST(request(payload));
+    const response = await webhook.POST(
+      request(payload, undefined, webhookId ? { "webhook-id": webhookId } : {}),
+    );
     const text = await response.text();
     return {
       status: response.status,
@@ -783,9 +801,11 @@ async function deliver(
       collectorRequests: webhook.collectorRequests,
       tokenReads: webhook.tokenReads(),
       logged: logged.mock.calls.map((call) => call.map(String).join(" ")),
+      answersLogged: answerLog.mock.calls.map((call) => call.map(String).join(" ")),
     };
   } finally {
     logged.mockRestore();
+    answerLog.mockRestore();
   }
 }
 
@@ -1175,6 +1195,59 @@ test("a collector failure that may pass answers 503 before any Slack alert, and 
   }
 });
 
+test("the log records each answer to a delivery that starts a build, with its Webhook-Id, repository, ref and commit", async () => {
+  const webhookId = "test-webhook-delivery";
+  const commit = testSha(79);
+  const update = delivery(REPOSITORIES.ukRelease, [mainUpdate(commit)]);
+  const described =
+    `Hugging Face delivery ${webhookId} for ${REPOSITORIES.ukRelease} refs/heads/main at ${commit}`;
+
+  const collectorFailure = await deliver(
+    update,
+    { collector: () => new Response(COLLECTOR_REFUSAL, { status: 503 }) },
+    webhookId,
+  );
+  expect(collectorFailure.status).toBe(503);
+  expect(collectorFailure.logged).toContain(`Answered 503 to ${described}.`);
+  expect(collectorFailure.answersLogged).toEqual([]);
+
+  const recordFailure = await deliver(
+    update,
+    { releasesRecord: () => new Response("unavailable", { status: 503 }) },
+    webhookId,
+  );
+  expect(recordFailure.status).toBe(503);
+  expect(recordFailure.logged).toContain(`Answered 503 to ${described}.`);
+
+  // A retry or replay reuses the Webhook-Id, so its 200 follows the 503s above.
+  const retried = await deliver(update, {}, webhookId);
+  expect(retried.status).toBe(200);
+  expect(retried.answersLogged).toEqual([`Answered 200 to ${described}.`]);
+
+  const lastingFailure = await deliver(
+    update,
+    { collector: () => new Response(COLLECTOR_REFUSAL, { status: 403 }) },
+    webhookId,
+  );
+  expect(lastingFailure.status).toBe(200);
+  expect(lastingFailure.answersLogged).toEqual([`Answered 200 to ${described}.`]);
+
+  const withoutId = await deliver(update);
+  expect(withoutId.answersLogged).toEqual([
+    `Answered 200 to Hugging Face delivery without a Webhook-Id for ${REPOSITORIES.ukRelease} refs/heads/main at ${commit}.`,
+  ]);
+});
+
+test("a delivery that starts no build logs no answer", async () => {
+  const result = await deliver(
+    delivery(REPOSITORIES.usStaging, [newTag("not-a-finalized-run", testSha(80))]),
+  );
+
+  expect(result.status).toBe(200);
+  expect(result.answersLogged).toEqual([]);
+  expect(result.logged).toEqual([]);
+});
+
 /** An answer of the given status whose body read fails with `error`. */
 function bodyReadFailure(error: Error, status = 202): CollectorAnswer {
   return () =>
@@ -1292,6 +1365,13 @@ test("when an error answer's body cannot be read, its status decides whether the
     expectFailedTreeBuild(result, expectedStatus);
     expect(result.body.tree_build.detail).toBe(`The collector's HTTP ${code} answer could not be read.`);
   }
+
+  // A timeout while reading a refusal's body is still decided by the refusal.
+  const timedOut = await deliver(delivery(REPOSITORIES.usStaging, [mainUpdate(testSha(81))]), {
+    collector: bodyReadFailure(new DOMException("The operation timed out.", "TimeoutError"), 404),
+  });
+  expectFailedTreeBuild(timedOut, 200);
+  expect(timedOut.body.tree_build.detail).toBe("The collector did not answer within 15 seconds.");
 });
 
 const TREE_BUILD_TIME_LIMIT_MS = 15_000;
