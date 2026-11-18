@@ -241,8 +241,7 @@ function secretOk(request: Request, expected: string | undefined): boolean {
  * Names a delivery in the log of its answer. Hugging Face reuses a delivery's
  * Webhook-Id for its retries and replays, so the latest entry for an ID is the
  * delivery's latest answer. A delivery that updates main also names the range
- * of commits it covered, which is how the recovery steps find updates that no
- * delivery announced.
+ * of main commits it covered.
  */
 function describeDelivery(
   request: Request,

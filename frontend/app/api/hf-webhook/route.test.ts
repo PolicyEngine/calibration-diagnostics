@@ -1239,7 +1239,7 @@ test("the log records each answer to a delivery that starts a build, with its We
   ]);
 });
 
-test("the log shows the main range a delivery covered, so that a payload announcing nothing can be told apart", async () => {
+test("the log shows the main range a delivery covered, including an unchanged main and a new one", async () => {
   const head = testSha(85);
   const result = await deliver(
     delivery(REPOSITORIES.ukRelease, [mainUpdate(head, head)]),
@@ -1293,6 +1293,44 @@ test("the log of a staging delivery names its repository and commit", async () =
   expect(result.answersLogged).toEqual([
     `Answered 200 to Hugging Face delivery staging-delivery for ${REPOSITORIES.ukStaging} refs/heads/main at ${commit}, main from ${testSha(30)} to ${commit} (tree build: not_configured).`,
   ]);
+});
+
+test("a catch-up payload with a main update and several new tags posts each alert and requests one build", async () => {
+  const before = testSha(86);
+  const after = testSha(87);
+  const tags = ["microcosm-uk-2026-11-16", "microcosm-uk-2026-11-17"];
+  const tagAlerts: string[] = [];
+  const recordAlerts: string[] = [];
+  const result = await deliver(
+    delivery(REPOSITORIES.ukRelease, [
+      newTag(tags[0], testSha(88)),
+      newTag(tags[1], testSha(89)),
+      mainUpdate(after, before),
+    ]),
+    {
+      collector: queuedTreeBuild("queued", "uk", "release"),
+      releasesRecord: ukRecordsWithdrawingOlder(before, after),
+      postReleaseAlert: async ({ releaseId }) => {
+        tagAlerts.push(releaseId);
+        return true;
+      },
+      postReleaseRecordAlert: async ({ alert }) => {
+        recordAlerts.push(alert.kind);
+        return true;
+      },
+    },
+  );
+
+  expect(result.status).toBe(200);
+  expect(tagAlerts).toEqual(tags);
+  expect(recordAlerts).toEqual(["withdrawn"]);
+  expectOneTreeBuildRequest(result.collectorRequests, {
+    country: "uk",
+    kind: "release",
+    hf_repo: REPOSITORIES.ukRelease,
+    hf_ref: `refs/tags/${tags[1]}`,
+    hf_commit: testSha(89),
+  });
 });
 
 test("a delivery that starts no build logs no answer", async () => {

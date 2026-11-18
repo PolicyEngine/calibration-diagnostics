@@ -181,9 +181,9 @@ break the manifest-backed routes for every country.
    what its Hugging Face read token may read. Then have the collector build the
    release. The release repository needs a `releases.json`: without the file a
    run reports `no_releases_record` and builds nothing. Its default release needs
-   a current build, or the country gets no latest release. Microcosm's publisher
-   must be able to write that layout for the country, which may need a change
-   there first. A new build submission, a Hugging Face webhook delivery or the
+   a current build, or the country gets no latest release. Microcosm's build-folder
+   publisher accepts only the releases it names, so the country's release must be
+   added there first. A new build submission, a Hugging Face webhook delivery or the
    collector's `reconcile-calibration-trees` command run by hand can start the
    build.
 3. Add the `calibration` capability, release the package, and raise the pinned
