@@ -579,32 +579,35 @@ Failure meanings and recovery:
      A delivery that failed before reaching this code, such as a `401`, a Vercel
      authentication response or a platform error, leaves no log entry. Find those
      by their status on the Activity page and treat them the same way.
-  4. If the webhook was suspended, Hugging Face delivered nothing for the updates
-     made during the suspension, and neither the logs nor step 3 cover them. The
-     period to cover starts at the suspension, taken from Hugging Face's
-     notification email or the Activity page, or at the first failed delivery that
-     step 3 could not recover, if that is earlier. It ends where the first delivery
-     after re-enabling starts: that delivery's log entry names the `main` commit it
-     started from. For each release repository that changed in that period, whether
-     or not its country has a Slack channel, send one authenticated release payload
-     with the repository as `repo.name` and these `updatedRefs`:
+  4. If the webhook was suspended, assume Hugging Face delivered nothing for the
+     updates made during the suspension: its documentation does not say, and
+     neither the logs nor step 3 cover them. Work out one period per repository,
+     by time. It starts when the webhook was suspended, taken from Hugging Face's
+     notification email or the Activity page, or at that repository's first failed
+     delivery that step 3 could not recover, if that is earlier. It ends when you
+     re-enabled the webhook. For each release repository that changed in its
+     period, whether or not its country has a Slack channel, send one authenticated
+     release payload with the repository as `repo.name` and these `updatedRefs`:
      - a `main` entry with the last `main` commit before the period as `oldSha` and
        the last `main` commit in it as `newSha`, unless `main` did not move. It
        announces their net change once, so a build both published and withdrawn in
        the period is announced only as published;
      - one `refs/tags/<tag>` entry, with `oldSha` null and the tag's commit as
-       `newSha`, for each tag created in that period. A tag has no creation date
-       and may point at a commit outside `main`'s history, so list the repository's
-       tags and use the date of each tag's commit. A tag placed on an older commit
-       cannot be found this way.
+       `newSha`, for each tag created in the period. A tag can be created without
+       moving `main`. It has no creation date and may point at a commit outside
+       `main`'s history, so list the repository's tags and use the date of each
+       tag's commit. A tag placed on an older commit cannot be found this way.
 
      The payload also queues one build. For each staging repository that changed,
      send one `main`-update payload with its current head as both `oldSha` and
      `newSha` to queue its build. Require a 200 whose `tree_build.status` is `queued`
-     or `already_queued`. Hugging Face does not retry a payload sent by hand, so
-     send it again after a 503. An update made at about the start of the period may
-     already have been delivered. Check the Activity page, and if that does not
-     settle it, include the update: a repeated alert is the lesser failure.
+     or `already_queued` and that has no `release_record_problem`. Hugging Face does
+     not retry a payload sent by hand, so send it again after a 503. An update
+     already announced can fall inside the period, for example one made at about
+     its start, or one a delivery answered 200 covered after that repository's
+     first unrecovered failure. Check the Activity page and move `oldSha` past it
+     where you can. If that does not settle it, include the update: a repeated
+     alert is the lesser failure.
 - An answer with `release_record_problem` means `releases.json` could not be
   read for a lasting reason, such as a token without access or a record the
   release writer's rules refuse. The collector request and the tag alerts went
@@ -621,8 +624,8 @@ Failure meanings and recovery:
   It also limits each webhook to 1,000 triggers per 24 hours and does not say
   whether retries or replays count, or what happens to events over the limit. A
   UK staging build can make about one commit every 50 seconds, which would pass
-  that limit if it continued for a day. If the limit may have been reached, check
-  the release repositories for undelivered updates as in step 4.
+  that limit if it continued for a day. If the Activity tab shows that the limit
+  may have been reached, treat the time at the limit as the period in step 4.
 
 There is no scheduled run. A later delivery for the same country and kind queues
 a run that builds everything the collector's store lacks. The collector's own

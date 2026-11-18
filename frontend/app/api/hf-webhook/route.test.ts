@@ -382,6 +382,17 @@ test("a withdrawal is announced", async () => {
   expect(result.slackTexts).toEqual([`Microcosm UK build \`${NATIONAL}/${OLDER}\` withdrawn`]);
 });
 
+test("a build published and withdrawn between the two commits is announced only as published", async () => {
+  const result = await postMainUpdate({
+    before: nationalRecord(CURRENT, [OLDER, CURRENT]),
+    after: nationalRecord(CURRENT, [OLDER, CURRENT, NEWEST], [NEWEST]),
+  });
+
+  expect(result.slackTexts).toEqual([
+    `New Microcosm UK build \`${NATIONAL}/${NEWEST}\`: published, not current (current stays \`${CURRENT}\`)`,
+  ]);
+});
+
 test("the update that first creates releases.json posts one summary message", async () => {
   const after = nationalRecord(CURRENT, [OLDER, CURRENT]);
   (after.releases as Record<string, unknown>)[DENSE] = {
