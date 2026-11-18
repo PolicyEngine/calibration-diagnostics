@@ -240,13 +240,20 @@ function secretOk(request: Request, expected: string | undefined): boolean {
 /**
  * Names a delivery in the log of its answer. Hugging Face reuses a delivery's
  * Webhook-Id for its retries and replays, so the latest entry for an ID is the
- * delivery's latest answer.
+ * delivery's latest answer. A delivery started by a new tag also names its
+ * main commit, from which the recovery steps work out what was announced.
  */
-function describeDelivery(request: Request, repo: string, trigger: UpdatedRef): string {
+function describeDelivery(
+  request: Request,
+  repo: string,
+  trigger: UpdatedRef,
+  mainUpdate: UpdatedRef | undefined,
+): string {
   const webhookId = request.headers.get("webhook-id");
+  const mainCommit = mainUpdate && mainUpdate !== trigger ? `, main at ${mainUpdate.newSha}` : "";
   return (
     `Hugging Face delivery ${webhookId ?? "without a Webhook-Id"} ` +
-    `for ${repo} ${trigger.ref} at ${trigger.newSha}`
+    `for ${repo} ${trigger.ref} at ${trigger.newSha}${mainCommit}`
   );
 }
 
@@ -479,7 +486,7 @@ export function createHfWebhookHandler(
     const tagUpdate = registration.kind === "release" ? newTagRefs.at(-1) : undefined;
     const trigger = registration.kind === "staging" ? mainUpdate : tagUpdate ?? mainUpdate;
     const deliveryDescription = trigger
-      ? describeDelivery(request, registration.repo, trigger)
+      ? describeDelivery(request, registration.repo, trigger, mainUpdate)
       : null;
 
     // releases.json is read before anything is requested or posted. A
@@ -560,7 +567,11 @@ export function createHfWebhookHandler(
       recordAlerted = posted;
     }
 
-    if (deliveryDescription) console.info(`Answered 200 to ${deliveryDescription}.`);
+    if (deliveryDescription) {
+      console.info(
+        `Answered 200 to ${deliveryDescription} (tree build: ${treeBuild?.outcome.status}).`,
+      );
+    }
     return NextResponse.json({
       ok: true,
       country,
