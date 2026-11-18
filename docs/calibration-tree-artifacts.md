@@ -556,8 +556,10 @@ Failure meanings and recovery:
   or replay keeps the delivery's `Webhook-Id`, so the latest entry for an ID is
   its latest answer. The 503 entries are at error level and the 200 entries at
   info level, so do not filter the logs by level. Vercel keeps function logs for
-  a limited time that depends on the plan. For older deliveries only the Activity
-  page remains, and alerts can then be lost or repeated.
+  a limited time that depends on the plan. For older deliveries step 3 has only
+  the Activity page's status codes to go on, which may not show an event's last
+  answer, so alerts can then be lost or repeated. Say so when reporting the
+  incident.
   1. Correct the cause, and if the webhook is suspended, re-enable it.
   2. Give Hugging Face's own retries time to run, then read the logs again. The
      webhook keeps no record of the deliveries it has handled, so a replay that
@@ -574,20 +576,26 @@ Failure meanings and recovery:
      country has no Slack channel (Belgium today), has no alerts to lose, and
      one request covers everything the store lacks: if no later delivery from
      that repository was answered 200, replay only its newest such delivery.
-  4. Find the updates no delivery announced. For each release repository whose
-     country has a Slack channel, take the `main` ranges ("main from <commit> to
-     <commit>") of the deliveries whose latest entry is "Answered 200 to",
-     counting step 3's replays. Leave out entries with no range and ranges whose
-     two commits are the same, which announce nothing. Put the ranges in the
-     order of the repository's history, not of the log. A gap is a place where a
-     range does not start at the commit the one before it ends at, and the time
-     from the last range to the repository's current head is one too. For each
-     gap, send one authenticated release payload. Its `main` entry has the commit
-     before the gap as `oldSha` and the commit after it as `newSha`; it announces
-     their net change once and queues one build. Add one `refs/tags/<tag>` entry,
-     with `oldSha` null and the tag's commit as `newSha`, for each tag created in
-     that gap, or those tags get no tag alert. Send one `main`-update payload per
-     staging repository to queue its build.
+  4. If the webhook was suspended, Hugging Face delivered nothing for the updates
+     made during the suspension, and neither the logs nor step 3 cover them. Work
+     from the suspension period, taken from Hugging Face's notification email or
+     the Activity page and the time you re-enabled the webhook, and from each
+     repository's history. For each release repository that changed in that
+     period, whether or not its country has a Slack channel, send one
+     authenticated release payload:
+     - a `main` entry with the last `main` commit before the suspension as `oldSha`
+       and the last `main` commit before re-enabling as `newSha`, unless `main` did
+       not move. It announces their net change once;
+     - one `refs/tags/<tag>` entry, with `oldSha` null and the tag's commit as
+       `newSha`, for each tag created in that period. A tag can be created without
+       moving `main`, so look for tags by date.
+
+     The payload also queues one build. For each staging repository that changed,
+     send one `main`-update payload with its current head as both `oldSha` and
+     `newSha` to queue its build. An update made at about the moment of the
+     suspension may already have been delivered. Check the Activity page, and if
+     that does not settle it, include the update: a repeated alert is the lesser
+     failure.
 - An answer with `release_record_problem` means `releases.json` could not be
   read for a lasting reason, such as a token without access or a record the
   release writer's rules refuse. The collector request and the tag alerts went
