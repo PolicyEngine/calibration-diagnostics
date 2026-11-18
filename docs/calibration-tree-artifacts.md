@@ -155,17 +155,30 @@ its own API creates. Two things start a build:
   collector to queue one run for that country and kind. The run reads the
   repository at its head and builds what the collector's store lacks.
 
-The webhook's request is the only trigger for what no submission builds: staging
-runs whose diagnostics are only in a staging repository's `runs/<id>/`, and
-release builds whose submission was never made, failed or was rejected. Each
-release run also ends by pointing the country's latest release at the current
-build of `releases.json`'s default release. There is no scheduled run, so a
-build that a lost request would have covered waits for the next delivery for
-that country and kind. A release repository without `releases.json` gets no new
-tree from a run, which reports `no_releases_record`.
+The webhook's request is the only automatic trigger for what no submission
+builds: staging runs whose diagnostics are only in a staging repository's
+`runs/<id>/`, and release builds whose submission was never made, failed or was
+rejected. Each release run also ends by pointing the country's latest release at
+the current build of `releases.json`'s default release. There is no scheduled
+run, so a build that a lost request would have covered waits for the next
+delivery for that country and kind, or for someone to run the collector's
+`reconcile-calibration-trees` command by hand. A release repository without
+`releases.json` gets no new tree from a run, which reports `no_releases_record`.
+
+A run treats a build its store holds as finished. It does not check that the
+stored tree's files are all present and does not restore missing ones, and
+nothing else does so automatically.
 
 The collector's README describes both paths, in "Building trees from
 submissions" and "Queuing calibration tree builds".
+
+`.github/workflows/publish-calibration-tree.yml` and the
+`publish:calibration-tree` script remain only for deployments from before the
+webhook stopped dispatching that workflow: such a deployment, whether it is being
+replaced or was restored by a rollback, answers Hugging Face with an error if the
+workflow is missing. Current code does not start it, and its job does nothing
+while the GitHub repository variable `CALIBRATION_TREE_BUILD_ENABLED` is `FALSE`.
+Both are removed once no deployment production could return to dispatches it.
 
 ### Release builds
 
@@ -237,8 +250,8 @@ delivery.
   503 answers makes Hugging Face suspend it, deliveries stop for every
   repository, release and staging alike. To recover, see "Hugging Face webhook"
   below.
-- **Changes with no alert:** a deleted `releases.json` (its readers then read
-  tags and pointer files), a change of default release and a build that is
+- **Changes with no alert:** a deleted `releases.json` (the release picker then
+  lists the repository's folders), a change of default release and a build that is
   no longer withdrawn are logged as warnings, and nothing is posted.
 
 #### Microcosm release lines
@@ -255,19 +268,11 @@ are how the dashboard reads the manifest entries already published from it.
   `releaseId` (and source ID) and records the folder as `releaseDirectory`.
   Readers fetch `releases/<releaseDirectory>/` at the entry's commit. Entries
   without `releaseDirectory` read `releases/<releaseId>/` as before.
-- A tag counts as a cut only when `releases/<release id>/release_manifest.json`
-  at the tag names it as `build.cut_tag`. Any other cut-shaped tag is
-  ineligible.
-- A country registration may name a per-line pointer (`pointer_path`, for the
-  UK `latest-national.json`). Its `revision` names the current cut. Other
-  countries keep `latest.json`.
 - The release picker adds every published cut beside the folders on `main` and
   hides a line folder unless the dashboard's latest release still points at it.
 
-These readers apply to a dataset repository with no `releases.json` (next
-section). The UK repository stays this way until Microcosm's switch commit
-writes `releases.json` and deletes its pointer files; the dashboard then reads
-it from `releases.json` with no change of its own.
+These rules apply to entries from a dataset repository with no `releases.json`
+(next section).
 
 #### Build folders and `releases.json`
 
@@ -298,14 +303,15 @@ the release picker and the Staging page at the configured
 revision). No country registration names the layout.
 
 - Only Hugging Face's 404 for the file means the repository has no
-  `releases.json`, and then the tags and pointer files are read. A 404 whose
+  `releases.json`. The release picker then lists the repository's folders under
+  `releases/` on `main` beside the builds the manifest records, and a collector
+  run reports `no_releases_record`. A 404 whose
   error code (`X-Error-Code`) is `RepoNotFound` or `RevisionNotFound`, any
   other failure, and a record the writer's rules refuse are errors: the
   release picker answers 502 for that country, the collector's run stores
   nothing for that repository and leaves the latest release as it was, and a
   local-area Staging candidate has no comparison baseline. No reader falls back
-  to tags or
-  pointer files.
+  to the folder listing.
 
 - A build's release id is its folder, `<release>/<build>`. Its manifest entry
   records no separate `releaseDirectory`, and readers fetch
@@ -542,16 +548,20 @@ Failure meanings and recovery:
   delivery. Hugging Face documents no limit on those retries and no guarantee
   that the Activity page shows an event's last answer, so follow these steps
   whenever deliveries were answered 503, whether or not the webhook was
-  suspended. The function logs are the record of each delivery's answer: each
-  503 logs "answering 503", and each delivery answered 200 logs nothing of the
-  kind.
+  suspended. The function logs are the record of each answer: every delivery
+  that starts a build logs "Answered 503 to" or "Answered 200 to", followed by
+  its `Webhook-Id`, repository, ref and commit. A retry or replay keeps the
+  delivery's `Webhook-Id`, so the latest entry for an ID is its latest answer.
   1. Correct the cause, and if the webhook is suspended, re-enable it.
-  2. For each repository, find the deliveries whose latest answer was 503
-     and that were never later answered 200. Replay every one of them,
+  2. Find the deliveries whose latest entry is "Answered 503 to". For a release
+     repository whose country has a Slack channel, replay every one of them,
      oldest first, from the Activity page. Each covers its own pair of
      commits, so replaying only the latest would lose the earlier updates'
      alerts. Don't replay a delivery once it has been answered 200: its
-     alerts were posted.
+     alerts were posted. A staging repository, or a release repository whose
+     country has no Slack channel (Belgium today), has no alerts to lose, and
+     one request covers everything the store lacks: if no later delivery from
+     that repository was answered 200, replay only its newest such delivery.
   3. The repository's last delivered commit is now the `newSha` of its
      latest delivery answered 200, counting step 2's replays. For updates
      made after that commit (while the webhook was suspended, so never

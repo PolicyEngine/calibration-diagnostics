@@ -4,13 +4,13 @@
 
 The calibration dashboard resolves a country and release through its
 Vercel-backed build manifest, whose entries pin the corresponding Hugging
-Face commit and reads `releases/<folder>/calibration_diagnostics.json`: the
+Face commit, and reads `releases/<folder>/calibration_diagnostics.json`: the
 release's own folder, or its line's folder for a Microcosm cut tag (see
 [the release lines note](calibration-tree-artifacts.md#microcosm-release-lines)).
-The country's current release comes from `latest.json` unless the registration
-names another pointer file in `pointer_path`. A dataset repository with a root
-`releases.json` reads neither: each build is in `releases/<release>/<build>/`,
-and `releases.json` alone names the builds and the current one (see
+The country's current release is the latest release the manifest records for it.
+In a dataset repository with a root `releases.json`, each build is in
+`releases/<release>/<build>/`, and `releases.json` alone names the builds and the
+current one (see
 [the build folders note](calibration-tree-artifacts.md#build-folders-and-releasesjson)).
 The readers look for that file in every repository; the registration does not
 name the layout.
@@ -165,11 +165,14 @@ refused this way.
 
 Registering a country before its first release fails the deployment smoke
 check, which requires every selectable `calibration` country to serve a
-release, until the collector has written that country's manifest entry. Merge
-the pull request that raises the package to the version with the registration,
-have the collector build the country's release (a build submission, or a
-Hugging Face webhook delivery once the collector lists the country), then re-run
-the deployment.
+release, until the collector has written that country's manifest entry. Add the
+country to the collector first. Merge the pull request that raises the package
+to the version with the registration, and have the collector build the country's
+release, from a new build submission or, for a release already on Hugging Face,
+by running its `reconcile-calibration-trees` command by hand. Then re-run the
+deployment. The Hugging Face webhook cannot do this step: production has no
+registration for the country until that deployment is promoted, so it ignores
+the repository's deliveries.
 
 ### Presentation
 

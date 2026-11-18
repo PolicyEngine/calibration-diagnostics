@@ -359,8 +359,9 @@ this repository's, and are not verified here.
   `HF_RELEASE_READ_TOKEN`. That must be a dedicated fine-grained read-only token for the
   registered private release repositories (`policyengine/populace-uk-private`,
   `policyengine/populace-be-private`) and the private US staging repository
-  `policyengine/populace-us-staging`. Previews use the Vercel project's Preview
-  `HF_TOKEN`. The tokens' scopes
+  `policyengine/populace-us-staging`. Never reuse the `HF_TOKEN` Actions secret, which
+  `.github/workflows/publish-calibration-tree.yml` uses, for the dashboard. Previews use
+  the Vercel project's Preview `HF_TOKEN`. The tokens' scopes
   cannot be read from GitHub or Vercel, so they are not verified here.
 
 Each registered country's release and staging repositories can be overridden on the
