@@ -1,0 +1,91 @@
+name: Publish calibration tree
+
+on:
+  workflow_dispatch:
+    inputs:
+      country:
+        description: Registered dashboard country code
+        required: true
+        default: us
+        type: string
+      event_kind:
+        description: Hugging Face event type or manual operation
+        required: true
+        default: manual
+        type: choice
+        options:
+          - manual
+          - tag
+          - branch
+          - staging
+          - migrate-timestamps
+      release_id:
+        description: Hugging Face release tag that triggered reconciliation
+        required: false
+        type: string
+      hf_commit_sha:
+        description: Hugging Face commit that triggered reconciliation
+        required: false
+        type: string
+      dry_run:
+        description: Build missing artifacts and validate existing artifacts without writing Blob data
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+# One publisher at a time: every country writes the same manifest. With the
+# default single-slot queue, a newer dispatch replaces any dispatch still
+# pending (GitHub cancels the older pending run), so a burst of Hugging Face
+# webhooks collapses to the running job plus the most recently dispatched
+# commit, whose state reconciliation then reads. During a UK staging build
+# each 300 s telemetry cycle makes about six single-file Hub commits, hence
+# about six dispatches; most are cancelled before they take a runner.
+# The slot is shared across countries and event kinds, so a pending release,
+# manual or migrate dispatch is replaced too. Nothing reconciles on a
+# schedule: the next webhook from that repository, or a manual dispatch,
+# repairs it.
+concurrency:
+  group: calibration-tree-manifest-publication
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: ${{ vars.CALIBRATION_TREE_BUILD_ENABLED != 'FALSE' }}
+    runs-on: ubuntu-latest
+    # Runs that find nothing to build take about 15 s. Without a limit a hung
+    # publish would hold the serialized group, and every later publication,
+    # for GitHub's 6-hour default.
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      POPULACE_UK_STAGING_HF_TOKEN: ${{ secrets.POPULACE_UK_STAGING_HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Build, validate, and publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--country "${{ inputs.country }}")
+          if [[ "${{ inputs.event_kind }}" == "staging" ]]; then
+            args+=(--reconcile-staging)
+            if [[ -n "${{ inputs.hf_commit_sha }}" ]]; then
+              args+=(--sha "${{ inputs.hf_commit_sha }}")
+            fi
+          elif [[ "${{ inputs.event_kind }}" == "migrate-timestamps" ]]; then
+            args+=(--migrate-release-timestamps)
+          else
+            args+=(--reconcile-releases)
+          fi
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            args+=(--dry-run)
+          fi
+          bun run publish:calibration-tree -- "${args[@]}"
