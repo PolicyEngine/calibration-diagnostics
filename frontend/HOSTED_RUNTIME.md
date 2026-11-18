@@ -224,8 +224,8 @@ environment, which the workflow neither supplies nor changes:
 `MICROCOSM_TELEMETRY_VERCEL_OIDC` and `MICROCOSM_BUILD_MONITOR_COLLECTOR_ONLY` once
 they are set; see [Reading the telemetry collector](#reading-the-telemetry-collector)),
 `POPULACE_UK_STAGING_HF_TOKEN` (UK staging), `BLOB_STORE_ID` and
-`BLOB_READ_WRITE_TOKEN` (Blob storage), `HF_WEBHOOK_SECRET` and
-`GITHUB_ACTIONS_DISPATCH_TOKEN` (the Hugging Face webhook),
+`BLOB_READ_WRITE_TOKEN` (Blob storage), `HF_WEBHOOK_SECRET` (the Hugging Face
+webhook),
 `SLACK_WEBHOOK_POPULACE_US` and `SLACK_WEBHOOK_POPULACE_UK`, and
 `CROSS_DATASET_ARTIFACT_BASE_URL` and `CROSS_DATASET_ARTIFACT_BASE_URL_BE`. Each name
 was listed on 2026-10-26. The project also stores its own Production `HF_TOKEN` and
@@ -319,14 +319,14 @@ monitor that shows these runs.
 
 The Hugging Face webhook route (`frontend/app/api/hf-webhook/route.ts`) asks the
 collector to queue a calibration-tree build, `POST /v1/calibration-tree-builds`, for
-each delivery that dispatches the calibration tree publisher
+each delivery that starts one
 ([Calibration-tree builds in the collector](../docs/calibration-tree-artifacts.md#calibration-tree-builds-in-the-collector)).
 It reads two things besides its own webhook settings:
 
 - `MICROCOSM_TELEMETRY_COLLECTOR_URL`, once, when the server module starts, with the
   same rule as the build monitor. Unset, the webhook sends no request. An invalid value
-  is reported in each delivery's answer as a failed request and never stops the GitHub
-  dispatch. The webhook needs neither `MICROCOSM_TELEMETRY_READ_SECRET_VERSION` nor
+  is reported in each delivery's answer as a failed request and never stops the
+  delivery's Slack alerts. The webhook needs neither `MICROCOSM_TELEMETRY_READ_SECRET_VERSION` nor
   `MICROCOSM_TELEMETRY_GOOGLE_IDENTITY_PROVIDER`.
 - The deployment's Vercel OIDC token, read with `getVercelOidcToken()` (`@vercel/oidc`)
   for each request and sent as `Authorization: Bearer`, whatever
@@ -359,9 +359,8 @@ this repository's, and are not verified here.
   `HF_RELEASE_READ_TOKEN`. That must be a dedicated fine-grained read-only token for the
   registered private release repositories (`policyengine/populace-uk-private`,
   `policyengine/populace-be-private`) and the private US staging repository
-  `policyengine/populace-us-staging`. Never reuse the publisher's `HF_TOKEN` Actions
-  secret, which `.github/workflows/publish-calibration-tree.yml` uses, for the
-  dashboard. Previews use the Vercel project's Preview `HF_TOKEN`. The tokens' scopes
+  `policyengine/populace-us-staging`. Previews use the Vercel project's Preview
+  `HF_TOKEN`. The tokens' scopes
   cannot be read from GitHub or Vercel, so they are not verified here.
 
 Each registered country's release and staging repositories can be overridden on the
@@ -482,7 +481,7 @@ so both are unset and the backend uses the reviewed values; its 503 refusal guar
 against a later change that sets them. The variable proxy on Vercel uses the checked-in
 identity and never forwards either setting to the backend. On Vercel, `POPULACE_HF_REPO`
 changes which repository the dashboard's US release discovery reads, and which
-repository's Hugging Face webhook events start a US calibration tree publication
+repository's Hugging Face webhook events queue a US calibration tree build
 (`frontend/lib/microcosm/hf-webhook-config.ts`). Release discovery follows the
 repository's `main` branch through the dashboard manifest. Neither setting was present
 in the Vercel project's Production or Preview environment on 2026-10-26. If either

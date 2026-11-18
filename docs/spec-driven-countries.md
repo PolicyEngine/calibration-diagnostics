@@ -3,7 +3,7 @@
 ## Contract today
 
 The calibration dashboard resolves a country and release through its
-Vercel-backed build manifest, whose publisher pins the corresponding Hugging
+Vercel-backed build manifest, whose entries pin the corresponding Hugging
 Face commit and reads `releases/<folder>/calibration_diagnostics.json`: the
 release's own folder, or its line's folder for a Microcosm cut tag (see
 [the release lines note](calibration-tree-artifacts.md#microcosm-release-lines)).
@@ -165,10 +165,11 @@ refused this way.
 
 Registering a country before its first release fails the deployment smoke
 check, which requires every selectable `calibration` country to serve a
-release, until `publish-calibration-tree.yml` has written that country's
-manifest entry. Merge the pull request that raises the package to the version
-with the registration, dispatch the publisher for the country from `main`, then
-re-run the deployment.
+release, until the collector has written that country's manifest entry. Merge
+the pull request that raises the package to the version with the registration,
+have the collector build the country's release (a build submission, or a
+Hugging Face webhook delivery once the collector lists the country), then re-run
+the deployment.
 
 ### Presentation
 

@@ -1,17 +1,18 @@
 # AI-assistant investigation documentation
 
 These documents define tool-independent procedures for investigating Microcosm
-calibration targets and maintaining the dashboard's published calibration-tree
-artifacts. Microcosm release identifiers still use the deprecated
+calibration targets. Microcosm release identifiers still use the deprecated
 `populace-us-*` prefix.
 
 ## When to use each document
 
 - For the complete investigation sequence and report format, follow [Investigate a Microcosm target](workflows/investigate-microcosm-target.md).
 - For a shorter reusable checklist, use [Microcosm target investigation checklist](checklists/microcosm-target-investigation.md).
-- To build, publish, replace, or diagnose calibration-tree files, follow
-  [Publish calibration tree artifacts](workflows/publish-calibration-tree-artifacts.md)
-  and its [publication checklist](checklists/calibration-tree-publication.md).
+- To diagnose the calibration-tree files the dashboard reads, start from
+  [Calibration build and comparison artifacts](../calibration-tree-artifacts.md).
+  The collector builds and publishes them ([PolicyEngine/microcosm-collector](https://github.com/PolicyEngine/microcosm-collector)).
+  Treat Blob deletion and manifest changes as external state changes that need
+  explicit authorization, and never print Blob, Hugging Face or webhook secrets.
 - When several reviewers can inspect separate technical areas, assign the relevant documents in [roles](roles/):
   - [Investigation coordinator](roles/microcosm-investigation-supervisor.md)
   - [Chronicle and source-data review](roles/microcosm-chronicle-auditor.md)

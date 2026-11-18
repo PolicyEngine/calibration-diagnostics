@@ -484,9 +484,10 @@ export function createHfWebhookHandler(
 
     // The collector request comes before the Slack alerts, which a repeat would
     // post twice. A failure that may pass then answers 503 with nothing posted,
-    // and Hugging Face's retry requests the build and posts each alert once;
-    // the collector treats a repeated request as already queued. A lasting
-    // failure is logged, reported as tree_build, and does not stop the alerts.
+    // and Hugging Face's retry requests the build and posts each alert once.
+    // Repeating the request is safe: the collector answers already_queued
+    // within its 10-minute window, and a later run builds only what is missing.
+    // A lasting failure is logged, reported as tree_build, and stops no alert.
     const treeBuild = trigger
       ? await requestTreeBuild(
           treeBuildRequestBody(registration, trigger),
