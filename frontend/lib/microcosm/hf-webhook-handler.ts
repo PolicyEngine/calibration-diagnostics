@@ -204,7 +204,7 @@ async function compareReleaseRecords(
 function logUnannounced(repo: string, update: UpdatedRef, change: UnannouncedRecordChange) {
   const span = `${update.oldSha ?? "none"} to ${update.newSha ?? "none"}`;
   const what = change.kind === "removed"
-    ? `${RELEASES_RECORD_PATH} was removed from ${repo}; its readers now read tags and pointer files`
+    ? `${RELEASES_RECORD_PATH} was removed from ${repo}; the release picker now lists its folders, and collector runs build no new release tree for it`
     : change.kind === "default_changed"
       ? `in ${repo}, the default release changed from ${change.from ?? "none"} to ${change.to ?? "none"}`
       : `in ${repo}, ${change.release}/${change.build} is no longer withdrawn`;
@@ -235,6 +235,19 @@ function secretOk(request: Request, expected: string | undefined): boolean {
   const a = Buffer.from(provided);
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/**
+ * Names a delivery in the log of its answer. Hugging Face reuses a delivery's
+ * Webhook-Id for its retries and replays, so the latest entry for an ID is the
+ * delivery's latest answer.
+ */
+function describeDelivery(request: Request, repo: string, trigger: UpdatedRef): string {
+  const webhookId = request.headers.get("webhook-id");
+  return (
+    `Hugging Face delivery ${webhookId ?? "without a Webhook-Id"} ` +
+    `for ${repo} ${trigger.ref} at ${trigger.newSha}`
+  );
 }
 
 function treeBuildRequestBody(
@@ -465,17 +478,21 @@ export function createHfWebhookHandler(
     const mainUpdate = mainUpdates.at(-1);
     const tagUpdate = registration.kind === "release" ? newTagRefs.at(-1) : undefined;
     const trigger = registration.kind === "staging" ? mainUpdate : tagUpdate ?? mainUpdate;
+    const deliveryDescription = trigger
+      ? describeDelivery(request, registration.repo, trigger)
+      : null;
 
     // releases.json is read before anything is requested or posted. A
     // transient failure then answers 503 with nothing done, and Hugging
     // Face's retry of the delivery does everything once.
     // Only a release repository whose country has a Slack channel can get
-    // record alerts, so only its record is read and only it risks a 503.
+    // record alerts, so only its record is read and only it risks a 503 here.
     const comparison =
       registration.kind === "release" && mainUpdate && config.releaseAlertCountries.has(country)
         ? await compareReleaseRecords(repo, mainUpdate, config, fetchImplementation)
         : null;
     if (comparison?.kind === "retry") {
+      console.error(`Answered 503 to ${deliveryDescription}.`);
       return NextResponse.json(
         { detail: `Unable to read ${RELEASES_RECORD_PATH}; retry the delivery.` },
         { status: 503 },
@@ -499,6 +516,7 @@ export function createHfWebhookHandler(
     // A delivery that starts no build answers without tree_build.
     const treeBuildAnswer = treeBuild ? { tree_build: treeBuild.outcome } : {};
     if (treeBuild?.retry) {
+      console.error(`Answered 503 to ${deliveryDescription}.`);
       return NextResponse.json(
         {
           detail: "Unable to queue the calibration tree build; retry the delivery.",
@@ -542,6 +560,7 @@ export function createHfWebhookHandler(
       recordAlerted = posted;
     }
 
+    if (deliveryDescription) console.info(`Answered 200 to ${deliveryDescription}.`);
     return NextResponse.json({
       ok: true,
       country,
