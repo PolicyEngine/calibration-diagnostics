@@ -26,35 +26,20 @@ export const RECORD_EVENTS_JSON_LIMIT = 1_500_000;
 
 type JsonDocument = Record<string, unknown>;
 
-function jsonObject(value: unknown): JsonDocument | null {
-  return value != null && typeof value === "object" && !Array.isArray(value)
-    ? (value as JsonDocument)
-    : null;
+// What a run's own events file holds, and so what the Stage timeline takes
+// from the collector's record: the run's stage changes and its calibration
+// events. Every other event with status `progress` is a heartbeat, a progress
+// report (one per batch of work) or a stage update, which the events file
+// never holds; a long record holds thousands of them.
+function isStageTimelineEvent(event: JsonDocument): boolean {
+  return event.event_type === "calibration" || event.status !== "progress";
 }
 
-// A heartbeat as the collector serves it in a run's documents: a `progress`
-// event that is not a calibration event and carries the emitter's machine
-// reading or, from emitters before 0.14.0, no message and no details beside
-// its resource sample. It names the stage the run is in. A run's own events
-// file never holds one. (A heartbeat whose reading the collector dropped
-// looks like an older emitter's and is left out the same way only when it
-// has no message.)
-function isHeartbeat(event: JsonDocument): boolean {
-  if (event.event_type === "calibration" || event.status !== "progress") return false;
-  const details = jsonObject(event.details);
-  if (jsonObject(details?.reading)) return true;
-  const message = typeof event.message === "string" ? event.message.trim() : "";
-  return (
-    message === "" &&
-    (details == null || Object.keys(details).length === 0) &&
-    event.resources != null
-  );
-}
-
-// The newest items whose JSON fits the limit, in their order.
-function newestWithin<T>(items: readonly T[]): T[] {
-  // The brackets, less the comma the first item has none of.
-  let size = 1;
+// The newest items whose JSON, added to JSON of `used` characters, stays
+// within the limit; in their order. An empty list's JSON (`[]`) counts as 1,
+// the brackets less the comma its first item has none of.
+function newestWithin<T>(items: readonly T[], used = 1): { kept: T[]; size: number } {
+  let size = used;
   let first = items.length;
   while (first > 0) {
     const itemSize = JSON.stringify(items[first - 1]).length + 1;
@@ -62,26 +47,34 @@ function newestWithin<T>(items: readonly T[]): T[] {
     size += itemSize;
     first -= 1;
   }
-  return items.slice(first);
+  return { kept: items.slice(first), size };
 }
 
 /**
  * An unfinished run's Stage timeline events and calibration progress, from
- * the collector's record: heartbeats left out, and the newest of each kept
- * within `RECORD_EVENTS_JSON_LIMIT`.
+ * the collector's record. The events are the run's stage changes and
+ * calibration events, in order. Within `RECORD_EVENTS_JSON_LIMIT`, the
+ * newest stage changes are kept first and the newest calibration events
+ * fill what is left, so calibration never crowds out the run's stages.
  */
 export function recordInternals(record: {
   events: JsonDocument[];
   calibration_progress: JsonDocument | null;
 }): { events: JsonDocument[]; calibration_progress: JsonDocument | null } {
-  const events = newestWithin(record.events.filter((event) => !isHeartbeat(event)));
+  const timeline = record.events.filter(isStageTimelineEvent);
+  const stages = newestWithin(timeline.filter((event) => event.event_type !== "calibration"));
+  const calibrationRows = newestWithin(
+    timeline.filter((event) => event.event_type === "calibration"),
+    stages.size,
+  );
+  const kept = new Set([...stages.kept, ...calibrationRows.kept]);
   const calibration = record.calibration_progress;
   const calibrationEvents = Array.isArray(calibration?.events) ? calibration.events : null;
   return {
-    events,
+    events: timeline.filter((event) => kept.has(event)),
     calibration_progress:
       calibration && calibrationEvents
-        ? { ...calibration, events: newestWithin(calibrationEvents) }
+        ? { ...calibration, events: newestWithin(calibrationEvents).kept }
         : calibration,
   };
 }
