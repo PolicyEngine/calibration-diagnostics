@@ -18,6 +18,37 @@ import type { StagingRunSummary } from "@policyengine/calibration-tree/staging-a
 
 export type RunStateSource = "collector" | "hugging_face";
 
+// At most this many of an unfinished run's events and calibration events
+// come from the collector's record, the newest. A record can hold many more
+// than a run's copied files (an abandoned run's, 10 MB), and the Candidate
+// tab's answer must stay within the platform's response size.
+export const MOST_RECORD_EVENTS = 5_000;
+
+type JsonDocument = Record<string, unknown>;
+
+/**
+ * An unfinished run's Stage timeline events and calibration progress, from
+ * the collector's record. Heartbeats name no stage and are left out, as the
+ * run's own events file never holds them.
+ */
+export function recordInternals(record: {
+  events: JsonDocument[];
+  calibration_progress: JsonDocument | null;
+}): { events: JsonDocument[]; calibration_progress: JsonDocument | null } {
+  const events = record.events
+    .filter((event) => typeof event.stage === "string" && event.stage !== "")
+    .slice(-MOST_RECORD_EVENTS);
+  const calibration = record.calibration_progress;
+  const calibrationEvents = Array.isArray(calibration?.events) ? calibration.events : null;
+  return {
+    events,
+    calibration_progress:
+      calibration && calibrationEvents
+        ? { ...calibration, events: calibrationEvents.slice(-MOST_RECORD_EVENTS) }
+        : calibration,
+  };
+}
+
 export interface CalibrationEpoch {
   epoch: number | null;
   epochs: number | null;

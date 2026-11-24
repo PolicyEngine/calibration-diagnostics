@@ -10,7 +10,7 @@ import {
 } from "@policyengine/calibration-tree/latest-artifact";
 import type { ReleasesRecord } from "@policyengine/calibration-tree/release-record";
 import {
-  loadStoredCutReleases,
+  loadStoredTaggedReleases,
   loadStoredPointerReleaseId,
   loadStoredReleaseFolders,
   loadStoredReleasesRecord,
@@ -26,7 +26,7 @@ interface MicrocosmReleasesRouteDependencies {
   loadReleases: typeof loadStoredReleaseFolders;
   loadPointerReleaseId: typeof loadStoredPointerReleaseId;
   readManifest: typeof readStoreManifest;
-  loadPublishedCutReleases: typeof loadStoredCutReleases;
+  loadPublishedCutReleases: typeof loadStoredTaggedReleases;
 }
 
 export function createMicrocosmReleasesHandler(
@@ -35,7 +35,7 @@ export function createMicrocosmReleasesHandler(
     loadReleases: loadStoredReleaseFolders,
     loadPointerReleaseId: loadStoredPointerReleaseId,
     readManifest: readStoreManifest,
-    loadPublishedCutReleases: loadStoredCutReleases,
+    loadPublishedCutReleases: loadStoredTaggedReleases,
   },
 ) {
   // A repository with releases.json lists the builds it names and nothing
@@ -60,8 +60,8 @@ export function createMicrocosmReleasesHandler(
       latestReleaseId,
     ]);
     // Per-attempt tags and releases published only as a tag are named only
-    // by the dashboard manifest; without it the picker keeps the folder
-    // listing.
+    // by the tree manifest, which the folder listing also reads, so a failed
+    // manifest read fails the listing.
     const cuts = manifest
       ? await dependencies
         .loadPublishedCutReleases(revalidate, country, manifest, folders)

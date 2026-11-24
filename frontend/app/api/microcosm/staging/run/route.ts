@@ -11,6 +11,7 @@ import {
   candidateRunState,
   huggingFaceRecordsAnEnd,
   type HuggingFaceRunState,
+  recordInternals,
 } from "@/lib/microcosm/staging-run-state";
 import { loadStoredStagingRun } from "@/lib/microcosm/stored-staging";
 import {
@@ -118,9 +119,7 @@ export function createStagingRunHandler(
       return NextResponse.json(
         scrub({
           ...detail,
-          ...(internalsFromRecord
-            ? { events: record.events, calibration_progress: record.calibration_progress }
-            : {}),
+          ...(internalsFromRecord ? recordInternals(record) : {}),
           run_internals_source: internalsFromRecord ? "collector" : "hugging_face",
           state,
           collector_note: collector.note,

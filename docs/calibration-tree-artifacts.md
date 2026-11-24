@@ -373,8 +373,11 @@ tab lists the collector's copies of the runs' files (`staging-run-files/<country
 in the store), and a run's calibration views read the copies of the original
 files of the run's stored tree, whether its diagnostics came from the run folder
 or its staged bundle. A run with diagnostics shows them once the collector has
-built its tree. While a run's copy records no end, its Stage timeline and
-calibration progress come from the collector's record. The release pages read
+built its tree, and only while that tree holds the diagnostics the run's files
+declare. While a run's copy records no end and the page's state for it comes
+from the collector's record, its Stage timeline and calibration progress come
+from that record too, without heartbeats and at most the newest 5,000 events
+of each. The release pages read
 each build's copies of its original files and the copy of `releases.json` the
 same way.
 

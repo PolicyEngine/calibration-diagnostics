@@ -172,15 +172,22 @@ export class FakeCollectorStore {
     );
   }
 
-  /** Copies a staging run's files into its country's index. */
-  addStagingRun(run: FakeStagingRun): void {
-    const index = this.stagingIndexes.get(run.country) ?? {
+  /** The country's index of copied runs, created empty: a repository with no runs. */
+  stagingIndex(country: MicrocosmCountry): StagingRunFilesIndex {
+    const index = this.stagingIndexes.get(country) ?? {
       schemaVersion: STAGING_RUN_FILES_SCHEMA_VERSION,
-      country: run.country,
-      hfRepo: `policyengine/fake-${run.country}-staging`,
+      country,
+      hfRepo: `policyengine/fake-${country}-staging`,
       updatedAt: "2026-10-20T00:00:00.000Z",
       runs: {},
     };
+    this.stagingIndexes.set(country, index);
+    return index;
+  }
+
+  /** Copies a staging run's files into its country's index. */
+  addStagingRun(run: FakeStagingRun): void {
+    const index = this.stagingIndex(run.country);
     const files: Partial<Record<StagingRunFileName, StagingRunFileRecord>> = {};
     for (const [name, document] of Object.entries(run.files)) {
       const bytes = bytesOf(document!);

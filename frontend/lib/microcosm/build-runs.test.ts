@@ -1015,8 +1015,9 @@ describe("how much the build list reads", () => {
   test("the build list reads the collector and the copied run history at the same time", async () => {
     clearBuildRunCaches();
     const collector = fakeTelemetryCollector({ countryCode: "US", runCount: 2 });
-    // A staging repository with no copied runs.
+    // A staging repository with no runs.
     const store = new FakeCollectorStore();
+    store.stagingIndex("us");
     let historyRequestedWhileCollectorListPending = false;
     const holdingTheList = (async (input: RequestInfo | URL) => {
       if (new URL(String(input)).pathname === "/v1/runs") {
@@ -1146,8 +1147,11 @@ describe("how much the build list reads", () => {
     const collectorDown = (async (_input: RequestInfo | URL) =>
       Response.json({ detail: "Unavailable." }, { status: 503 })) as typeof fetch;
 
+    const store = new FakeCollectorStore();
+    store.stagingIndex("us");
+
     const response = await withCollector(collectorDown, () =>
-      withStore(new FakeCollectorStore(), () => loadBuildRuns("staging", "us")),
+      withStore(store, () => loadBuildRuns("staging", "us")),
     );
 
     expect(response.available).toBe(true);

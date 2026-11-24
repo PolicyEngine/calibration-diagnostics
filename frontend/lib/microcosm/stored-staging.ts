@@ -19,6 +19,7 @@ import {
   buildComparison,
   latestMicrocosmCalibrationSummary,
   latestMicrocosmTargetDiagnosticsPage,
+  microcosmCountryGeography,
   recordedReleaseInventory,
   type Calibration,
   type ReleaseEntry,
@@ -28,6 +29,7 @@ import {
   newestPublishedLocalAreaRelease,
   resolveStagingComparisonRelease,
   sortRuns,
+  stagedBundleDiagnosticsFile,
   stagingRepository,
   stagingTargetChangeCacheTtlSeconds,
   stagingUnavailableReason,
@@ -45,11 +47,11 @@ import {
   validateStagingRunConsistency,
 } from "@policyengine/calibration-tree/staging-contract";
 import {
-  loadCopiedStagingRuns,
   readStagingRunFile,
   readStagingRunFilesIndex,
   stagingJsonObjectOrNull,
   type StagingRunFileName,
+  type StagingRunFilesIndex,
   type StagingRunRecord,
 } from "@policyengine/calibration-tree/staging-run-files";
 import { buildTargetChangeDataset } from "@policyengine/calibration-tree/target-change";
@@ -59,7 +61,7 @@ import {
   loadStoredPointerReleaseId,
   loadStoredRelease,
   loadStoredReleaseFolders,
-  loadStoredCutReleases,
+  loadStoredTaggedReleases,
   loadStoredReleasesRecord,
   readBuildCopy,
   readStoreManifest,
@@ -75,6 +77,10 @@ const CACHE_LIMIT = 8;
 // built from them is reused while the run's documents name the same build.
 const STAGING_CALIBRATION_CACHE_SECONDS = 300;
 const NOT_UPLOADED = "This staging run has not uploaded calibration_diagnostics.json yet.";
+// A staged bundle's receipt states that list it as landed, as the Hugging
+// Face reader takes them.
+const STAGED_BUNDLE_LANDED = new Set(["uploaded", "already_staged"]);
+const SHA_256 = /^[0-9a-f]{64}$/;
 
 function stringValue(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
@@ -119,9 +125,9 @@ export interface CopiedRunDocuments {
   calibrationProgress: JsonObject | null;
   events: JsonObject[];
   reformValidation: JsonObject | null;
+  /** The staged bundle's receipt, as the run copied it. */
+  stagedDatasetReceipt: JsonObject | null;
 }
-
-type CopiedDocumentName = Exclude<StagingRunFileName, "artifacts/staged_dataset.json">;
 
 async function readCopiedJson(record: StagingRunRecord, name: StagingRunFileName) {
   const file = record.files[name];
@@ -130,15 +136,43 @@ async function readCopiedJson(record: StagingRunRecord, name: StagingRunFileName
     : null;
 }
 
-/** The country's copied runs by run ID, without removed ones. */
+/** The country's index of copied runs; null when the store holds none yet. */
+async function copiedRunIndex(country: MicrocosmCountry): Promise<StagingRunFilesIndex | null> {
+  const { index, etag } = await readStagingRunFilesIndex({ country, client: collectorStoreBlob });
+  // The package answers an index the store doesn't hold with an empty one.
+  return etag === null ? null : index;
+}
+
+function noCopiesDetail(country: MicrocosmCountry): string {
+  return `The collector's store holds no copy of ${microcosmCountryGeography(country)}'s staging runs yet.`;
+}
+
+/** The country's copied runs by run ID, without removed ones; empty when the store holds no copies. */
 async function copiedRunRecords(country: MicrocosmCountry): Promise<Map<string, StagingRunRecord>> {
-  const { index } = await readStagingRunFilesIndex({ country, client: collectorStoreBlob });
+  const index = await copiedRunIndex(country);
   return new Map(
-    Object.values(index.runs)
+    Object.values(index?.runs ?? {})
       .filter((record) => !record.removedAt)
       .map((record) => [record.runId, record]),
   );
 }
+
+const ALL_DOCUMENTS: readonly StagingRunFileName[] = [
+  "progress.json",
+  "run_manifest.json",
+  "calibration_progress.json",
+  "events.ndjson",
+  "reform_validation.json",
+  "artifacts/staged_dataset.json",
+];
+
+// What a run's calibration needs: its identity and how its diagnostics were
+// declared.
+const CALIBRATION_DOCUMENTS: readonly StagingRunFileName[] = [
+  "progress.json",
+  "run_manifest.json",
+  "artifacts/staged_dataset.json",
+];
 
 /**
  * One run's copied documents, parsed and checked as the Hugging Face reader
@@ -146,25 +180,13 @@ async function copiedRunRecords(country: MicrocosmCountry): Promise<Map<string, 
  */
 export async function copiedRunDocuments(
   record: StagingRunRecord,
-  names: readonly CopiedDocumentName[] = [
-    "progress.json",
-    "run_manifest.json",
-    "calibration_progress.json",
-    "events.ndjson",
-    "reform_validation.json",
-  ],
+  names: readonly StagingRunFileName[] = ALL_DOCUMENTS,
 ): Promise<CopiedRunDocuments> {
   const wanted = new Set(names);
-  const read = (name: CopiedDocumentName) =>
+  const read = (name: StagingRunFileName) =>
     wanted.has(name) ? readCopiedJson(record, name) : Promise.resolve(null);
-  const [progressBytes, manifestBytes, calibrationBytes, eventBytes, reformBytes] =
-    await Promise.all([
-      read("progress.json"),
-      read("run_manifest.json"),
-      read("calibration_progress.json"),
-      read("events.ndjson"),
-      read("reform_validation.json"),
-    ]);
+  const [progressBytes, manifestBytes, calibrationBytes, eventBytes, reformBytes, receiptBytes] =
+    await Promise.all(ALL_DOCUMENTS.map(read));
   const progressDocument = stagingJsonObjectOrNull(progressBytes);
   const manifestDocument = stagingJsonObjectOrNull(manifestBytes);
   const calibrationDocument = stagingJsonObjectOrNull(calibrationBytes);
@@ -186,13 +208,14 @@ export async function copiedRunDocuments(
     calibrationProgress,
     events,
     reformValidation: stagingJsonObjectOrNull(reformBytes),
+    stagedDatasetReceipt: stagingJsonObjectOrNull(receiptBytes),
   };
 }
 
 async function readRunDocuments(
   country: MicrocosmCountry,
   runId: string,
-  names?: readonly CopiedDocumentName[],
+  names?: readonly StagingRunFileName[],
 ): Promise<CopiedRunDocuments | null> {
   const record = (await copiedRunRecords(country)).get(runId);
   return record ? copiedRunDocuments(record, names) : null;
@@ -212,7 +235,12 @@ function candidateReleaseIdOf(
 
 // --- the run list --------------------------------------------------------
 
-/** The Candidate tab's run list, as `loadStagingRuns` gives it, from the copies. */
+/**
+ * The Candidate tab's run list, as `loadStagingRuns` gives it, from the
+ * copies, listed as the package's `loadCopiedStagingRuns` lists them. A
+ * country the collector has copied no runs for yet is unavailable, so a
+ * missing copy never reads as a repository without runs.
+ */
 export async function loadStoredStagingRuns(_revalidate: number, country: MicrocosmCountry = "us") {
   const unavailable = unavailableStaging(country);
   if (unavailable) {
@@ -224,14 +252,44 @@ export async function loadStoredStagingRuns(_revalidate: number, country: Microc
     };
   }
   const repository = configuredRepository(country);
-  const copied = await loadCopiedStagingRuns({ country, client: collectorStoreBlob });
-  return { ...copied, source_repo: repository.repo, revision: repository.revision };
+  const index = await copiedRunIndex(country);
+  if (!index) {
+    return {
+      available: false as const,
+      source_repo: repository.repo,
+      revision: repository.revision,
+      detail: noCopiesDetail(country),
+      truncated: false,
+      runs: [] as StagingRunSummary[],
+      incompatible_runs: [] as IncompatibleStagingRun[],
+    };
+  }
+  const records = Object.values(index.runs).filter((record) => !record.removedAt);
+  return {
+    available: true as const,
+    source_repo: repository.repo,
+    revision: repository.revision,
+    truncated: false,
+    runs: records
+      .filter((record) => record.problem === null)
+      .map((record) => record.summary)
+      .sort(sortRuns),
+    incompatible_runs: records.flatMap((record): IncompatibleStagingRun[] =>
+      record.problem === null
+        ? []
+        : [{
+          run_id: record.runId,
+          run_manifest_path: `runs/${record.runId}/run_manifest.json`,
+          detail: record.problem,
+        }]
+    ),
+  };
 }
 
 // --- a run's calibration -------------------------------------------------
 
 interface CalibrationCacheEntry {
-  promise: Promise<Calibration>;
+  promise: Promise<Calibration | null>;
   expiresAt: number;
 }
 
@@ -262,36 +320,86 @@ function remember<T>(
   return promise;
 }
 
+interface StagingTreeSource {
+  entry: NonNullable<ReturnType<typeof stagingTreeEntry>>;
+  /** The diagnostics are the run's telemetry upload, not its staged bundle's. */
+  fromRunFolder: boolean;
+  /** The SHA-256 the run's files declare for the diagnostics; null when they declare none. */
+  declaredSha256: string | null;
+}
+
+/**
+ * The run's stored tree and how the run's copied files declare its
+ * diagnostics, decided as the Hugging Face reader decided which file to read:
+ * a schema 1 run, or one whose run manifest declares telemetry diagnostics,
+ * from its run folder; any other from its staged bundle, through the receipt
+ * the run manifest declares. Null when the run has no current copy, no tree,
+ * or no diagnostics the old reader would have read: a receipt that is absent,
+ * differs from its declaration, names another run or lists no landed bundle
+ * with diagnostics.
+ */
+function stagingTreeSource(
+  documents: CopiedRunDocuments | null,
+  manifest: CalibrationTreeManifest,
+  country: MicrocosmCountry,
+  runId: string,
+): StagingTreeSource | null {
+  const entry = stagingTreeEntry(manifest, country, runId);
+  if (!documents || !entry) return null;
+  const runManifest = documents.runManifest;
+  if (!isStructuredStagingDocument(runManifest)) {
+    return { entry, fromRunFolder: true, declaredSha256: null };
+  }
+  const artifacts = objectOrNull(runManifest?.artifacts);
+  const diagnosticsArtifact = objectOrNull(artifacts?.calibration_diagnostics);
+  if (stringValue(diagnosticsArtifact?.staging_path) != null) {
+    // A structured run manifest always declares its artifacts' digests.
+    return { entry, fromRunFolder: true, declaredSha256: stringValue(diagnosticsArtifact?.sha256) ?? "" };
+  }
+  const stagedArtifact = objectOrNull(artifacts?.staged_dataset);
+  const receipt = documents.stagedDatasetReceipt;
+  const receiptCopy = documents.record.files["artifacts/staged_dataset.json"];
+  if (
+    !stringValue(stagedArtifact?.staging_path) ||
+    !receipt ||
+    receiptCopy?.sha256 !== stringValue(stagedArtifact?.sha256) ||
+    !STAGED_BUNDLE_LANDED.has(String(receipt.status)) ||
+    stringValue(receipt.run_id) !== runId
+  ) {
+    return null;
+  }
+  const files = objectOrNull(receipt.files);
+  const diagnosticsFile = stagedBundleDiagnosticsFile(files);
+  const declared = diagnosticsFile ? stringValue(objectOrNull(files?.[diagnosticsFile])?.sha256) : null;
+  if (!declared || !SHA_256.test(declared)) return null;
+  return { entry, fromRunFolder: false, declaredSha256: declared };
+}
+
 /**
  * A staging run's calibration, as `loadStagingCalibration` builds it, from
  * its stored tree's copies: the run's candidate release and time come from
- * its documents, and the source is the run's telemetry diagnostics or its
- * staged bundle, as its run manifest says. Null for a run without a stored
- * tree.
+ * its copied documents, and the source is the run's telemetry diagnostics or
+ * its staged bundle, as its run manifest says. Null for a run without a
+ * current copy or a stored tree, and while the tree holds other diagnostics
+ * than the run's files declare: the collector copies a run's files before it
+ * builds the run's tree.
  */
 async function calibrationFromStore(
   country: MicrocosmCountry,
   runId: string,
-  progress: JsonObject | null,
-  runManifest: JsonObject | null,
+  documents: CopiedRunDocuments | null,
   manifest?: CalibrationTreeManifest,
 ): Promise<Calibration | null> {
   const treeManifest = manifest ?? (await readStoreManifest()).manifest;
-  const entry = stagingTreeEntry(treeManifest, country, runId);
-  if (!entry) return null;
+  const source = stagingTreeSource(documents, treeManifest, country, runId);
+  if (!source) return null;
+  const progress = documents?.progress ?? null;
+  const runManifest = documents?.runManifest ?? null;
   const candidateReleaseId = candidateReleaseIdOf(runId, progress, runManifest);
   const updatedAt = stringValue(progress?.updated_at) ?? stringValue(runManifest?.updated_at);
-  const diagnosticsArtifact = objectOrNull(
-    objectOrNull(runManifest?.artifacts)?.calibration_diagnostics,
-  );
-  // As the Hugging Face reader decides: a schema 1 run, or one whose run
-  // manifest declares telemetry diagnostics, read them from its run folder;
-  // any other read its staged bundle's.
-  const fromRunFolder =
-    !isStructuredStagingDocument(runManifest) ||
-    stringValue(diagnosticsArtifact?.staging_path) != null;
+  const { entry, fromRunFolder, declaredSha256 } = source;
   const build = entry.buildArtifactId;
-  const key = [country, build, candidateReleaseId, updatedAt, fromRunFolder].join(":");
+  const key = [country, build, candidateReleaseId, updatedAt, fromRunFolder, declaredSha256].join(":");
   return remember(calibrationCache, key, STAGING_CALIBRATION_CACHE_SECONDS, async () => {
     const [diagnostics, buildManifest, releaseManifest] = await Promise.all([
       readBuildCopy(country, build, "calibrationDiagnostics"),
@@ -304,6 +412,7 @@ async function calibrationFromStore(
           `${country} staging run ${runId} (build ${build}).`,
       );
     }
+    if (declaredSha256 != null && diagnostics.sha256 !== declaredSha256) return null;
     return buildCalibration(
       diagnostics.payload,
       candidateReleaseId,
@@ -319,7 +428,7 @@ async function calibrationFromStore(
   });
 }
 
-/** A staging run's calibration from the store; null for a run without a stored tree. */
+/** A staging run's calibration from the store; null for a run without one. */
 export async function loadStoredStagingCalibration(
   runId: string,
   _revalidate: number,
@@ -327,13 +436,8 @@ export async function loadStoredStagingCalibration(
 ): Promise<Calibration | null> {
   if (stagingUnavailableReason(country)) return null;
   assertSafeReleaseId(runId, "run");
-  const documents = await readRunDocuments(country, runId, ["progress.json", "run_manifest.json"]);
-  return calibrationFromStore(
-    country,
-    runId,
-    documents?.progress ?? null,
-    documents?.runManifest ?? null,
-  );
+  const documents = await readRunDocuments(country, runId, CALIBRATION_DOCUMENTS);
+  return calibrationFromStore(country, runId, documents);
 }
 
 // --- one run -------------------------------------------------------------
@@ -370,10 +474,21 @@ export async function loadStoredStagingRun(
   if (unavailable) return { ...unavailable, ...emptyRunDetail(runId) };
   assertSafeReleaseId(runId, "run");
   const repository = configuredRepository(country);
-  const documents = await readRunDocuments(country, runId);
+  const index = await copiedRunIndex(country);
+  if (!index) {
+    return {
+      available: false,
+      source_repo: repository.repo,
+      revision: repository.revision,
+      detail: noCopiesDetail(country),
+      ...emptyRunDetail(runId),
+    };
+  }
+  const record = Object.hasOwn(index.runs, runId) ? index.runs[runId] : null;
+  const documents = record && !record.removedAt ? await copiedRunDocuments(record) : null;
   const progress = documents?.progress ?? null;
   const runManifest = documents?.runManifest ?? null;
-  const calibration = await calibrationFromStore(country, runId, progress, runManifest);
+  const calibration = await calibrationFromStore(country, runId, documents);
   const candidateReleaseId = candidateReleaseIdOf(runId, progress, runManifest);
   const identity = progress ?? runManifest;
   return {
@@ -415,7 +530,7 @@ export interface StoredStagingRunTelemetry {
   events: JsonObject[];
 }
 
-const TELEMETRY_DOCUMENTS: readonly CopiedDocumentName[] = [
+const TELEMETRY_DOCUMENTS: readonly StagingRunFileName[] = [
   "progress.json",
   "run_manifest.json",
   "calibration_progress.json",
@@ -459,7 +574,8 @@ export async function loadStoredStagingTelemetry(
       problems: [],
     };
   }
-  const { index } = await readStagingRunFilesIndex({ country, client: collectorStoreBlob });
+  const index = await copiedRunIndex(country);
+  if (!index) throw new StoredCopyMissingError(noCopiesDetail(country));
   const records = Object.values(index.runs).filter((record) => !record.removedAt);
   const problems = records.flatMap((record) =>
     record.problem === null ? [] : [{ run_id: record.runId, detail: record.problem }],
@@ -540,7 +656,7 @@ async function storedBaselineReleases(
   const record = await loadStoredReleasesRecord(0, country);
   if (record) return recordedReleaseInventory(record, country, manifest);
   const folders = await loadStoredReleaseFolders(0, country);
-  const tagged = await loadStoredCutReleases(0, country, manifest, folders);
+  const tagged = await loadStoredTaggedReleases(0, country, manifest, folders);
   return [...folders, ...tagged];
 }
 
@@ -580,17 +696,18 @@ const targetChangeCache = new Map<
   { promise: Promise<ReturnType<typeof buildTargetChangeDataset> | null>; expiresAt: number }
 >();
 
+// The run's tree, its documents' status and its calibration, read once for
+// the target-change readers. The cache key names the tree, so a replaced
+// tree is never answered from an earlier one's cache entry.
 async function targetChangeCandidate(country: MicrocosmCountry, runId: string) {
-  const documents = await readRunDocuments(country, runId, ["progress.json", "run_manifest.json"]);
+  const [{ manifest }, documents] = await Promise.all([
+    readStoreManifest(),
+    readRunDocuments(country, runId, CALIBRATION_DOCUMENTS),
+  ]);
   return {
+    tree: stagingTreeEntry(manifest, country, runId)?.buildArtifactId ?? "none",
     ttlSeconds: stagingTargetChangeCacheTtlSeconds(documents?.progress?.status),
-    calibration: () =>
-      calibrationFromStore(
-        country,
-        runId,
-        documents?.progress ?? null,
-        documents?.runManifest ?? null,
-      ),
+    calibration: () => calibrationFromStore(country, runId, documents, manifest),
   };
 }
 
@@ -606,7 +723,7 @@ export async function loadStoredStagingTargetChangeDataset(
   const candidate = await targetChangeCandidate(country, runId);
   const dataset = await remember(
     targetChangeCache,
-    `${country}:${runId}:${releaseId}`,
+    `${country}:${runId}:${candidate.tree}:${releaseId}`,
     candidate.ttlSeconds,
     async () => {
       const [release, staging] = await Promise.all([
@@ -616,7 +733,7 @@ export async function loadStoredStagingTargetChangeDataset(
       return staging ? buildTargetChangeDataset(release, staging) : null;
     },
   );
-  if (!dataset) targetChangeCache.delete(`${country}:${runId}:${releaseId}`);
+  if (!dataset) targetChangeCache.delete(`${country}:${runId}:${candidate.tree}:${releaseId}`);
   return dataset;
 }
 
@@ -641,7 +758,7 @@ export async function loadStoredStagingTargetChangeDatasetFromBuild(
   if (stagingUnavailableReason(country)) return null;
   assertSafeReleaseId(runId, "run");
   const candidate = await targetChangeCandidate(country, runId);
-  const key = `${country}:${runId}:build:${currentBuildArtifactId}`;
+  const key = `${country}:${runId}:${candidate.tree}:build:${currentBuildArtifactId}`;
   const dataset = await remember(targetChangeCache, key, candidate.ttlSeconds, async () => {
     const [current, staging] = await Promise.all([
       loadCalibrationComparisonSource(country, currentBuildArtifactId, treePartReader),

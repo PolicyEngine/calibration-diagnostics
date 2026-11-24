@@ -343,7 +343,7 @@ export async function loadStoredReleaseFolders(
  * release's folder (a tag of a release series). Roles come from each build's
  * stored release manifest.
  */
-export async function loadStoredCutReleases(
+export async function loadStoredTaggedReleases(
   _revalidate: number,
   country: MicrocosmCountry,
   manifest: CalibrationTreeManifest,
@@ -353,12 +353,12 @@ export async function loadStoredCutReleases(
   const calibratedFolders = new Set(
     folders.filter((folder) => folder.has_calibration).map((folder) => folder.release_id),
   );
-  const cuts = manifestReleaseBuilds(manifest, country).filter(
+  const tagged = manifestReleaseBuilds(manifest, country).filter(
     (build) =>
       releaseDirectoryOf(build) !== build.releaseId || !calibratedFolders.has(build.releaseId!),
   );
   return Promise.all(
-    cuts.map((build) =>
+    tagged.map((build) =>
       manifestReleaseEntry(
         country,
         build,
