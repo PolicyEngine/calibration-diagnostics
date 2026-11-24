@@ -2,8 +2,8 @@
 // readers, the Blob I/O and the publisher) has one source, in
 // PolicyEngine/microcosm-collector, published to npm as
 // @policyengine/calibration-tree. The dashboard installs one published
-// version from npm, keeps no copy of its own, and runs the installed
-// package's publisher.
+// version from npm and keeps no copy of its own. The collector runs the
+// package's publisher; the dashboard only reads what it stores.
 import { expect, test } from "bun:test";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -11,7 +11,6 @@ import { join, relative } from "node:path";
 const FRONTEND_ROOT = import.meta.dir;
 const PACKAGE_NAME = "@policyengine/calibration-tree";
 const INSTALLED_PACKAGE = join("node_modules", "@policyengine", "calibration-tree");
-const PUBLISHER_MODULE = join(INSTALLED_PACKAGE, "src", "publish-calibration-tree.ts");
 // An exact release, such as 0.1.0: no range, tag, path or workspace protocol.
 const EXACT_RELEASE = /^\d+\.\d+\.\d+$/;
 // Code and tests, whose paths are read when they run.
@@ -99,20 +98,6 @@ test("no dashboard script runs the package's tree publisher: the collector build
     .filter(([, command]) => command.includes("publish-calibration-tree"))
     .map(([name]) => name);
   expect(publisherScripts).toEqual([]);
-});
-
-test("the publisher script runs the installed package's publisher module", () => {
-  const exportedPublisher = relative(
-    FRONTEND_ROOT,
-    Bun.resolveSync(`${PACKAGE_NAME}/publish-calibration-tree`, FRONTEND_ROOT),
-  );
-  expect({
-    script: frontendManifest().scripts["publish:calibration-tree"],
-    exportedPublisher,
-  }).toEqual({
-    script: `bun run ${PUBLISHER_MODULE}`,
-    exportedPublisher: PUBLISHER_MODULE,
-  });
 });
 
 test("lint typechecks the dashboard alone; the collector typechecks the package", () => {
