@@ -5,6 +5,7 @@ import {
   loadBuildRun,
   loadBuildRuns,
 } from "@/lib/microcosm/build-runs";
+import { FakeCollectorStore } from "@/lib/microcosm/test-support/fake-collector-store";
 import {
   FAKE_COLLECTOR_URL,
   fakeTelemetryCollector,
@@ -223,14 +224,21 @@ describe("the Build progress tab with the setting off", () => {
 
 
   for (const off of [undefined, "", "0"]) {
-    test(`still reads the Hugging Face run files when the setting is ${JSON.stringify(off ?? null)}`, async () => {
-      const { huggingFaceRequests } = serveUsCollector(1);
+    test(`still reads the collector's copies of the run files when the setting is ${JSON.stringify(off ?? null)}`, async () => {
+      const collector = fakeTelemetryCollector({ countryCode: "US", runCount: 1 });
+      const store = new FakeCollectorStore();
+      const restore = store.install(collector.fetch);
       if (off === undefined) delete process.env[SETTING];
       else process.env[SETTING] = off;
 
-      await loadBuildRuns("staging", "us");
+      try {
+        await loadBuildRuns("staging", "us");
+      } finally {
+        restore();
+      }
 
-      expect(huggingFaceRequests.length).toBeGreaterThan(0);
+      expect(store.requests).toContain("staging-run-files/us/index.json");
+      expect(store.huggingFaceRequests).toEqual([]);
     });
   }
 });

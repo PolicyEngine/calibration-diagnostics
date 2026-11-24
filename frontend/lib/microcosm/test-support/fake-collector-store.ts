@@ -5,8 +5,9 @@
 // original-file copies, each country's `releases.json` copy and each
 // country's staging run copies. It also replaces `globalThis.fetch`, which
 // the Hugging Face readers use: every request to Hugging Face is recorded and
-// answered 500, so a test can say that a page made none, and any other
-// request fails the test. The Blob credentials are removed meanwhile, so a
+// answered 500, so a test can say that a page made none; any other request
+// goes to the fetch `install` is given, such as a fake telemetry collector's,
+// or fails the test. The Blob credentials are removed meanwhile, so a
 // read that bypassed the client fails without leaving the machine.
 import { spyOn } from "bun:test";
 import { createHash } from "node:crypto";
@@ -97,6 +98,9 @@ export interface FakeStagingRun {
 export class FakeCollectorStore {
   readonly objects = new Map<string, Uint8Array>();
   readonly requests: string[] = [];
+  /** Set to make every read fail, as an unreachable store does. */
+  failure: Error | null = null;
+  private otherRequests: typeof fetch | null = null;
   readonly huggingFaceRequests: string[] = [];
   manifest: CalibrationTreeManifest = emptyCalibrationTreeManifest();
   private readonly stagingIndexes = new Map<MicrocosmCountry, StagingRunFilesIndex>();
@@ -219,6 +223,7 @@ export class FakeCollectorStore {
   /** As `@vercel/blob`'s `get` answers: null for a missing object. */
   readonly get = (async (pathname: string) => {
     this.requests.push(pathname);
+    if (this.failure) throw this.failure;
     const body = this.object(pathname);
     if (body == null) return null;
     return {
@@ -245,11 +250,17 @@ export class FakeCollectorStore {
       this.huggingFaceRequests.push(url.toString());
       return new Response("Hugging Face is not available in this test.", { status: 500 });
     }
+    if (this.otherRequests) return this.otherRequests(input);
     throw new Error(`Unexpected request in a collector store test: ${url.toString()}`);
   }) as typeof fetch;
 
-  /** Serves this store to the dashboard's readers; returns the function that undoes it. */
-  install(): () => void {
+  /**
+   * Serves this store to the dashboard's readers; returns the function that
+   * undoes it. Requests to neither the store nor Hugging Face go to
+   * `otherRequests`.
+   */
+  install(otherRequests: typeof fetch | null = null): () => void {
+    this.otherRequests = otherRequests;
     const originalFetch = globalThis.fetch;
     const originalSettings = Object.fromEntries(
       CREDENTIAL_SETTINGS.map((name) => [name, process.env[name]]),

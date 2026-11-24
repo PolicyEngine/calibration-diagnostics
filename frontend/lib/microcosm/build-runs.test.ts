@@ -24,6 +24,7 @@ import {
   FAKE_COLLECTOR_URL,
   fakeTelemetryCollector,
 } from "@/lib/microcosm/test-support/fake-telemetry-collector";
+import { FakeCollectorStore } from "@/lib/microcosm/test-support/fake-collector-store";
 import { CollectorRequestError } from "@/lib/server/microcosm/telemetry-collector-client";
 import { secretManager } from "@/lib/server/secret-manager";
 
@@ -358,6 +359,17 @@ const READ_SECRET_VERSION =
 
 // Runs `body` with the collector configured to answer through `collectorFetch`,
 // or with the collector not configured when it is null.
+// Runs `body` with `store` serving the collector's copies; other requests go
+// to the fetch in place when it starts, such as a fake collector's.
+async function withStore<T>(store: FakeCollectorStore, body: () => Promise<T>): Promise<T> {
+  const restore = store.install(globalThis.fetch);
+  try {
+    return await body();
+  } finally {
+    restore();
+  }
+}
+
 async function withCollector<T>(
   collectorFetch: typeof fetch | null,
   body: () => Promise<T>,
@@ -626,7 +638,8 @@ describe("unfinished Candidate tab runs older than the collector's list", () => 
         jest.advanceTimersByTime(5_000);
         const first = await pending;
         answerRecord();
-        await Bun.sleep(0);
+        // Bun's fake timers hold Bun.sleep too, so the answer is let through
+        // with microtask turns only.
         await settlePendingWork();
         return [first, await poll()];
       }),
@@ -999,35 +1012,33 @@ describe("how much the build list reads", () => {
   // Past the build list's 30-second and the collector list's 15-second caches.
   const PAST_THE_LIST_CACHES_MS = 31_000;
 
-  test("the build list reads the collector and the Hugging Face history at the same time", async () => {
+  test("the build list reads the collector and the copied run history at the same time", async () => {
     clearBuildRunCaches();
     const collector = fakeTelemetryCollector({ countryCode: "US", runCount: 2 });
-    let huggingFaceRequested = false;
-    let huggingFaceRequestedWhileCollectorListPending = false;
-    const bothSources = (async (input: RequestInfo | URL) => {
-      const url = new URL(String(input));
-      if (url.origin === "https://huggingface.co") {
-        huggingFaceRequested = true;
-        // An empty staging repository.
-        return Response.json([]);
-      }
-      if (url.pathname === "/v1/runs") {
+    // A staging repository with no copied runs.
+    const store = new FakeCollectorStore();
+    let historyRequestedWhileCollectorListPending = false;
+    const holdingTheList = (async (input: RequestInfo | URL) => {
+      if (new URL(String(input)).pathname === "/v1/runs") {
         // Hold the collector's list for up to half a second, or until the
-        // Hugging Face history has been asked for.
+        // copied history has been asked for.
         const deadline = Date.now() + 500;
-        while (!huggingFaceRequested && Date.now() < deadline) {
+        while (!store.requests.length && Date.now() < deadline) {
           await new Promise((resolve) => setTimeout(resolve, 5));
         }
-        huggingFaceRequestedWhileCollectorListPending = huggingFaceRequested;
+        historyRequestedWhileCollectorListPending = store.requests.length > 0;
       }
       return collector.fetch(input);
     }) as typeof fetch;
 
-    const response = await withCollector(bothSources, () => loadBuildRuns("staging", "us"));
+    const response = await withCollector(holdingTheList, () =>
+      withStore(store, () => loadBuildRuns("staging", "us")),
+    );
 
     expect(response.problems).toEqual([]);
     expect(response.runs).toHaveLength(2);
-    expect(huggingFaceRequestedWhileCollectorListPending).toBe(true);
+    expect(historyRequestedWhileCollectorListPending).toBe(true);
+    expect(store.huggingFaceRequests).toEqual([]);
   });
 
   test("a collector run whose list row is unchanged is read once, even while it runs", async () => {
@@ -1115,31 +1126,29 @@ describe("how much the build list reads", () => {
     expect(readsOf(finishedRunId)).toBe(1);
   });
 
-  test("a Hugging Face failure still lists the collector's runs and says so", async () => {
+  test("a failure to read the copied run files still lists the collector's runs and says so", async () => {
     clearBuildRunCaches();
     const collector = fakeTelemetryCollector({ countryCode: "US", runCount: 2 });
-    const huggingFaceDown = (async (input: RequestInfo | URL) => {
-      if (new URL(String(input)).origin === "https://huggingface.co") {
-        return Response.json({ error: "Unavailable." }, { status: 503 });
-      }
-      return collector.fetch(input);
-    }) as typeof fetch;
+    const store = new FakeCollectorStore();
+    store.failure = new Error("Vercel Blob: Failed to fetch blob: 503");
 
-    const response = await withCollector(huggingFaceDown, () => loadBuildRuns("staging", "us"));
+    const response = await withCollector(collector.fetch, () =>
+      withStore(store, () => loadBuildRuns("staging", "us")),
+    );
 
     expect(response.available).toBe(true);
     expect(response.runs).toHaveLength(2);
     expect(response.problems.map((problem) => problem.run_id)).toEqual(["hugging-face-history"]);
   });
 
-  test("a collector failure still lists the Hugging Face runs and says so", async () => {
+  test("a collector failure still lists the copied runs and says so", async () => {
     clearBuildRunCaches();
-    const collectorDown = (async (input: RequestInfo | URL) => {
-      if (new URL(String(input)).origin === "https://huggingface.co") return Response.json([]);
-      return Response.json({ detail: "Unavailable." }, { status: 503 });
-    }) as typeof fetch;
+    const collectorDown = (async (_input: RequestInfo | URL) =>
+      Response.json({ detail: "Unavailable." }, { status: 503 })) as typeof fetch;
 
-    const response = await withCollector(collectorDown, () => loadBuildRuns("staging", "us"));
+    const response = await withCollector(collectorDown, () =>
+      withStore(new FakeCollectorStore(), () => loadBuildRuns("staging", "us")),
+    );
 
     expect(response.available).toBe(true);
     expect(response.problems).toEqual([
