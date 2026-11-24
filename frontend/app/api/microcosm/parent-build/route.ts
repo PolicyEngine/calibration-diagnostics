@@ -5,28 +5,25 @@ import {
   requiredCountry,
 } from "@/lib/api/request-country";
 import {
-  PARENT_BUILD_MANIFEST_FILE,
   parentBuildFromManifest,
   type ParentBuildResponse,
 } from "@/lib/microcosm/inherited-calibration";
-import {
-  isReleaseId,
-  resolveCalibrationRelease,
-} from "@policyengine/calibration-tree/calibration-release-locator";
+import { isReleaseId } from "@policyengine/calibration-tree/calibration-release-locator";
 import { CountryNotConfiguredError } from "@policyengine/calibration-tree/countries";
-import { loadCountryRepositoryHashedJson } from "@policyengine/calibration-tree/latest-artifact";
 import { isBuildFolderId } from "@policyengine/calibration-tree/release-record";
+import {
+  loadStoredParentBuildManifest,
+  resolveStoredRelease,
+} from "@/lib/microcosm/collector-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// The Hugging Face read waits up to 120 seconds, so the route allows longer,
-// as the release route does, and a slow read ends in this route's 502.
+// As long as the release route allows, so a slow store read ends in this
+// route's 502.
 export const maxDuration = 300;
 
-// The file is read at the build's pinned commit, where its bytes never
-// change, so the read is cached for a day and the CDN keeps the answer for an
-// hour.
-const PARENT_MANIFEST_REVALIDATE_SECONDS = 86_400;
+// The file is the store's copy of the one the build was published with,
+// whose bytes never change, so the CDN keeps the answer for an hour.
 const ANSWER_CACHE_HEADERS = {
   "Cache-Control": "public, max-age=0, must-revalidate",
   "Vercel-CDN-Cache-Control": "public, max-age=3600, stale-if-error=86400",
@@ -34,18 +31,22 @@ const ANSWER_CACHE_HEADERS = {
 const NO_STORE = { "Cache-Control": "no-store" };
 
 export interface ParentBuildRouteDependencies {
-  resolveRelease: typeof resolveCalibrationRelease;
-  loadJson: typeof loadCountryRepositoryHashedJson;
+  resolveRelease(
+    country: Parameters<typeof resolveStoredRelease>[0],
+    release: string,
+  ): ReturnType<typeof resolveStoredRelease>;
+  loadParentManifest: typeof loadStoredParentBuildManifest;
 }
 
 // The build whose calibration a release build inherits, and that build's
 // staging run, from the `parent_build_manifest.json` a compatibility
-// recertification carries in its folder. The folder and commit come from the
-// calibration tree manifest, never from the request.
+// recertification carries in its folder, read from the collector's copy of
+// the build's files. The build comes from the calibration tree manifest,
+// never from the request.
 export function createParentBuildHandler(
   dependencies: ParentBuildRouteDependencies = {
-    resolveRelease: resolveCalibrationRelease,
-    loadJson: loadCountryRepositoryHashedJson,
+    resolveRelease: resolveStoredRelease,
+    loadParentManifest: loadStoredParentBuildManifest,
   },
 ) {
   return async function GET(request: Request) {
@@ -62,7 +63,7 @@ export function createParentBuildHandler(
 
     let location;
     try {
-      location = await dependencies.resolveRelease(country, release, 3600);
+      location = await dependencies.resolveRelease(country, release);
     } catch (error) {
       if (error instanceof CountryNotConfiguredError) {
         return countryNotConfiguredResponse(error);
@@ -81,15 +82,10 @@ export function createParentBuildHandler(
     }
 
     try {
-      const manifest = await dependencies.loadJson(
-        `releases/${location.releaseDirectory}/${PARENT_BUILD_MANIFEST_FILE}`,
-        PARENT_MANIFEST_REVALIDATE_SECONDS,
-        country,
-        location.hfCommitSha,
-      );
+      const manifest = await dependencies.loadParentManifest(location, country);
       const body: ParentBuildResponse = {
         release_id: location.releaseId,
-        ...parentBuildFromManifest(manifest?.payload ?? null),
+        ...parentBuildFromManifest(manifest),
       };
       return NextResponse.json(body, { headers: ANSWER_CACHE_HEADERS });
     } catch (error) {

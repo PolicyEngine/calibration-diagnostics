@@ -5,12 +5,13 @@ import { hasCapability, type MicrocosmCountry } from "@policyengine/calibration-
 import {
   scrub,
 } from "@policyengine/calibration-tree/latest-artifact";
+import type { StagingComparisonRelease } from "@policyengine/calibration-tree/staging-artifact";
 import {
-  loadStagingComparison,
-  resolveStagingComparisonRelease,
-  type StagingComparison,
-  type StagingComparisonRelease,
-} from "@policyengine/calibration-tree/staging-artifact";
+  loadStoredStagingComparison,
+  resolveStoredStagingComparisonRelease,
+} from "@/lib/microcosm/stored-staging";
+
+type StagingComparison = Awaited<ReturnType<typeof loadStoredStagingComparison>>;
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -32,9 +33,8 @@ export interface StagingCompareRouteDependencies {
 
 export function createStagingCompareHandler(
   dependencies: StagingCompareRouteDependencies = {
-    resolveComparisonRelease: (runId, country) =>
-      resolveStagingComparisonRelease(runId, country),
-    loadComparison: loadStagingComparison,
+    resolveComparisonRelease: resolveStoredStagingComparisonRelease,
+    loadComparison: loadStoredStagingComparison,
   },
 ) {
   return async function GET(request: Request) {

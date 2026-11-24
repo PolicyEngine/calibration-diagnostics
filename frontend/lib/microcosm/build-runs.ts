@@ -34,9 +34,9 @@ import {
   localRunRoots,
 } from "@/lib/microcosm/local-build-runs";
 import {
-  loadStagingRuns,
-  loadStagingRunTelemetry,
-} from "@policyengine/calibration-tree/staging-artifact";
+  loadStoredStagingRunTelemetry,
+  loadStoredStagingTelemetry,
+} from "@/lib/microcosm/stored-staging";
 import { onOffSetting } from "@/lib/microcosm/on-off-setting";
 import {
   CollectorRequestError,
@@ -79,9 +79,9 @@ const COLLECTOR_LIST_WAIT_MS = 5_000;
 const EARLIER_COLLECTOR_LIST_MAX_AGE_MS = 60_000;
 
 // `1` makes the Build progress tab read build telemetry only from the
-// collector: neither its run list nor a run's detail reads the run files
-// builds wrote to the Hugging Face staging repositories. Unset, empty or `0`
-// reads both.
+// collector's read API: neither its run list nor a run's detail reads the
+// collector's copies of the run files builds wrote to the Hugging Face staging
+// repositories. Unset, empty or `0` reads both.
 export const COLLECTOR_ONLY_ENV = "MICROCOSM_BUILD_MONITOR_COLLECTOR_ONLY";
 
 function collectorOnly(): boolean {
@@ -166,6 +166,23 @@ const answeredCollectorLists = new Map<
 // Counts `clear()` calls, so that a request made before one keeps no answer.
 let collectorListsGeneration = 0;
 
+// What the collector answered for a run older than its list: the run's
+// documents, or null when it has no record of the run.
+type OlderRunRecord = BuildRunDocuments | null;
+
+// The latest answer for each older run, by `country:run id`, and the request
+// in flight for it. They follow the rules of the list above: a request in
+// flight is shared for `COLLECTOR_LIST_WAIT_MS`, a late answer serves later
+// polls, and a failed request is dropped so the next poll asks again.
+const olderRunRecords = new Map<
+  string,
+  { record: OlderRunRecord; requestedAt: number; answeredAt: number }
+>();
+const olderRunRequests = new Map<
+  string,
+  { record: Promise<OlderRunRecord>; requestedAt: number }
+>();
+
 export const collectorRunLists = {
   recent(country: MicrocosmCountry): Promise<CollectorRunSummary[]> {
     const now = Date.now();
@@ -218,10 +235,13 @@ export const collectorRunLists = {
       ? answered.runs
       : null;
   },
+  // Also forgets the records read for runs older than the list.
   clear(): void {
     collectorListsGeneration += 1;
     collectorLists.clear();
     answeredCollectorLists.clear();
+    olderRunRecords.clear();
+    olderRunRequests.clear();
   },
 };
 
@@ -278,7 +298,7 @@ const hostedRunLoaders: HostedRunLoaders = {
     !collectorOnly() && hasCapability(country, "staging"),
   loadCollector: loadCollectorRecord,
   loadHistory: async (runId, country) => ({
-    ...(await loadStagingRunTelemetry(runId, 0, country)),
+    ...(await loadStoredStagingRunTelemetry(runId, 0, country)),
     source: "staging",
     country,
   }),
@@ -323,6 +343,8 @@ async function loadLocal(country: MicrocosmCountry): Promise<LoadedRuns> {
   return { available: true, detail: null, documents, problems };
 }
 
+// The run files builds wrote to the Hugging Face staging repository, from the
+// collector's copies of them.
 async function loadHuggingFaceStaging(
   country: MicrocosmCountry,
 ): Promise<LoadedRuns> {
@@ -334,56 +356,37 @@ async function loadHuggingFaceStaging(
       problems: [],
     };
   }
-  const list = await loadStagingRuns(0, country);
-  if (!list.available) {
+  const cachedFinal = (runId: string) =>
+    stagingRunCache.get(`${country}:${runId}`)?.final === true;
+  const copied = await loadStoredStagingTelemetry(country, STAGING_RUN_LIMIT, cachedFinal);
+  if (!copied.available) {
     return {
       available: false,
-      detail:
-        ("detail" in list ? list.detail : null) ??
-        "Staging runs are unavailable.",
+      detail: copied.detail ?? "Staging runs are unavailable.",
       documents: [],
       problems: [],
     };
   }
-  const problems: BuildRunProblem[] = (list.incompatible_runs ?? []).map(
-    (run) => ({
-      run_id: run.run_id,
-      detail: run.detail,
-    }),
-  );
   const documents: BuildRunDocuments[] = [];
-  await Promise.all(
-    list.runs.slice(0, STAGING_RUN_LIMIT).map(async (summary) => {
-      const key = `${country}:${summary.run_id}`;
-      const cached = stagingRunCache.get(key);
-      if (cached?.final) {
-        documents.push(cached.documents);
-        return;
-      }
-      try {
-        const telemetry = await loadStagingRunTelemetry(
-          summary.run_id,
-          0,
-          country,
-        );
-        const loaded: BuildRunDocuments = {
-          ...telemetry,
-          source: "staging",
-          country,
-        };
-        stagingRunCache.set(key, {
-          documents: loaded,
-          final: isFinal(loaded),
-          collector_version: null,
-          read_at: Date.now(),
-        });
-        documents.push(loaded);
-      } catch (error) {
-        problems.push({ run_id: summary.run_id, detail: message(error) });
-      }
-    }),
-  );
-  return { available: true, detail: null, documents, problems };
+  for (const runId of copied.runIds) {
+    const key = `${country}:${runId}`;
+    const cached = stagingRunCache.get(key);
+    if (cached?.final) {
+      documents.push(cached.documents);
+      continue;
+    }
+    const telemetry = copied.telemetry.get(runId);
+    if (!telemetry) continue;
+    const loaded: BuildRunDocuments = { ...telemetry, source: "staging", country };
+    stagingRunCache.set(key, {
+      documents: loaded,
+      final: isFinal(loaded),
+      collector_version: null,
+      read_at: Date.now(),
+    });
+    documents.push(loaded);
+  }
+  return { available: true, detail: null, documents, problems: copied.problems };
 }
 
 // What a collector run's row in the collector's run list says about its
@@ -469,31 +472,113 @@ async function loadCollector(country: MicrocosmCountry): Promise<LoadedRuns> {
   return { available: true, detail: null, documents, problems };
 }
 
+function requestOlderRunRecord(
+  country: MicrocosmCountry,
+  runId: string,
+  key: string,
+): Promise<OlderRunRecord> {
+  const generation = collectorListsGeneration;
+  const requestedAt = Date.now();
+  const record = loadCollectorRun(runId, country).catch((error: unknown) => {
+    if (
+      error instanceof InvalidCollectorRunIdError ||
+      (error instanceof CollectorRequestError && error.status === 404)
+    ) {
+      return null;
+    }
+    throw error;
+  });
+  const request = { record, requestedAt };
+  olderRunRequests.set(key, request);
+  const finishRequest = () => {
+    if (olderRunRequests.get(key) === request) olderRunRequests.delete(key);
+  };
+  record.then((answered) => {
+    finishRequest();
+    const latest = olderRunRecords.get(key);
+    if (
+      generation === collectorListsGeneration &&
+      (!latest || latest.requestedAt <= requestedAt)
+    ) {
+      olderRunRecords.set(key, {
+        record: answered,
+        requestedAt,
+        answeredAt: Date.now(),
+      });
+    }
+  }, finishRequest);
+  return record;
+}
+
+// The collector's record of a run older than its list. An answer is reused
+// for `UNFINISHED_RECORD_REUSE_MS`. Past `waitMs` the latest earlier answer
+// stands in, however old; with none, the wait is reported as a failure and
+// the request's answer serves a later poll.
+async function loadOlderRunRecord(
+  country: MicrocosmCountry,
+  runId: string,
+  waitMs: number,
+): Promise<OlderRunRecord> {
+  const key = `${country}:${runId}`;
+  const now = Date.now();
+  const latest = olderRunRecords.get(key);
+  if (latest && now - latest.answeredAt < UNFINISHED_RECORD_REUSE_MS) {
+    return latest.record;
+  }
+  const inFlight = olderRunRequests.get(key);
+  const record =
+    inFlight && now - inFlight.requestedAt < COLLECTOR_LIST_WAIT_MS
+      ? inFlight.record
+      : requestOlderRunRecord(country, runId, key);
+  const answered = await settledWithin(record, waitMs);
+  if (answered !== WAIT_OVER) return answered;
+  if (latest) return latest.record;
+  throw new Error(`no answer within ${waitMs / 1000} seconds`);
+}
+
 export interface CollectorTimelines {
   // The build monitor's timeline of each requested run the collector has a
   // record of, by run id.
   timelines: Map<string, BuildTimeline>;
+  // The collector's record each timeline was built from, for the run's own
+  // page. Optional so callers that only read states can leave it out.
+  documents?: Map<string, BuildRunDocuments>;
   // Why some or all requested runs could not use the collector's record;
   // null when the collector answered for every run it knows.
   note: string | null;
 }
 
-const HUGGING_FACE_FALLBACK =
-  "run states come from the Hugging Face staging repository";
+// Where run states come from when the collector's record can't be used: the
+// collector's copies of the run files builds wrote to Hugging Face.
+const RUN_FILES_FALLBACK =
+  "run states come from the collector's copies of the Hugging Face staging run files";
+
+export interface CollectorTimelineOptions {
+  // The requested runs whose Hugging Face copy records no end. Those older
+  // than the collector's list are read one by one: only the collector can say
+  // how they ended. A run with a recorded end needs no such read.
+  unfinishedRunIds?: readonly string[];
+  // How long to wait for the list, and then for the runs read one by one.
+  waitMs?: number;
+}
 
 // The collector's state for runs the Candidate tab lists from Hugging Face.
 // It reads the same records the Build progress tab does (the country's 60
-// most recent collector runs, from the shared list) and derives each state
-// with the same `buildTimeline`, so the two tabs agree on every run the
-// collector knows. It waits at most `waitMs` for the list.
+// most recent collector runs, from the shared list), plus the unfinished runs
+// older than that list, and derives each state with the same `buildTimeline`,
+// so the two tabs agree on every run the collector knows.
 export async function loadCollectorTimelines(
   country: MicrocosmCountry,
   runIds: readonly string[],
   nowMs: number = Date.now(),
-  waitMs: number = COLLECTOR_LIST_WAIT_MS,
+  {
+    unfinishedRunIds = [],
+    waitMs = COLLECTOR_LIST_WAIT_MS,
+  }: CollectorTimelineOptions = {},
 ): Promise<CollectorTimelines> {
   const timelines = new Map<string, BuildTimeline>();
-  if (!runIds.length) return { timelines, note: null };
+  const documents = new Map<string, BuildRunDocuments>();
+  if (!runIds.length) return { timelines, documents, note: null };
   let summaries: CollectorRunSummary[];
   try {
     // An invalid collector setting throws here; it must not hide the
@@ -501,7 +586,8 @@ export async function loadCollectorTimelines(
     if (!collectorConfigured()) {
       return {
         timelines,
-        note: `The telemetry collector is not configured on this server, so ${HUGGING_FACE_FALLBACK}.`,
+        documents,
+        note: `The telemetry collector is not configured on this server, so ${RUN_FILES_FALLBACK}.`,
       };
     }
     const listed = await settledWithin(collectorRunLists.recent(country), waitMs);
@@ -517,7 +603,8 @@ export async function loadCollectorTimelines(
       if (!earlier) {
         return {
           timelines,
-          note: `The telemetry collector did not answer within ${waitMs / 1000} seconds, so ${HUGGING_FACE_FALLBACK}.`,
+          documents,
+          note: `The telemetry collector did not answer within ${waitMs / 1000} seconds, so ${RUN_FILES_FALLBACK}.`,
         };
       }
       summaries = earlier;
@@ -525,32 +612,54 @@ export async function loadCollectorTimelines(
   } catch (error) {
     return {
       timelines,
-      note: `The telemetry collector could not be read (${message(error)}), so ${HUGGING_FACE_FALLBACK}.`,
+      documents,
+      note: `The telemetry collector could not be read (${message(error)}), so ${RUN_FILES_FALLBACK}.`,
     };
   }
   const requested = new Set(runIds);
+  const listed = new Set(summaries.map((summary) => summary.run_id));
+  // A list shorter than its limit holds every run the collector has.
+  const olderRunIds =
+    summaries.length < STAGING_RUN_LIMIT
+      ? []
+      : unfinishedRunIds.filter(
+          (runId) => requested.has(runId) && !listed.has(runId),
+        );
   const problems: BuildRunProblem[] = [];
-  await Promise.all(
-    summaries
+  await Promise.all([
+    ...summaries
       .filter((summary) => requested.has(summary.run_id))
       .map(async (summary) => {
         try {
-          const documents = await loadCollectorDocuments(summary, country);
-          timelines.set(summary.run_id, buildTimeline(documents, nowMs));
+          const record = await loadCollectorDocuments(summary, country);
+          timelines.set(summary.run_id, buildTimeline(record, nowMs));
+          documents.set(summary.run_id, record);
         } catch (error) {
           problems.push({ run_id: summary.run_id, detail: message(error) });
         }
       }),
-  );
-  if (!problems.length) return { timelines, note: null };
+    ...olderRunIds.map(async (runId) => {
+      try {
+        const record = await loadOlderRunRecord(country, runId, waitMs);
+        if (record) {
+          timelines.set(runId, buildTimeline(record, nowMs));
+          documents.set(runId, record);
+        }
+      } catch (error) {
+        problems.push({ run_id: runId, detail: message(error) });
+      }
+    }),
+  ]);
+  if (!problems.length) return { timelines, documents, note: null };
   const unreadable = problems
     .map((problem) => `${problem.run_id} (${problem.detail})`)
     .join(", ");
   return {
     timelines,
+    documents,
     note: `The telemetry collector's record could not be read for ${unreadable}, so ${
       problems.length === 1 ? "that run's state comes" : "those runs' states come"
-    } from the Hugging Face staging repository.`,
+    } from the collector's copies of the Hugging Face staging run files.`,
   };
 }
 

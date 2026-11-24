@@ -24,6 +24,7 @@ import {
   FAKE_COLLECTOR_URL,
   fakeTelemetryCollector,
 } from "@/lib/microcosm/test-support/fake-telemetry-collector";
+import { FakeCollectorStore } from "@/lib/microcosm/test-support/fake-collector-store";
 import { CollectorRequestError } from "@/lib/server/microcosm/telemetry-collector-client";
 import { secretManager } from "@/lib/server/secret-manager";
 
@@ -358,6 +359,17 @@ const READ_SECRET_VERSION =
 
 // Runs `body` with the collector configured to answer through `collectorFetch`,
 // or with the collector not configured when it is null.
+// Runs `body` with `store` serving the collector's copies; other requests go
+// to the fetch in place when it starts, such as a fake collector's.
+async function withStore<T>(store: FakeCollectorStore, body: () => Promise<T>): Promise<T> {
+  const restore = store.install(globalThis.fetch);
+  try {
+    return await body();
+  } finally {
+    restore();
+  }
+}
+
 async function withCollector<T>(
   collectorFetch: typeof fetch | null,
   body: () => Promise<T>,
@@ -424,6 +436,11 @@ describe("loadCollectorTimelines for the Candidate tab", () => {
     );
     expect(loaded.timelines.get(newest)?.state).toBe("running");
     expect(loaded.timelines.get(finished)?.state).toBe("passed");
+    // The records the timelines were built from, for the run's own page.
+    expect([...(loaded.documents ?? new Map()).keys()].toSorted()).toEqual(
+      [newest, finished].toSorted(),
+    );
+    expect(loaded.documents?.get(newest)?.run_id).toBe(newest);
   });
 
   test("asks the collector nothing when no run is requested", async () => {
@@ -433,7 +450,7 @@ describe("loadCollectorTimelines for the Candidate tab", () => {
       loadCollectorTimelines("am", [], NOW),
     );
 
-    expect(loaded).toEqual({ timelines: new Map(), note: null });
+    expect(loaded).toEqual({ timelines: new Map(), documents: new Map(), note: null });
     expect(collector.listRequests).toHaveLength(0);
   });
 
@@ -444,6 +461,10 @@ describe("loadCollectorTimelines for the Candidate tab", () => {
 
     expect(loaded.timelines.size).toBe(0);
     expect(loaded.note).toContain("not configured");
+    // The Candidate tab reads the collector's copies of the run files.
+    expect(loaded.note).toContain(
+      "run states come from the collector's copies of the Hugging Face staging run files",
+    );
   });
 
   test("a failed collector request leaves every run on Hugging Face, with a note", async () => {
@@ -477,6 +498,182 @@ describe("loadCollectorTimelines for the Candidate tab", () => {
     expect([...loaded.timelines.keys()]).toEqual([readable]);
     expect(loaded.note).toContain(unreadable);
     expect(loaded.note).toContain("500");
+  });
+});
+
+describe("unfinished Candidate tab runs older than the collector's list", () => {
+  // The list holds the 60 newest runs, so this collector's 71st is outside it.
+  function collectorWithOlderRun() {
+    const collector = fakeTelemetryCollector({ countryCode: "AM", runCount: 80 });
+    return { collector, olderRunId: collector.runs[70].run_id };
+  }
+
+  function readsOf(
+    collector: ReturnType<typeof fakeTelemetryCollector>,
+    runId: string,
+  ): number {
+    return collector.documentRequests.filter((requested) => requested === runId).length;
+  }
+
+  async function withFakeTimers<T>(body: () => Promise<T>): Promise<T> {
+    jest.useFakeTimers();
+    try {
+      return await body();
+    } finally {
+      jest.useRealTimers();
+    }
+  }
+
+  async function settlePendingWork(): Promise<void> {
+    for (let turn = 0; turn < 200; turn += 1) await Promise.resolve();
+  }
+
+  test("an unfinished run takes the state of its own collector record", async () => {
+    const { collector, olderRunId } = collectorWithOlderRun();
+
+    const loaded = await withCollector(collector.fetch, () =>
+      loadCollectorTimelines("am", [olderRunId], NOW, {
+        unfinishedRunIds: [olderRunId],
+      }),
+    );
+
+    expect(loaded.note).toBeNull();
+    expect(loaded.timelines.get(olderRunId)?.state).toBe("passed");
+    expect(readsOf(collector, olderRunId)).toBe(1);
+  });
+
+  test("a run Hugging Face records as ended is not read on its own", async () => {
+    const { collector, olderRunId } = collectorWithOlderRun();
+    const endedRunId = collector.runs[71].run_id;
+
+    const loaded = await withCollector(collector.fetch, () =>
+      loadCollectorTimelines("am", [olderRunId, endedRunId], NOW, {
+        unfinishedRunIds: [olderRunId],
+      }),
+    );
+
+    expect([...loaded.timelines.keys()]).toEqual([olderRunId]);
+    expect(readsOf(collector, endedRunId)).toBe(0);
+  });
+
+  test("a run the collector has no record of stays on Hugging Face, without a note or a second request", async () => {
+    const { collector } = collectorWithOlderRun();
+    const unknownRunId = "hugging-face-only-run";
+    const poll = () =>
+      loadCollectorTimelines("am", [unknownRunId], NOW, {
+        unfinishedRunIds: [unknownRunId],
+      });
+
+    const [first, second] = await withCollector(collector.fetch, async () => [
+      await poll(),
+      await poll(),
+    ]);
+
+    expect(first).toEqual({ timelines: new Map(), documents: new Map(), note: null });
+    expect(second).toEqual({ timelines: new Map(), documents: new Map(), note: null });
+    expect(readsOf(collector, unknownRunId)).toBe(1);
+  });
+
+  test("a list shorter than its limit holds every run, so nothing is read on its own", async () => {
+    const collector = fakeTelemetryCollector({ countryCode: "AM", runCount: 30 });
+    const unknownRunId = "hugging-face-only-run";
+
+    const loaded = await withCollector(collector.fetch, () =>
+      loadCollectorTimelines("am", [unknownRunId], NOW, {
+        unfinishedRunIds: [unknownRunId],
+      }),
+    );
+
+    expect(loaded).toEqual({ timelines: new Map(), documents: new Map(), note: null });
+    expect(collector.documentRequests).toEqual([]);
+  });
+
+  test("a failed read adds a note and is tried again at the next poll", async () => {
+    const { collector, olderRunId } = collectorWithOlderRun();
+    let failing = true;
+    const failingOnce = (async (input: RequestInfo | URL) => {
+      if (failing && String(input).endsWith(`/v1/runs/${olderRunId}`)) {
+        return Response.json({ detail: "Internal error." }, { status: 500 });
+      }
+      return collector.fetch(input);
+    }) as typeof fetch;
+    const poll = () =>
+      loadCollectorTimelines("am", [olderRunId], NOW, {
+        unfinishedRunIds: [olderRunId],
+      });
+
+    const [failed, recovered] = await withCollector(failingOnce, async () => {
+      const first = await poll();
+      failing = false;
+      return [first, await poll()];
+    });
+
+    expect(failed.timelines.size).toBe(0);
+    expect(failed.note).toContain(olderRunId);
+    expect(failed.note).toContain("500");
+    expect(recovered.note).toBeNull();
+    expect(recovered.timelines.get(olderRunId)?.state).toBe("passed");
+  });
+
+  test("the tab waits at most 5 seconds for the record, and a late answer serves the next poll", async () => {
+    const { collector, olderRunId } = collectorWithOlderRun();
+    let answerRecord!: () => void;
+    const recordAnswer = new Promise<void>((resolve) => {
+      answerRecord = resolve;
+    });
+    const slowRecord = (async (input: RequestInfo | URL) => {
+      if (String(input).endsWith(`/v1/runs/${olderRunId}`)) await recordAnswer;
+      return collector.fetch(input);
+    }) as typeof fetch;
+    const poll = () =>
+      loadCollectorTimelines("am", [olderRunId], NOW, {
+        unfinishedRunIds: [olderRunId],
+      });
+
+    const [firstPoll, nextPoll] = await withFakeTimers(() =>
+      withCollector(slowRecord, async () => {
+        await collectorRunLists.recent("am");
+        const pending = poll();
+        await settlePendingWork();
+        jest.advanceTimersByTime(5_000);
+        const first = await pending;
+        answerRecord();
+        // Bun's fake timers hold Bun.sleep too, so the answer is let through
+        // with microtask turns only.
+        await settlePendingWork();
+        return [first, await poll()];
+      }),
+    );
+
+    expect(firstPoll.timelines.size).toBe(0);
+    expect(firstPoll.note).toContain(olderRunId);
+    expect(firstPoll.note).toContain("no answer within 5 seconds");
+    expect(nextPoll.note).toBeNull();
+    expect(nextPoll.timelines.get(olderRunId)?.state).toBe("passed");
+    expect(readsOf(collector, olderRunId)).toBe(1);
+  });
+
+  test("the record is read again once its copy is 5 minutes old", async () => {
+    const { collector, olderRunId } = collectorWithOlderRun();
+    const poll = () =>
+      loadCollectorTimelines("am", [olderRunId], NOW, {
+        unfinishedRunIds: [olderRunId],
+      });
+    const reads: number[] = [];
+
+    await withFakeTimers(() =>
+      withCollector(collector.fetch, async () => {
+        await poll();
+        jest.advanceTimersByTime(4 * 60_000);
+        await poll();
+        reads.push(readsOf(collector, olderRunId));
+        jest.advanceTimersByTime(60_000 + 1);
+        await poll();
+        reads.push(readsOf(collector, olderRunId));
+      }),
+    );
+
+    expect(reads).toEqual([1, 2]);
   });
 });
 
@@ -815,35 +1012,34 @@ describe("how much the build list reads", () => {
   // Past the build list's 30-second and the collector list's 15-second caches.
   const PAST_THE_LIST_CACHES_MS = 31_000;
 
-  test("the build list reads the collector and the Hugging Face history at the same time", async () => {
+  test("the build list reads the collector and the copied run history at the same time", async () => {
     clearBuildRunCaches();
     const collector = fakeTelemetryCollector({ countryCode: "US", runCount: 2 });
-    let huggingFaceRequested = false;
-    let huggingFaceRequestedWhileCollectorListPending = false;
-    const bothSources = (async (input: RequestInfo | URL) => {
-      const url = new URL(String(input));
-      if (url.origin === "https://huggingface.co") {
-        huggingFaceRequested = true;
-        // An empty staging repository.
-        return Response.json([]);
-      }
-      if (url.pathname === "/v1/runs") {
+    // A staging repository with no runs.
+    const store = new FakeCollectorStore();
+    store.stagingIndex("us");
+    let historyRequestedWhileCollectorListPending = false;
+    const holdingTheList = (async (input: RequestInfo | URL) => {
+      if (new URL(String(input)).pathname === "/v1/runs") {
         // Hold the collector's list for up to half a second, or until the
-        // Hugging Face history has been asked for.
+        // copied history has been asked for.
         const deadline = Date.now() + 500;
-        while (!huggingFaceRequested && Date.now() < deadline) {
+        while (!store.requests.length && Date.now() < deadline) {
           await new Promise((resolve) => setTimeout(resolve, 5));
         }
-        huggingFaceRequestedWhileCollectorListPending = huggingFaceRequested;
+        historyRequestedWhileCollectorListPending = store.requests.length > 0;
       }
       return collector.fetch(input);
     }) as typeof fetch;
 
-    const response = await withCollector(bothSources, () => loadBuildRuns("staging", "us"));
+    const response = await withCollector(holdingTheList, () =>
+      withStore(store, () => loadBuildRuns("staging", "us")),
+    );
 
     expect(response.problems).toEqual([]);
     expect(response.runs).toHaveLength(2);
-    expect(huggingFaceRequestedWhileCollectorListPending).toBe(true);
+    expect(historyRequestedWhileCollectorListPending).toBe(true);
+    expect(store.huggingFaceRequests).toEqual([]);
   });
 
   test("a collector run whose list row is unchanged is read once, even while it runs", async () => {
@@ -931,31 +1127,32 @@ describe("how much the build list reads", () => {
     expect(readsOf(finishedRunId)).toBe(1);
   });
 
-  test("a Hugging Face failure still lists the collector's runs and says so", async () => {
+  test("a failure to read the copied run files still lists the collector's runs and says so", async () => {
     clearBuildRunCaches();
     const collector = fakeTelemetryCollector({ countryCode: "US", runCount: 2 });
-    const huggingFaceDown = (async (input: RequestInfo | URL) => {
-      if (new URL(String(input)).origin === "https://huggingface.co") {
-        return Response.json({ error: "Unavailable." }, { status: 503 });
-      }
-      return collector.fetch(input);
-    }) as typeof fetch;
+    const store = new FakeCollectorStore();
+    store.failure = new Error("Vercel Blob: Failed to fetch blob: 503");
 
-    const response = await withCollector(huggingFaceDown, () => loadBuildRuns("staging", "us"));
+    const response = await withCollector(collector.fetch, () =>
+      withStore(store, () => loadBuildRuns("staging", "us")),
+    );
 
     expect(response.available).toBe(true);
     expect(response.runs).toHaveLength(2);
     expect(response.problems.map((problem) => problem.run_id)).toEqual(["hugging-face-history"]);
   });
 
-  test("a collector failure still lists the Hugging Face runs and says so", async () => {
+  test("a collector failure still lists the copied runs and says so", async () => {
     clearBuildRunCaches();
-    const collectorDown = (async (input: RequestInfo | URL) => {
-      if (new URL(String(input)).origin === "https://huggingface.co") return Response.json([]);
-      return Response.json({ detail: "Unavailable." }, { status: 503 });
-    }) as typeof fetch;
+    const collectorDown = (async (_input: RequestInfo | URL) =>
+      Response.json({ detail: "Unavailable." }, { status: 503 })) as typeof fetch;
 
-    const response = await withCollector(collectorDown, () => loadBuildRuns("staging", "us"));
+    const store = new FakeCollectorStore();
+    store.stagingIndex("us");
+
+    const response = await withCollector(collectorDown, () =>
+      withStore(store, () => loadBuildRuns("staging", "us")),
+    );
 
     expect(response.available).toBe(true);
     expect(response.problems).toEqual([

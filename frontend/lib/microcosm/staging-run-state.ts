@@ -10,12 +10,81 @@
 import {
   type BuildRunState,
   type BuildTimeline,
+  FINAL_RUN_STATES,
   collectorMissedTheEnd,
   runState,
 } from "@/lib/microcosm/build-monitor";
 import type { StagingRunSummary } from "@policyengine/calibration-tree/staging-artifact";
 
 export type RunStateSource = "collector" | "hugging_face";
+
+// An unfinished run's events and calibration events from the collector's
+// record are kept newest first up to this many characters of JSON each, so
+// the Candidate tab's answer stays well within the platform's 4.5 MB
+// response limit. A record can hold far more than a run's copied files.
+export const RECORD_EVENTS_JSON_LIMIT = 1_500_000;
+
+type JsonDocument = Record<string, unknown>;
+
+function jsonObject(value: unknown): JsonDocument | null {
+  return value != null && typeof value === "object" && !Array.isArray(value)
+    ? (value as JsonDocument)
+    : null;
+}
+
+// A heartbeat as the collector serves it in a run's documents: a `progress`
+// event that is not a calibration event and carries the emitter's machine
+// reading or, from emitters before 0.14.0, no message and no details beside
+// its resource sample. It names the stage the run is in. A run's own events
+// file never holds one. (A heartbeat whose reading the collector dropped
+// looks like an older emitter's and is left out the same way only when it
+// has no message.)
+function isHeartbeat(event: JsonDocument): boolean {
+  if (event.event_type === "calibration" || event.status !== "progress") return false;
+  const details = jsonObject(event.details);
+  if (jsonObject(details?.reading)) return true;
+  const message = typeof event.message === "string" ? event.message.trim() : "";
+  return (
+    message === "" &&
+    (details == null || Object.keys(details).length === 0) &&
+    event.resources != null
+  );
+}
+
+// The newest items whose JSON fits the limit, in their order.
+function newestWithin<T>(items: readonly T[]): T[] {
+  // The brackets, less the comma the first item has none of.
+  let size = 1;
+  let first = items.length;
+  while (first > 0) {
+    const itemSize = JSON.stringify(items[first - 1]).length + 1;
+    if (size + itemSize > RECORD_EVENTS_JSON_LIMIT) break;
+    size += itemSize;
+    first -= 1;
+  }
+  return items.slice(first);
+}
+
+/**
+ * An unfinished run's Stage timeline events and calibration progress, from
+ * the collector's record: heartbeats left out, and the newest of each kept
+ * within `RECORD_EVENTS_JSON_LIMIT`.
+ */
+export function recordInternals(record: {
+  events: JsonDocument[];
+  calibration_progress: JsonDocument | null;
+}): { events: JsonDocument[]; calibration_progress: JsonDocument | null } {
+  const events = newestWithin(record.events.filter((event) => !isHeartbeat(event)));
+  const calibration = record.calibration_progress;
+  const calibrationEvents = Array.isArray(calibration?.events) ? calibration.events : null;
+  return {
+    events,
+    calibration_progress:
+      calibration && calibrationEvents
+        ? { ...calibration, events: newestWithin(calibrationEvents) }
+        : calibration,
+  };
+}
 
 export interface CalibrationEpoch {
   epoch: number | null;
@@ -89,6 +158,12 @@ function huggingFaceState(
   return huggingFace.status == null
     ? null
     : runState(huggingFace.status, timeMs(huggingFace.updated_at), nowMs);
+}
+
+// Whether a run's Hugging Face status records that the run ended. A run
+// without one may have ended all the same, and only the collector can say so.
+export function huggingFaceRecordsAnEnd(status: string | null): boolean {
+  return status != null && FINAL_RUN_STATES.has(runState(status, null, 0));
 }
 
 function lastCalibrationEpoch(timeline: BuildTimeline): CalibrationEpoch | null {

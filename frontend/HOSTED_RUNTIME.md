@@ -350,11 +350,16 @@ this repository's, and are not verified here.
   `hosted_release.json`, without a token: the Modal function has no Modal secret
   attached. The repository answered an unauthenticated request on 2026-10-26. If it
   became private, the backend would need a token, which this code does not provide.
-- **The dashboard server** reads calibration releases and staging runs with `HF_TOKEN`,
-  or `HUGGINGFACE_TOKEN` when `HF_TOKEN` is unset. The Hugging Face webhook uses the
-  same token to read a release repository's `releases.json` before and after each
-  `main` update, for the Slack release alerts. UK staging is the exception: it reads
-  only `POPULACE_UK_STAGING_HF_TOKEN`, a Vercel project setting. For production
+- **The dashboard server** reads calibration releases and staging runs from the
+  collector's calibration tree store, not from Hugging Face: each build's copies of its
+  original files, each country's `releases.json` copy and the copies of the staging
+  runs' files, with the Blob credentials it reads the tree manifest with
+  (`BLOB_STORE_ID` with the deployment's Vercel OIDC token, or `BLOB_READ_WRITE_TOKEN`).
+  The Hugging Face webhook still reads a release repository's `releases.json` before and
+  after each `main` update, for the Slack release alerts, with `HF_TOKEN`, or
+  `HUGGINGFACE_TOKEN` when `HF_TOKEN` is unset. No code reads
+  `POPULACE_UK_STAGING_HF_TOKEN` any more; it and the other Hugging Face tokens stay
+  configured until tracker task 6b · 8 deletes them. For production
   deployments the workflow sets `HF_TOKEN` from the repository secret
   `HF_RELEASE_READ_TOKEN`. That must be a dedicated fine-grained read-only token for the
   registered private release repositories (`policyengine/populace-uk-private`,

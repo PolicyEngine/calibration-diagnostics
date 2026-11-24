@@ -354,21 +354,33 @@ staging repository main-branch update
      staging (see "Calibration-tree builds in the collector" below)
   -> one collector run, when the request's 10-minute window ends
   -> list the runs in the staging repository's runs/<id>/ folders at its head
-  -> skip runs the store holds and runs a submission is processing
-  -> build and store the passed, published and completed runs, newest first
+  -> copy each run's changed files to staging-run-files/<country>/
+  -> build, or replace, the tree of each run with diagnostics, whatever its
+     status, newest first
 ```
 
-Active or failed staging runs remain on the live 30-second API path.
+The collector's README describes the job's limits and which runs it covers.
+The Candidate tab polls every 30 seconds; an unfinished run's state comes
+from the collector's telemetry when the page asks for it.
 
 A staged dataset's diagnostics are the `calibration_diagnostics.json` its
 receipt records or, failing that, the one `<dataset>.diagnostics.json` it
 records: Microcosm's UK local lane stages its outputs under the dataset's own
 stem. A receipt recording several stem files has no target view.
 
-The dashboard's own staging reads take the repository and credential name from
-the country's registration. UK staging reads use
-`POPULACE_UK_STAGING_HF_TOKEN`; if a UK run points to a staged dataset in the UK
-release repository, that second read uses `HF_TOKEN`.
+The dashboard's own staging reads make no Hugging Face request. The Candidate
+tab lists the collector's copies of the runs' files (`staging-run-files/<country>/`
+in the store), and a run's calibration views read the copies of the original
+files of the run's stored tree, whether its diagnostics came from the run folder
+or its staged bundle. A run with diagnostics shows them once the collector has
+built its tree and, when the run's files declare the diagnostics' digest (in
+a structured run manifest or a staged bundle's receipt), only while the tree
+holds those diagnostics. While a run's copy records no end and the page's
+state for it comes from the collector's record, its Stage timeline and
+calibration progress come from that record too, without heartbeats, and only
+the newest events of each that fit a size limit. The release pages read
+each build's copies of its original files and the copy of `releases.json` the
+same way.
 
 ## Browser loading
 

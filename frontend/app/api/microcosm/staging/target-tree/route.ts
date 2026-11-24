@@ -4,7 +4,7 @@ import { requestedCountry } from "@/lib/api/request-country";
 import { buildCalibrationTree, type CalibrationTreeTarget } from "@policyengine/calibration-tree/calibration-tree";
 import { calibrationTreeRequestState } from "@/lib/microcosm/calibration-tree-request";
 import { classifyApiError, scrub } from "@policyengine/calibration-tree/latest-artifact";
-import { loadStagingCalibration } from "@policyengine/calibration-tree/staging-artifact";
+import { loadStoredStagingCalibration } from "@/lib/microcosm/stored-staging";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ detail: "Provide a staging run id via ?run=." }, { status: 400 });
   }
   try {
-    const calibration = await loadStagingCalibration(runId, revalidate, country);
+    const calibration = await loadStoredStagingCalibration(runId, revalidate, country);
     if (!calibration) {
       return NextResponse.json(
         {

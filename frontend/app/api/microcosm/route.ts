@@ -8,21 +8,21 @@ import {
   hfResolveUrl,
   latestMicrocosmCalibrationHighlights,
   latestMicrocosmCalibrationSummary,
-  loadRelease,
   microcosmRepo,
   scrub,
 } from "@policyengine/calibration-tree/latest-artifact";
+import { loadStoredRelease } from "@/lib/microcosm/collector-store";
 
 export const revalidate = 21_600;
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 interface MicrocosmRouteDependencies {
-  loadRelease: typeof loadRelease;
+  loadRelease: typeof loadStoredRelease;
 }
 
 export function createMicrocosmHandler(
-  dependencies: MicrocosmRouteDependencies = { loadRelease },
+  dependencies: MicrocosmRouteDependencies = { loadRelease: loadStoredRelease },
 ) {
   return async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
@@ -74,8 +74,8 @@ export function createMicrocosmHandler(
             cal.source === "local_filesystem"
               ? "This page reads the configured local calibration artifacts."
               : isLatestRequest
-                ? `This page resolves the dashboard's current release through its version manifest, then reads ${microcosmRepo(country)} at immutable commit ${cal.hf_commit_sha}.`
-                : `This page resolves release ${cal.release_id} to immutable Hugging Face commit ${cal.hf_commit_sha}.`,
+                ? `This page resolves the dashboard's current release through its version manifest, then reads the collector's copies of ${microcosmRepo(country)}'s files at immutable commit ${cal.hf_commit_sha}.`
+                : `This page resolves release ${cal.release_id} to immutable Hugging Face commit ${cal.hf_commit_sha} and reads the collector's copies of its files.`,
             "Loss values are the calibrator's own metric for this release; their scale is not comparable across releases that calibrate to different target surfaces.",
           ],
           build_manifest: cal.build_manifest,
