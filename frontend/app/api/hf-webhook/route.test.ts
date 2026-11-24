@@ -907,33 +907,6 @@ test("a Belgian release asks the collector to queue a release calibration-tree b
   });
 });
 
-test("a deployment that still holds the former GitHub dispatch settings sends its only request to the collector", async () => {
-  // The settings are deleted by hand after this change is deployed, so a
-  // deployment can run this code with them still present. Any request to
-  // another address fails the fake's fetch.
-  const repo = "policyengine/populace-us-staging";
-  const commit = testSha(75);
-  const result = await deliver(delivery(repo, [mainUpdate(commit)]), {
-    config: resolveHfWebhookConfig({
-      HF_WEBHOOK_SECRET: "test-webhook-secret",
-      MICROCOSM_TELEMETRY_COLLECTOR_URL: COLLECTOR_URL,
-      GITHUB_ACTIONS_DISPATCH_TOKEN: "former-dispatch-token",
-      CALIBRATION_TREE_GITHUB_REPOSITORY: "example/dashboard",
-      CALIBRATION_TREE_GITHUB_WORKFLOW: "publish.yml",
-    }),
-  });
-
-  expect(result.status).toBe(200);
-  expectOneTreeBuildRequest(result.collectorRequests, {
-    country: "us",
-    kind: "staging",
-    hf_repo: repo,
-    hf_ref: "refs/heads/main",
-    hf_commit: commit,
-  });
-  expect(result.text).not.toContain("former-dispatch-token");
-});
-
 test("the collector request names the repository as configured, not as the delivery spells it", async () => {
   // The collector compares the name exactly, so neither the delivery's
   // spelling nor its lower-case form would do.

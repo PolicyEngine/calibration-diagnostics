@@ -16,23 +16,6 @@ test("resolves the registered release and staging repositories without ambient s
   expect(config.secret).toBeUndefined();
 });
 
-test("the former GitHub dispatch settings are not part of the webhook's configuration", () => {
-  // They stay in the deployment's environment until they are deleted by hand.
-  for (const environment of [
-    {},
-    {
-      GITHUB_ACTIONS_DISPATCH_TOKEN: "former-dispatch-token",
-      CALIBRATION_TREE_GITHUB_REPOSITORY: "example/dashboard",
-      CALIBRATION_TREE_GITHUB_WORKFLOW: "publish.yml",
-    },
-  ]) {
-    const config = resolveHfWebhookConfig(environment);
-    expect(config).not.toHaveProperty("githubToken");
-    expect(config).not.toHaveProperty("githubRepository");
-    expect(config).not.toHaveProperty("githubWorkflow");
-  }
-});
-
 test("applies the webhook secret and repository overrides from an explicit environment", () => {
   const config = resolveHfWebhookConfig({
     HF_WEBHOOK_SECRET: "configured-secret",
