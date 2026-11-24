@@ -400,53 +400,113 @@ def _reads_setting(text, context, name):
     )
 
 
+def _former_tree_publisher_setting_reads(workflow_text):
+    reads = [
+        f"{context}.{name}"
+        for context, name in FORMER_TREE_PUBLISHER_SETTINGS
+        if _reads_setting(workflow_text, context, name)
+    ]
+    reads.extend(
+        expression.group(0)
+        for expression in EVERY_SECRET_OR_VARIABLE.finditer(workflow_text)
+    )
+    return reads
+
+
 def _workflow_files():
     workflows = ROOT / ".github/workflows"
     return sorted([*workflows.glob("*.yml"), *workflows.glob("*.yaml")])
 
 
-def test_setting_detection_covers_both_expression_forms_and_ignores_case():
-    for text in (
-        "${{ secrets.HF_TOKEN }}",
-        "${{ secrets['hf_token'] }}",
-        '${{ SECRETS [ "HF_TOKEN" ] }}',
-        "${{ Secrets.Hf_Token }}",
-    ):
-        assert _reads_setting(text, "secrets", "HF_TOKEN"), text
-    for text in (
-        "${{ secrets.HF_RELEASE_READ_TOKEN }}",
-        "${{ secrets.HF_TOKEN_2 }}",
-        "${{ vars.HF_TOKEN }}",
-        "${{ env.HF_TOKEN }}",
-    ):
-        assert not _reads_setting(text, "secrets", "HF_TOKEN"), text
-    assert EVERY_SECRET_OR_VARIABLE.search("${{ toJson(secrets) }}")
-    assert EVERY_SECRET_OR_VARIABLE.search("    secrets: inherit\n")
-    assert not EVERY_SECRET_OR_VARIABLE.search("${{ toJSON(steps) }}")
+def _files_naming_the_tree_publisher(files):
+    return [
+        relative_path
+        for relative_path, text in files
+        if relative_path.startswith(".github/workflows/")
+        and TREE_PUBLISHER_COMMAND.search(text)
+    ]
+
+
+def _checkout_files():
+    """Each file a checkout of the next commit would contain, with its text."""
+    listing = subprocess.run(
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+    )
+    for relative_path in listing.stdout.decode().split("\0"):
+        file_path = ROOT / relative_path
+        if relative_path and file_path.is_file():
+            yield relative_path, file_path.read_text(errors="ignore")
+
+
+# Workflow fragments that read one of the former tree publisher's settings, or
+# could read any setting, in the forms GitHub accepts.
+READS_A_FORMER_TREE_PUBLISHER_SETTING = (
+    "env:\n  TOKEN: ${{ secrets.HF_TOKEN }}\n",
+    "env:\n  TOKEN: ${{ secrets['hf_token'] }}\n",
+    "env:\n  TOKEN: ${{ Secrets . Blob_Read_Write_Token }}\n",
+    "jobs:\n  publish:\n    if: vars.CALIBRATION_TREE_BUILD_ENABLED != 'FALSE'\n",
+    # A YAML escape: the value GitHub reads is `secrets.HF_TOKEN`.
+    'env:\n  TOKEN: "${{ secrets.\\x48F_TOKEN }}"\n',
+    "env:\n  EVERYTHING: ${{ toJSON(secrets) }}\n",
+    "env:\n  EVERYTHING: ${{ join(secrets.*, ' ') }}\n",
+    "env:\n  TOKEN: ${{ secrets[format('POPULACE_{0}_STAGING_HF_TOKEN', matrix.country)] }}\n",
+    "jobs:\n  call:\n    uses: ./.github/workflows/other.yml\n    secrets: 'inherit'\n",
+)
+# Workflow fragments that read none of them.
+READS_NO_FORMER_TREE_PUBLISHER_SETTING = (
+    "env:\n  TOKEN: ${{ secrets.HF_RELEASE_READ_TOKEN }}\n",
+    "env:\n  TOKEN: ${{ secrets.HF_TOKEN_2 }}\n",
+    "env:\n  TOKEN: ${{ env.HF_TOKEN }}\n",
+    "env:\n  NAME: ${{ vars.TELEMETRY_SERVICE }}\n",
+    "steps:\n  - run: gcloud secrets versions access latest --secret=HF_TOKEN\n",
+    "jobs:\n  call:\n    uses: ./.github/workflows/other.yml\n    secrets:\n      TOKEN: ${{ secrets.HF_RELEASE_READ_TOKEN }}\n",
+)
+
+
+def test_setting_detection_covers_the_forms_github_accepts():
+    assert {
+        fragment: bool(_former_tree_publisher_setting_reads(fragment))
+        for fragment in READS_A_FORMER_TREE_PUBLISHER_SETTING
+    } == {fragment: True for fragment in READS_A_FORMER_TREE_PUBLISHER_SETTING}
+    assert {
+        fragment: _former_tree_publisher_setting_reads(fragment)
+        for fragment in READS_NO_FORMER_TREE_PUBLISHER_SETTING
+    } == {fragment: [] for fragment in READS_NO_FORMER_TREE_PUBLISHER_SETTING}
 
 
 def test_no_workflow_reads_the_former_tree_publisher_settings():
-    readers = []
-    for workflow_file in _workflow_files():
-        text = workflow_file.read_text()
-        readers.extend(
-            f"{workflow_file.name}: {context}.{name}"
-            for context, name in FORMER_TREE_PUBLISHER_SETTINGS
-            if _reads_setting(text, context, name)
-        )
-        readers.extend(
-            f"{workflow_file.name}: {expression.group(0)}"
-            for expression in EVERY_SECRET_OR_VARIABLE.finditer(text)
-        )
-    assert readers == []
+    assert [
+        f"{workflow_file.name}: {read}"
+        for workflow_file in _workflow_files()
+        for read in _former_tree_publisher_setting_reads(workflow_file.read_text())
+    ] == []
+
+
+def test_publisher_detection_reads_every_file_except_its_own_guard():
+    files = [
+        (".github/scripts/trees.sh", "bun run publish:calibration-tree --country uk\n"),
+        (
+            "frontend/scripts/trees.ts",
+            'await import("@policyengine/calibration-tree/publish-calibration-tree");\n',
+        ),
+        (".github/workflows/trees.yml", "run: bun run publish:calibration-tree\n"),
+        ("frontend/package.json", '"trees": "bun run publish:calibration-tree"\n'),
+        ("frontend/tests/test_deploy_workflow.py", "publish:calibration-tree\n"),
+        ("docs/trees.md", "The collector builds the trees.\n"),
+    ]
+    assert _files_naming_the_tree_publisher(files) == [
+        ".github/scripts/trees.sh",
+        "frontend/scripts/trees.ts",
+        ".github/workflows/trees.yml",
+        "frontend/package.json",
+    ]
 
 
 def test_no_workflow_runs_the_tree_publisher():
-    assert [
-        workflow_file.name
-        for workflow_file in _workflow_files()
-        if TREE_PUBLISHER_COMMAND.search(workflow_file.read_text())
-    ] == []
+    assert _files_naming_the_tree_publisher(_checkout_files()) == []
 
 
 @pytest.mark.parametrize("exit_code", [0, 17])
