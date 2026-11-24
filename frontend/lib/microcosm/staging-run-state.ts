@@ -34,18 +34,27 @@ function jsonObject(value: unknown): JsonDocument | null {
 
 // A heartbeat as the collector serves it in a run's documents: a `progress`
 // event that is not a calibration event and carries the emitter's machine
-// reading or, from emitters before 0.14.0, nothing but the resources. It
-// names the stage the run is in. A run's own events file never holds one.
+// reading or, from emitters before 0.14.0, no message and no details beside
+// its resource sample. It names the stage the run is in. A run's own events
+// file never holds one. (A heartbeat whose reading the collector dropped
+// looks like an older emitter's and is left out the same way only when it
+// has no message.)
 function isHeartbeat(event: JsonDocument): boolean {
   if (event.event_type === "calibration" || event.status !== "progress") return false;
   const details = jsonObject(event.details);
   if (jsonObject(details?.reading)) return true;
-  return (details == null || Object.keys(details).length === 0) && event.resources != null;
+  const message = typeof event.message === "string" ? event.message.trim() : "";
+  return (
+    message === "" &&
+    (details == null || Object.keys(details).length === 0) &&
+    event.resources != null
+  );
 }
 
 // The newest items whose JSON fits the limit, in their order.
 function newestWithin<T>(items: readonly T[]): T[] {
-  let size = 0;
+  // The brackets, less the comma the first item has none of.
+  let size = 1;
   let first = items.length;
   while (first > 0) {
     const itemSize = JSON.stringify(items[first - 1]).length + 1;
