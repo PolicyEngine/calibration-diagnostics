@@ -223,6 +223,8 @@ type RecordInternalsBody = {
 };
 
 test("an unfinished run's events from the collector's record leave out heartbeats", async () => {
+  // Every emitter attaches a resource sample to every event.
+  const resources = { rss_bytes: 1 };
   const stageEvents = ["created", "target_compilation", "calibrating"].map((stage, index) => ({
     event_type: "stage",
     stage,
@@ -230,7 +232,7 @@ test("an unfinished run's events from the collector's record leave out heartbeat
     status: "started",
     time: new Date(Date.parse("2026-10-20T00:00:00Z") + index * 1_000).toISOString(),
     details: {},
-    resources: null,
+    resources,
   }));
   const workReport = {
     event_type: "stage",
@@ -239,15 +241,29 @@ test("an unfinished run's events from the collector's record leave out heartbeat
     status: "progress",
     time: "2026-10-20T00:10:00Z",
     details: { done: 50, total: 500, unit: "epochs" },
-    resources: null,
+    resources,
+  };
+  // A stage update with a message and nothing else, as a stage transition
+  // can send: not a heartbeat.
+  const stageUpdate = {
+    event_type: "stage",
+    stage: "calibrating",
+    stage_id: "calibrating",
+    status: "progress",
+    message: "Fitting weights.",
+    time: "2026-10-20T00:11:00Z",
+    details: {},
+    resources,
   };
   const heartbeats = Array.from({ length: 10 }, (_, index) => heartbeatEvent(index));
 
   const body = (await loadRun(
-    handlerWithLargeRecord([...stageEvents, ...heartbeats, workReport], []),
+    handlerWithLargeRecord([...stageEvents, ...heartbeats, workReport, stageUpdate], []),
   )) as unknown as RecordInternalsBody;
 
-  expect(body.events).toEqual(JSON.parse(JSON.stringify([...stageEvents, workReport])));
+  expect(body.events).toEqual(
+    JSON.parse(JSON.stringify([...stageEvents, workReport, stageUpdate])),
+  );
 });
 
 test("an unfinished run's internals from the collector's record keep the newest within a size limit", async () => {
