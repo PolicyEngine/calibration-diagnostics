@@ -312,6 +312,15 @@ function huggingFaceCopyLabel(
   return `${recorded.join(", ")} · updated ${timeWithAgo(state.hugging_face_updated_at, zone)}`;
 }
 
+// Whether the Run internals sections read a Hugging Face copy that has fallen
+// behind the collector's record, which the note below then says.
+export function runInternalsReadTheCopy(run: {
+  state?: CandidateRunState | null;
+  run_internals_source?: string | null;
+}): boolean {
+  return Boolean(run.state?.hugging_face_differs);
+}
+
 // The Run internals note when the run's Hugging Face copy, which those
 // sections read, has fallen behind the collector's record.
 export function HuggingFaceCopyNote({
@@ -1075,7 +1084,7 @@ function MicrocosmStagingRunsView({
   const status = candidateState?.status ?? null;
   const stage = candidateState?.stage ?? null;
   // Run internals read the Hugging Face copy; say so when it has fallen behind.
-  const internalsCopyNote = candidateState?.hugging_face_differs ? (
+  const internalsCopyNote = candidateState && runData && runInternalsReadTheCopy(runData) ? (
     <HuggingFaceCopyNote state={candidateState} progress={progress} zone={zone} />
   ) : null;
   // The selected run's own note: the collector may have answered for it even

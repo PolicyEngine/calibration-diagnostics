@@ -24,23 +24,22 @@ const LOCATION: CalibrationReleaseLocation = {
   updatedAt: "2026-11-15T22:20:07.000Z",
 };
 
-interface JsonRead {
-  filePath: string;
+interface CopyRead {
+  buildArtifactId: string;
   country: MicrocosmCountry;
-  revision: string;
 }
 
 function handlerReading(payload: Record<string, unknown> | null) {
-  const reads: JsonRead[] = [];
+  const reads: CopyRead[] = [];
   const resolved: { country: MicrocosmCountry; release: string }[] = [];
   const handler = createParentBuildHandler({
     resolveRelease: async (country, release) => {
       resolved.push({ country, release });
       return LOCATION;
     },
-    loadJson: async (filePath, _revalidate, country, revision) => {
-      reads.push({ filePath, country, revision });
-      return payload ? { payload, sha256: "b".repeat(64) } : null;
+    loadParentManifest: async (location, country) => {
+      reads.push({ buildArtifactId: location.buildArtifactId, country });
+      return payload;
     },
   });
   return { handler, reads, resolved };
@@ -52,7 +51,7 @@ function request(query: string): Request {
 
 const RECERTIFIED_QUERY = `country=us&release=${encodeURIComponent(RECERTIFIED_BUILD)}`;
 
-test("reads the parent's staging run from the parent build manifest at the build's pinned commit", async () => {
+test("reads the parent's staging run from the store's copy of the build's parent build manifest", async () => {
   const { handler, reads, resolved } = handlerReading({
     build_id: PARENT_BUILD,
     staging: { enabled: true, run_id: PARENT_RUN, uploads_succeeded: 711 },
@@ -67,13 +66,7 @@ test("reads the parent's staging run from the parent build manifest at the build
     staging_run_id: PARENT_RUN,
   });
   expect(resolved).toEqual([{ country: "us", release: RECERTIFIED_BUILD }]);
-  expect(reads).toEqual([
-    {
-      filePath: `releases/${RECERTIFIED_BUILD}/parent_build_manifest.json`,
-      country: "us",
-      revision: COMMIT,
-    },
-  ]);
+  expect(reads).toEqual([{ buildArtifactId: LOCATION.buildArtifactId, country: "us" }]);
   expect(response.headers.get("vercel-cdn-cache-control")).toContain("max-age=");
 });
 
@@ -133,7 +126,7 @@ test("a release the tree manifest does not hold is not found", async () => {
     resolveRelease: async () => {
       throw new Error("No matching calibration build exists for us.");
     },
-    loadJson: async () => {
+    loadParentManifest: async () => {
       throw new Error("must not be read");
     },
   });
@@ -144,11 +137,11 @@ test("a release the tree manifest does not hold is not found", async () => {
   expect(response.headers.get("cache-control")).toBe("no-store");
 });
 
-test("a Hugging Face failure is reported as unavailable and not cached", async () => {
+test("a store failure is reported as unavailable and not cached", async () => {
   const handler = createParentBuildHandler({
     resolveRelease: async () => LOCATION,
-    loadJson: async () => {
-      throw new Error("HF fetch failed 500");
+    loadParentManifest: async () => {
+      throw new Error("Vercel Blob: Failed to fetch blob: 500");
     },
   });
 
@@ -158,9 +151,9 @@ test("a Hugging Face failure is reported as unavailable and not cached", async (
   expect(response.headers.get("cache-control")).toBe("no-store");
 });
 
-// The Hugging Face read waits up to 120 seconds, as it does for the release
-// route; a route limit no longer than that ends a slow read with the
-// platform's timeout instead of this route's uncached 502.
-test("allows as long as the release route, which reads through the same Hugging Face fetch", () => {
+// The store read can be as slow as the release route's; a route limit no
+// longer than that ends a slow read with the platform's timeout instead of
+// this route's uncached 502.
+test("allows as long as the release route, which reads the same store", () => {
   expect(maxDuration).toBeGreaterThanOrEqual(releaseRouteMaxDuration);
 });

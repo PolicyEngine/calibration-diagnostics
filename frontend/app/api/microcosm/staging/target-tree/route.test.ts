@@ -1,21 +1,37 @@
 import { afterEach, expect, test } from "bun:test";
 
+import { FakeCollectorStore } from "@/lib/microcosm/test-support/fake-collector-store";
 import {
   stagingDiagnosticsFixture,
-  stagingTelemetryFetch,
+  stagingRunManifest,
 } from "@/lib/microcosm/test-support/staging-run-fixture";
 
 import { GET } from "./route";
 
-const originalFetch = globalThis.fetch;
+let restore: (() => void) | null = null;
 
 afterEach(() => {
-  globalThis.fetch = originalFetch;
+  restore?.();
+  restore = null;
 });
 
-test("builds the calibration tree from a staging diagnostics artifact", async () => {
+test("builds the calibration tree from a staging run's stored diagnostics", async () => {
   const runId = "uk-fit-map";
-  globalThis.fetch = stagingTelemetryFetch(runId, stagingDiagnosticsFixture());
+  const diagnostics = stagingDiagnosticsFixture();
+  const store = new FakeCollectorStore();
+  store.addBuild({
+    country: "uk",
+    kind: "staging",
+    stagingRunId: runId,
+    label: `${runId}-candidate`,
+    files: { calibrationDiagnostics: diagnostics },
+  });
+  store.addStagingRun({
+    country: "uk",
+    runId,
+    files: { "run_manifest.json": stagingRunManifest(runId, "a".repeat(64)) },
+  });
+  restore = store.install();
 
   const response = await GET(
     new Request(`http://example.test/api/microcosm/staging/target-tree?run=${runId}&country=uk`),
@@ -27,6 +43,7 @@ test("builds the calibration tree from a staging diagnostics artifact", async ()
     filteredMetrics: { nTargets: 1, within10Pct: 1 },
   });
   expect(response.headers.get("Cache-Control")).toBe("no-store");
+  expect(store.huggingFaceRequests).toEqual([]);
 });
 
 test("requires a staging run id", async () => {

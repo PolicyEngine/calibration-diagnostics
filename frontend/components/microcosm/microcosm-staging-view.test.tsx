@@ -17,7 +17,13 @@ import {
   usRunningCollectorDocuments,
 } from "@/lib/microcosm/test-support/collector-run-fixtures";
 import type { ViewerZone } from "@/lib/microcosm/viewer-time";
-import { CandidateOverview, HuggingFaceCopyNote, runLabel, StageEventTime } from "./microcosm-staging-view";
+import {
+  CandidateOverview,
+  HuggingFaceCopyNote,
+  runInternalsReadTheCopy,
+  runLabel,
+  StageEventTime,
+} from "./microcosm-staging-view";
 
 // The failed US run's Hugging Face progress document: its last upload.
 const FAILED_RUN_PROGRESS = {
@@ -226,4 +232,26 @@ test("a stage event's start reads in the viewer's zone, named", () => {
   );
   expect(eventTime("not a time")).toBe("not a time");
   expect(eventTime(null)).toBe("—");
+});
+
+test("the Run internals note is shown only when those sections read a copy that has fallen behind", () => {
+  const behind = candidateRunState(
+    FAILED_RUN_PROGRESS,
+    buildTimeline(usFailedCollectorDocuments(), INVESTIGATION_NOW_MS),
+    INVESTIGATION_NOW_MS,
+  );
+  expect(behind.hugging_face_differs).toBe(true);
+
+  expect(runInternalsReadTheCopy({ state: behind, run_internals_source: "hugging_face" })).toBe(true);
+  // Responses from before the field read the copy.
+  expect(runInternalsReadTheCopy({ state: behind })).toBe(true);
+  // An unfinished run's Stage timeline and Calibration progress come from
+  // the collector's record, so no copy is behind them.
+  expect(runInternalsReadTheCopy({ state: behind, run_internals_source: "collector" })).toBe(false);
+  expect(
+    runInternalsReadTheCopy({
+      state: { ...behind, hugging_face_differs: false },
+      run_internals_source: "hugging_face",
+    }),
+  ).toBe(false);
 });

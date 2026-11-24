@@ -119,6 +119,74 @@ test("a collector failure returns the Hugging Face state with a note", async () 
   });
 });
 
+test("the collector is told whether the selected run's Hugging Face copy records an end", async () => {
+  async function unfinishedRunIdsFor(status: string) {
+    const requested: (readonly string[] | undefined)[] = [];
+    const detail = huggingFaceDetail();
+    const get = createStagingRunHandler({
+      loadRun: async () => ({
+        ...detail,
+        progress: { ...detail.progress, status },
+      }),
+      loadCollectorTimelines: async (_country, _runIds, _nowMs, options) => {
+        requested.push(options?.unfinishedRunIds);
+        return { timelines: new Map(), note: null };
+      },
+      now: () => INVESTIGATION_NOW_MS,
+    });
+    await loadRun(get);
+    return requested;
+  }
+
+  expect(await unfinishedRunIdsFor("running")).toEqual([[US_FAILED_RUN_ID]]);
+  expect(await unfinishedRunIdsFor("failed")).toEqual([[]]);
+  expect(await unfinishedRunIdsFor("completed")).toEqual([[]]);
+});
+
+// A copy records a run's files only when the run writes them, so while it
+// records no end, the Stage timeline and Calibration progress come from the
+// collector's record (read API v2). The run manifest, which lists the uploaded
+// files, and the copy's progress document stay.
+function handlerWithRecord(copyStatus: string) {
+  const detail = huggingFaceDetail();
+  const record = usFailedCollectorDocuments();
+  return createStagingRunHandler({
+    loadRun: async () => ({
+      ...detail,
+      progress: { ...detail.progress, status: copyStatus },
+      run_manifest: { schema_version: 1, run_id: US_FAILED_RUN_ID, artifacts: { a: {} } },
+      events: [{ stage: "copied-event" }],
+      calibration_progress: { schema_version: 1, events: [{ epoch: 1, loss: 9 }] },
+    }),
+    loadCollectorTimelines: async () => ({
+      timelines: new Map([[US_FAILED_RUN_ID, buildTimeline(record, INVESTIGATION_NOW_MS)]]),
+      documents: new Map([[US_FAILED_RUN_ID, record]]),
+      note: null,
+    }),
+    now: () => INVESTIGATION_NOW_MS,
+  });
+}
+
+test("an unfinished run's stage events and calibration progress come from the collector's record", async () => {
+  const record = usFailedCollectorDocuments();
+
+  const body = (await loadRun(handlerWithRecord("running"))) as Record<string, unknown>;
+
+  expect(body.run_internals_source).toBe("collector");
+  expect(body.events).toEqual(JSON.parse(JSON.stringify(record.events)));
+  expect(body.calibration_progress).toEqual(JSON.parse(JSON.stringify(record.calibration_progress)));
+  expect(body.progress).toMatchObject({ status: "running", stage: "calibrating" });
+  expect(body.run_manifest).toMatchObject({ artifacts: { a: {} } });
+});
+
+test("a run whose copy records its end keeps the copy's stage events and calibration progress", async () => {
+  const body = (await loadRun(handlerWithRecord("failed"))) as Record<string, unknown>;
+
+  expect(body.run_internals_source).toBe("hugging_face");
+  expect(body.events).toEqual([{ stage: "copied-event" }]);
+  expect(body.calibration_progress).toEqual({ schema_version: 1, events: [{ epoch: 1, loss: 9 }] });
+});
+
 test("a run the collector does not know keeps its Hugging Face state without a note", async () => {
   const { get } = handler(async () => ({ timelines: new Map(), note: null }));
 
