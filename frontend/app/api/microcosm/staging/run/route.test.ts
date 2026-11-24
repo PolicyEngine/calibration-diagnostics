@@ -222,48 +222,118 @@ type RecordInternalsBody = {
   calibration_progress: { events: { epoch: number }[] };
 };
 
-test("an unfinished run's events from the collector's record leave out heartbeats", async () => {
-  // Every emitter attaches a resource sample to every event.
-  const resources = { rss_bytes: 1 };
-  const stageEvents = ["created", "target_compilation", "calibrating"].map((stage, index) => ({
+// Every emitter attaches a resource sample to every event.
+const RESOURCES = { rss_bytes: 1 };
+
+function stageChange(index: number, stage = `stage-${index}`): Record<string, unknown> {
+  return {
     event_type: "stage",
     stage,
     stage_id: stage,
-    status: "started",
-    time: new Date(Date.parse("2026-10-20T00:00:00Z") + index * 1_000).toISOString(),
+    status: index % 2 === 0 ? "started" : "completed",
+    message: `Stage ${stage}.`,
+    time: new Date(Date.parse("2026-10-23T15:00:00Z") + index * 60_000).toISOString(),
     details: {},
-    resources,
-  }));
-  const workReport = {
+    resources: RESOURCES,
+  };
+}
+
+// A progress report, as builds send one per batch of work: a stage event
+// with status `progress` and the batch counts.
+function progressReport(index: number): Record<string, unknown> {
+  return {
     event_type: "stage",
+    stage: "post_export_scoring",
+    stage_id: "post_export_scoring",
+    status: "progress",
+    message: null,
+    time: new Date(Date.parse("2026-10-23T20:00:00Z") + index * 5_000).toISOString(),
+    details: {
+      done: index % 177,
+      unit: "scoring_batch",
+      batch: index % 177,
+      total: 177,
+      batches: 177,
+      pass_name: "reform_coverage_smoke baseline plan",
+      elapsed_seconds: index * 5.1,
+    },
+    resources: { ...RESOURCES, cpu_user_seconds: index, cpu_system_seconds: index, peak_rss_bytes: 2 },
+  };
+}
+
+// A calibration event as the record's events list carries one.
+function calibrationEvent(index: number, padding = ""): Record<string, unknown> {
+  return {
+    event_type: "calibration",
     stage: "calibrating",
     stage_id: "calibrating",
     status: "progress",
-    time: "2026-10-20T00:10:00Z",
-    details: { done: 50, total: 500, unit: "epochs" },
-    resources,
+    message: null,
+    time: new Date(Date.parse("2026-10-23T18:00:00Z") + index * 1_000).toISOString(),
+    details: { epoch: index, epochs: 1_500, loss: 0.2, padding },
+    resources: RESOURCES,
   };
-  // A stage update with a message and nothing else, as a stage transition
-  // can send: not a heartbeat.
-  const stageUpdate = {
-    event_type: "stage",
-    stage: "calibrating",
-    stage_id: "calibrating",
-    status: "progress",
-    message: "Fitting weights.",
-    time: "2026-10-20T00:11:00Z",
-    details: {},
-    resources,
-  };
+}
+
+test("an unfinished run's events from the collector's record are its stage changes and calibration events", async () => {
+  const stages = ["created", "target_compilation", "calibrating"].map((stage, index) =>
+    stageChange(index, stage),
+  );
+  const calibration = [calibrationEvent(1), calibrationEvent(2)];
+  // A stage update with status `progress`, as a stage transition can send:
+  // the run's own events file holds none either.
+  const stageUpdate = { ...progressReport(0), message: "Fitting weights.", details: {} };
   const heartbeats = Array.from({ length: 10 }, (_, index) => heartbeatEvent(index));
 
   const body = (await loadRun(
-    handlerWithLargeRecord([...stageEvents, ...heartbeats, workReport, stageUpdate], []),
+    handlerWithLargeRecord(
+      [stages[0], ...heartbeats, stages[1], progressReport(1), stages[2], ...calibration, stageUpdate],
+      [],
+    ),
   )) as unknown as RecordInternalsBody;
 
   expect(body.events).toEqual(
-    JSON.parse(JSON.stringify([...stageEvents, workReport, stageUpdate])),
+    JSON.parse(JSON.stringify([stages[0], stages[1], stages[2], ...calibration])),
   );
+});
+
+test("a long record's progress reports no longer crowd out the run's stages", async () => {
+  // As the US run of 2026-10-23 recorded it: 42 stage changes, calibration,
+  // then thousands of scoring-batch progress reports and heartbeats.
+  const stages = Array.from({ length: 42 }, (_, index) => stageChange(index));
+  const calibration = Array.from({ length: 1_500 }, (_, index) => calibrationEvent(index + 1));
+  const reports = Array.from({ length: 3_000 }, (_, index) => progressReport(index));
+  const heartbeats = Array.from({ length: 400 }, (_, index) => heartbeatEvent(index));
+
+  const body = (await loadRun(
+    handlerWithLargeRecord([...stages, ...calibration, ...reports, ...heartbeats], []),
+  )) as unknown as RecordInternalsBody;
+
+  expect(body.events.filter((event) => event.event_type === "stage")).toEqual(
+    JSON.parse(JSON.stringify(stages)),
+  );
+  expect(body.events.filter((event) => event.event_type === "calibration")).toHaveLength(1_500);
+});
+
+test("calibration events past the size limit give way before stage changes", async () => {
+  const stages = Array.from({ length: 30 }, (_, index) => stageChange(index));
+  const calibration = Array.from({ length: 10_000 }, (_, index) =>
+    calibrationEvent(index + 1, "x".repeat(300)),
+  );
+
+  const body = (await loadRun(
+    handlerWithLargeRecord([...stages.slice(0, 15), ...calibration, ...stages.slice(15)], []),
+  )) as unknown as RecordInternalsBody;
+
+  expect(body.events.filter((event) => event.event_type === "stage")).toEqual(
+    JSON.parse(JSON.stringify(stages)),
+  );
+  const kept = body.events.filter((event) => event.event_type === "calibration");
+  expect(kept.length).toBeGreaterThan(0);
+  expect(kept.length).toBeLessThan(10_000);
+  // The newest calibration events are the ones kept.
+  expect((kept.at(-1)?.details as { epoch: number }).epoch).toBe(10_000);
+  expect(JSON.stringify(body.events).length).toBeLessThanOrEqual(1_500_000);
 });
 
 test("an unfinished run's internals from the collector's record keep the newest within a size limit", async () => {
