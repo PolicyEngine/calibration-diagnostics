@@ -313,12 +313,14 @@ function huggingFaceCopyLabel(
 }
 
 // Whether the Run internals sections read a Hugging Face copy that has fallen
-// behind the collector's record, which the note below then says.
+// behind the collector's record, which the note below then says. An
+// unfinished run's stage events and calibration progress come from the
+// collector's record instead, so no copy is behind them.
 export function runInternalsReadTheCopy(run: {
   state?: CandidateRunState | null;
   run_internals_source?: string | null;
 }): boolean {
-  return Boolean(run.state?.hugging_face_differs);
+  return run.run_internals_source !== "collector" && Boolean(run.state?.hugging_face_differs);
 }
 
 // The Run internals note when the run's Hugging Face copy, which those

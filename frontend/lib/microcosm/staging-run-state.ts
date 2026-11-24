@@ -10,6 +10,7 @@
 import {
   type BuildRunState,
   type BuildTimeline,
+  FINAL_RUN_STATES,
   collectorMissedTheEnd,
   runState,
 } from "@/lib/microcosm/build-monitor";
@@ -89,6 +90,12 @@ function huggingFaceState(
   return huggingFace.status == null
     ? null
     : runState(huggingFace.status, timeMs(huggingFace.updated_at), nowMs);
+}
+
+// Whether a run's Hugging Face status records that the run ended. A run
+// without one may have ended all the same, and only the collector can say so.
+export function huggingFaceRecordsAnEnd(status: string | null): boolean {
+  return status != null && FINAL_RUN_STATES.has(runState(status, null, 0));
 }
 
 function lastCalibrationEpoch(timeline: BuildTimeline): CalibrationEpoch | null {

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { requestedCountry } from "@/lib/api/request-country";
 import { hasCapability } from "@policyengine/calibration-tree/countries";
 import { scrub } from "@policyengine/calibration-tree/latest-artifact";
-import { loadStagingTargetDiagnostics } from "@policyengine/calibration-tree/staging-artifact";
+import { loadStoredStagingTargetDiagnostics } from "@/lib/microcosm/stored-staging";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   try {
     return NextResponse.json(
       scrub(
-        await loadStagingTargetDiagnostics(request.url, runId ?? "", revalidate, country),
+        await loadStoredStagingTargetDiagnostics(request.url, runId ?? "", revalidate, country),
       ),
       { headers: { "Cache-Control": "no-store" } },
     );

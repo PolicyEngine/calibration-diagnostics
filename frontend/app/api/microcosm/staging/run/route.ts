@@ -2,23 +2,23 @@ import { NextResponse } from "next/server";
 
 import { requestedCountry } from "@/lib/api/request-country";
 import {
+  type CollectorTimelineOptions,
   type CollectorTimelines,
   loadCollectorTimelines,
 } from "@/lib/microcosm/build-runs";
 import {
   type CalibrationEpoch,
   candidateRunState,
+  huggingFaceRecordsAnEnd,
   type HuggingFaceRunState,
 } from "@/lib/microcosm/staging-run-state";
+import { loadStoredStagingRun } from "@/lib/microcosm/stored-staging";
 import {
   hasCapability,
   type MicrocosmCountry,
 } from "@policyengine/calibration-tree/countries";
 import { scrub } from "@policyengine/calibration-tree/latest-artifact";
-import {
-  loadStagingRun,
-  type StagingRunDetail,
-} from "@policyengine/calibration-tree/staging-artifact";
+import type { StagingRunDetail } from "@policyengine/calibration-tree/staging-artifact";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -35,6 +35,7 @@ export interface StagingRunRouteDependencies {
     country: MicrocosmCountry,
     runIds: readonly string[],
     nowMs: number,
+    options: CollectorTimelineOptions,
   ): Promise<CollectorTimelines>;
   now(): number;
 }
@@ -70,12 +71,16 @@ function huggingFaceRunState(detail: StagingRunDetail): HuggingFaceRunState {
   };
 }
 
-// One Candidate tab run: its Hugging Face copy (candidate files, progress and
-// events, unchanged) plus `state`, which is the collector's state when the
-// collector has a record of the run.
+// One Candidate tab run: the collector's copies of its files (candidate
+// files, progress and events) plus `state`, which is the collector's state
+// when the collector has a record of the run. While the copy records no end,
+// a copy changes only when the run writes its files, so the Stage timeline's
+// events and the calibration progress come from the collector's record (read
+// API v2) when it has one; `run_internals_source` says which. The progress
+// document and the run manifest, with its uploaded files, stay the copy's.
 export function createStagingRunHandler(
   dependencies: StagingRunRouteDependencies = {
-    loadRun: loadStagingRun,
+    loadRun: loadStoredStagingRun,
     loadCollectorTimelines,
     now: Date.now,
   },
@@ -91,20 +96,33 @@ export function createStagingRunHandler(
     try {
       const detail = await dependencies.loadRun(runId ?? "", revalidate, country);
       if (!detail.available || !runId) {
-        return NextResponse.json(scrub({ ...detail, state: null, collector_note: null }), {
-          headers: { "Cache-Control": "no-store" },
-        });
+        return NextResponse.json(
+          scrub({
+            ...detail,
+            state: null,
+            collector_note: null,
+            run_internals_source: "hugging_face",
+          }),
+          { headers: { "Cache-Control": "no-store" } },
+        );
       }
       const nowMs = dependencies.now();
-      const collector = await dependencies.loadCollectorTimelines(country, [runId], nowMs);
+      const huggingFace = huggingFaceRunState(detail);
+      const unfinished = !huggingFaceRecordsAnEnd(huggingFace.status);
+      const collector = await dependencies.loadCollectorTimelines(country, [runId], nowMs, {
+        unfinishedRunIds: unfinished ? [runId] : [],
+      });
+      const state = candidateRunState(huggingFace, collector.timelines.get(runId), nowMs);
+      const record = collector.documents?.get(runId);
+      const internalsFromRecord = unfinished && record != null && state.state_source === "collector";
       return NextResponse.json(
         scrub({
           ...detail,
-          state: candidateRunState(
-            huggingFaceRunState(detail),
-            collector.timelines.get(runId),
-            nowMs,
-          ),
+          ...(internalsFromRecord
+            ? { events: record.events, calibration_progress: record.calibration_progress }
+            : {}),
+          run_internals_source: internalsFromRecord ? "collector" : "hugging_face",
+          state,
           collector_note: collector.note,
         }),
         { headers: { "Cache-Control": "no-store" } },

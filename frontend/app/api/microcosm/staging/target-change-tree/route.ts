@@ -8,9 +8,9 @@ import {
 } from "@policyengine/calibration-tree/latest-artifact";
 import { isSha256 } from "@policyengine/calibration-tree/calibration-tree-artifact";
 import {
-  loadStagingTargetChangeDataset,
-  loadStagingTargetChangeDatasetFromBuild,
-} from "@policyengine/calibration-tree/staging-artifact";
+  loadStoredStagingTargetChangeDataset,
+  loadStoredStagingTargetChangeDatasetFromBuild,
+} from "@/lib/microcosm/stored-staging";
 import type { TargetChangeMode } from "@policyengine/calibration-tree/target-change";
 import { buildTargetChangeTree } from "@/lib/microcosm/target-change-tree";
 
@@ -20,14 +20,14 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 export interface StagingTargetChangeTreeRouteDependencies {
-  loadReleaseDataset: typeof loadStagingTargetChangeDataset;
-  loadBuildDataset: typeof loadStagingTargetChangeDatasetFromBuild;
+  loadReleaseDataset: typeof loadStoredStagingTargetChangeDataset;
+  loadBuildDataset: typeof loadStoredStagingTargetChangeDatasetFromBuild;
 }
 
 export function createStagingTargetChangeTreeHandler(
   dependencies: StagingTargetChangeTreeRouteDependencies = {
-    loadReleaseDataset: loadStagingTargetChangeDataset,
-    loadBuildDataset: loadStagingTargetChangeDatasetFromBuild,
+    loadReleaseDataset: loadStoredStagingTargetChangeDataset,
+    loadBuildDataset: loadStoredStagingTargetChangeDatasetFromBuild,
   },
 ) {
   return async function GET(request: Request) {

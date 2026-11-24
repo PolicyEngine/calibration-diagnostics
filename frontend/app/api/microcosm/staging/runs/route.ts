@@ -2,13 +2,32 @@ import { NextResponse } from "next/server";
 
 import { requestedCountry } from "@/lib/api/request-country";
 import {
+  type CollectorTimelineOptions,
   type CollectorTimelines,
   loadCollectorTimelines,
 } from "@/lib/microcosm/build-runs";
-import { overlayRunSummary } from "@/lib/microcosm/staging-run-state";
+import {
+  huggingFaceRecordsAnEnd,
+  overlayRunSummary,
+} from "@/lib/microcosm/staging-run-state";
 import type { MicrocosmCountry } from "@policyengine/calibration-tree/countries";
-import { loadStagingRuns } from "@policyengine/calibration-tree/staging-artifact";
 import { scrub } from "@policyengine/calibration-tree/latest-artifact";
+import type {
+  IncompatibleStagingRun,
+  StagingRunSummary,
+} from "@policyengine/calibration-tree/staging-artifact";
+import { loadStoredStagingRuns } from "@/lib/microcosm/stored-staging";
+
+// The run list `loadStoredStagingRuns` gives, as `loadStagingRuns` gave it.
+export interface StagingRunList {
+  available: boolean;
+  source_repo: string | null;
+  revision: string | null;
+  detail?: string | null;
+  truncated: boolean;
+  runs: StagingRunSummary[];
+  incompatible_runs: IncompatibleStagingRun[];
+}
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -21,22 +40,24 @@ export interface StagingRunsRouteDependencies {
   loadRuns(
     revalidate: number,
     country: MicrocosmCountry,
-  ): ReturnType<typeof loadStagingRuns>;
+  ): Promise<StagingRunList>;
   loadCollectorTimelines(
     country: MicrocosmCountry,
     runIds: readonly string[],
     nowMs: number,
+    options: CollectorTimelineOptions,
   ): Promise<CollectorTimelines>;
   now(): number;
 }
 
 // The Candidate tab's run list: the runs in the country's Hugging Face staging
-// repository, each with the collector's state when the collector has a record
-// of it. Runs only the collector knows have no candidate files there and are
-// listed on the Build progress tab instead.
+// repository, from the collector's copies of their files, each with the
+// collector's state when the collector has a record of it. Runs only the
+// collector knows have no candidate files there and are listed on the Build
+// progress tab instead.
 export function createStagingRunsHandler(
   dependencies: StagingRunsRouteDependencies = {
-    loadRuns: loadStagingRuns,
+    loadRuns: loadStoredStagingRuns,
     loadCollectorTimelines,
     now: Date.now,
   },
@@ -52,6 +73,11 @@ export function createStagingRunsHandler(
             country,
             list.runs.map((run) => run.run_id),
             nowMs,
+            {
+              unfinishedRunIds: list.runs
+                .filter((run) => !huggingFaceRecordsAnEnd(run.status))
+                .map((run) => run.run_id),
+            },
           )
         : { timelines: new Map(), note: null };
       return NextResponse.json(

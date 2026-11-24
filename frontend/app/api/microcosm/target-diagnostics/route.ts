@@ -4,9 +4,9 @@ import { requestedCountry } from "@/lib/api/request-country";
 import {
   classifyApiError,
   latestMicrocosmTargetDiagnosticsPage,
-  loadRelease,
   scrub,
 } from "@policyengine/calibration-tree/latest-artifact";
+import { loadStoredRelease } from "@/lib/microcosm/collector-store";
 
 export const revalidate = 21_600;
 export const runtime = "nodejs";
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   const country = requestedCountry(params);
   if (country instanceof Response) return country;
   try {
-    const cal = await loadRelease(release, revalidate, country);
+    const cal = await loadStoredRelease(release, revalidate, country);
     return NextResponse.json(scrub(latestMicrocosmTargetDiagnosticsPage(request.url, cal)));
   } catch (error) {
     const { status, body } = classifyApiError(error);

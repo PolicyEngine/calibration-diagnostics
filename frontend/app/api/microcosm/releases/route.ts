@@ -1,37 +1,41 @@
 import { NextResponse } from "next/server";
 
 import { requestedCountry } from "@/lib/api/request-country";
-import { readCalibrationTreeManifest } from "@policyengine/calibration-tree/calibration-tree-blob";
 import type { MicrocosmCountry } from "@policyengine/calibration-tree/countries";
 import {
-  loadPointerReleaseId,
-  loadPublishedCutReleases,
-  loadReleases,
-  loadReleasesRecord,
   mergeReleaseInventory,
   recordedReleaseInventory,
   scrub,
   type ReleaseEntry,
 } from "@policyengine/calibration-tree/latest-artifact";
 import type { ReleasesRecord } from "@policyengine/calibration-tree/release-record";
+import {
+  loadStoredCutReleases,
+  loadStoredPointerReleaseId,
+  loadStoredReleaseFolders,
+  loadStoredReleasesRecord,
+  readStoreManifest,
+} from "@/lib/microcosm/collector-store";
 
 export const revalidate = 60;
 
+// Every read is of the collector's store: its copy of releases.json, the
+// tree manifest, and each listed build's copy of its release manifest.
 interface MicrocosmReleasesRouteDependencies {
-  loadReleasesRecord: typeof loadReleasesRecord;
-  loadReleases: typeof loadReleases;
-  loadPointerReleaseId: typeof loadPointerReleaseId;
-  readManifest: typeof readCalibrationTreeManifest;
-  loadPublishedCutReleases: typeof loadPublishedCutReleases;
+  loadReleasesRecord: typeof loadStoredReleasesRecord;
+  loadReleases: typeof loadStoredReleaseFolders;
+  loadPointerReleaseId: typeof loadStoredPointerReleaseId;
+  readManifest: typeof readStoreManifest;
+  loadPublishedCutReleases: typeof loadStoredCutReleases;
 }
 
 export function createMicrocosmReleasesHandler(
   dependencies: MicrocosmReleasesRouteDependencies = {
-    loadReleasesRecord,
-    loadReleases,
-    loadPointerReleaseId,
-    readManifest: readCalibrationTreeManifest,
-    loadPublishedCutReleases,
+    loadReleasesRecord: loadStoredReleasesRecord,
+    loadReleases: loadStoredReleaseFolders,
+    loadPointerReleaseId: loadStoredPointerReleaseId,
+    readManifest: readStoreManifest,
+    loadPublishedCutReleases: loadStoredCutReleases,
   },
 ) {
   // A repository with releases.json lists the builds it names and nothing

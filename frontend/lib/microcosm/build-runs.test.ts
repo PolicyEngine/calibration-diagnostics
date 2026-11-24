@@ -425,8 +425,10 @@ describe("loadCollectorTimelines for the Candidate tab", () => {
     expect(loaded.timelines.get(newest)?.state).toBe("running");
     expect(loaded.timelines.get(finished)?.state).toBe("passed");
     // The records the timelines were built from, for the run's own page.
-    expect([...loaded.documents.keys()].toSorted()).toEqual([newest, finished].toSorted());
-    expect(loaded.documents.get(newest)?.run_id).toBe(newest);
+    expect([...(loaded.documents ?? new Map()).keys()].toSorted()).toEqual(
+      [newest, finished].toSorted(),
+    );
+    expect(loaded.documents?.get(newest)?.run_id).toBe(newest);
   });
 
   test("asks the collector nothing when no run is requested", async () => {

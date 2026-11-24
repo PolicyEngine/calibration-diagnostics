@@ -223,7 +223,7 @@ export class FakeCollectorStore {
     if (body == null) return null;
     return {
       statusCode: 200,
-      stream: new Response(body).body!,
+      stream: new Response(new Uint8Array(body)).body!,
       headers: new Headers(),
       blob: {
         url: `https://store.example/${pathname}`,

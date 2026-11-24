@@ -671,6 +671,10 @@ export interface MicrocosmStagingRunResponse {
   // the Hugging Face copy's. Null when staging is unavailable.
   state?: CandidateRunState | null;
   collector_note?: string | null;
+  // Where `events` and `calibration_progress` come from: the collector's
+  // record for an unfinished run it has one of, else the copy of the run's
+  // Hugging Face files.
+  run_internals_source?: "collector" | "hugging_face";
 }
 
 export interface MicrocosmVariableValue {

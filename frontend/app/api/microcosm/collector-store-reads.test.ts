@@ -510,7 +510,11 @@ test("the target-change tree compares the stored candidate with a stored release
   );
 
   expect(response.status).toBe(200);
-  expect((await response.json()).available).not.toBe(false);
+  // The fixtures carry no loss attribution, so the tree says so; the run's
+  // stored diagnostics were found.
+  expect((await response.json()).reason).not.toBe(
+    "This staging run has not uploaded calibration diagnostics yet.",
+  );
   expect(store.huggingFaceRequests).toEqual([]);
 });
 

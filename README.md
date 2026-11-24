@@ -230,17 +230,20 @@ both current and historical calibration maps through that manifest and uses a
 content-derived build artifact ID as the CDN path. Optional
 `POPULACE_UK_HF_REPO`, `POPULACE_UK_HF_REVISION` configure the UK;
 and `POPULACE_BE_HF_REPO`, `POPULACE_BE_HF_REVISION` for Belgium. The Belgium
-repository defaults in code to `policyengine/populace-be-private`. Set `HF_TOKEN`
-or `HUGGINGFACE_TOKEN` to read private datasets. Each country with the
+repository defaults in code to `policyengine/populace-be-private`. The release and
+staging calibration views read the collector's calibration tree store, which keeps a
+copy of each build's original files, each country's `releases.json` and the files of
+every staging run, so they need no Hugging Face token; the Hugging Face webhook reads
+`releases.json` with `HF_TOKEN` or `HUGGINGFACE_TOKEN`. Each country with the
 `staging` capability declares its own staging repository in the country
 registry; it never falls back to another country's repository. US staging
 defaults to `policyengine/populace-us-staging`; override it with the
 backward-compatible `POPULACE_STAGING_HF_REPO` and
 `POPULACE_STAGING_HF_REVISION` variables. UK staging defaults to the private dataset
-`policyengine/populace-uk-staging`; configure its server-only read credential as
-`POPULACE_UK_STAGING_HF_TOKEN`, and optionally override the dataset or revision
-with `POPULACE_UK_STAGING_HF_REPO` or `POPULACE_UK_STAGING_HF_REVISION`. Never
-use a `NEXT_PUBLIC_` variable for a private-repository credential.
+`policyengine/populace-uk-staging`; override the dataset or revision with
+`POPULACE_UK_STAGING_HF_REPO` or `POPULACE_UK_STAGING_HF_REVISION`. These settings
+name the repository the pages link to; the run files are read from the collector's
+copies. Never use a `NEXT_PUBLIC_` variable for a private-repository credential.
 
 A staging registration may also list `local_area_pipelines`: the
 `pipeline.id` values, as run manifests record them, of pipelines whose

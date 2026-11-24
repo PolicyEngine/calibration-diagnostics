@@ -170,7 +170,7 @@ function handlerWithRecord(copyStatus: string) {
 test("an unfinished run's stage events and calibration progress come from the collector's record", async () => {
   const record = usFailedCollectorDocuments();
 
-  const body = (await loadRun(handlerWithRecord("running"))) as Record<string, unknown>;
+  const body = (await loadRun(handlerWithRecord("running"))) as unknown as Record<string, unknown>;
 
   expect(body.run_internals_source).toBe("collector");
   expect(body.events).toEqual(JSON.parse(JSON.stringify(record.events)));
@@ -180,7 +180,7 @@ test("an unfinished run's stage events and calibration progress come from the co
 });
 
 test("a run whose copy records its end keeps the copy's stage events and calibration progress", async () => {
-  const body = (await loadRun(handlerWithRecord("failed"))) as Record<string, unknown>;
+  const body = (await loadRun(handlerWithRecord("failed"))) as unknown as Record<string, unknown>;
 
   expect(body.run_internals_source).toBe("hugging_face");
   expect(body.events).toEqual([{ stage: "copied-event" }]);
