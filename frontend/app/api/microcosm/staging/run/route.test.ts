@@ -179,23 +179,34 @@ test("an unfinished run's stage events and calibration progress come from the co
   expect(body.run_manifest).toMatchObject({ artifacts: { a: {} } });
 });
 
-test("an unfinished run's events from the collector's record leave out heartbeats and keep the newest", async () => {
+// Heartbeats as the collector serves them in a run's documents: `stage`
+// events with status `progress` that name the stage, carrying the emitter's
+// machine reading, or, from emitters before 0.14.0, only the resources.
+function heartbeatEvent(index: number): Record<string, unknown> {
+  return {
+    event_type: "stage",
+    stage: "calibrating",
+    stage_id: "calibrating",
+    status: "progress",
+    message: null,
+    time: new Date(Date.parse("2026-10-20T00:00:00Z") + index * 30_000).toISOString(),
+    resources: { rss_bytes: 1 },
+    details:
+      index % 2 === 0
+        ? { reading: { interval_seconds: 30, late_seconds: 0, machine: { cpu_busy_share: 0.4 } } }
+        : {},
+  };
+}
+
+function handlerWithLargeRecord(events: Record<string, unknown>[], calibrationEvents: unknown[]) {
   const detail = huggingFaceDetail();
   const record = usFailedCollectorDocuments();
-  const stageEvents = Array.from({ length: 6_000 }, (_, index) => ({
-    stage: "calibrating",
-    status: "progress",
-    time: new Date(Date.parse("2026-10-20T00:00:00Z") + index * 1_000).toISOString(),
-    sequence: index + 1,
-  }));
-  const heartbeats = [{ stage: null, status: "progress", time: "2026-10-20T00:00:00Z" }];
-  const calibrationEvents = Array.from({ length: 6_000 }, (_, index) => ({ epoch: index, loss: 1 }));
   const large = {
     ...record,
-    events: [...heartbeats, ...stageEvents, ...heartbeats],
+    events,
     calibration_progress: { ...record.calibration_progress, events: calibrationEvents },
   };
-  const get = createStagingRunHandler({
+  return createStagingRunHandler({
     loadRun: async () => detail,
     loadCollectorTimelines: async () => ({
       timelines: new Map([[US_FAILED_RUN_ID, buildTimeline(record, INVESTIGATION_NOW_MS)]]),
@@ -204,17 +215,62 @@ test("an unfinished run's events from the collector's record leave out heartbeat
     }),
     now: () => INVESTIGATION_NOW_MS,
   });
+}
 
-  const body = (await loadRun(get)) as unknown as {
-    events: { stage: string | null; sequence?: number }[];
-    calibration_progress: { events: { epoch: number }[] };
+type RecordInternalsBody = {
+  events: Record<string, unknown>[];
+  calibration_progress: { events: { epoch: number }[] };
+};
+
+test("an unfinished run's events from the collector's record leave out heartbeats", async () => {
+  const stageEvents = ["created", "target_compilation", "calibrating"].map((stage, index) => ({
+    event_type: "stage",
+    stage,
+    stage_id: stage,
+    status: "started",
+    time: new Date(Date.parse("2026-10-20T00:00:00Z") + index * 1_000).toISOString(),
+    details: {},
+    resources: null,
+  }));
+  const workReport = {
+    event_type: "stage",
+    stage: "calibrating",
+    stage_id: "calibrating",
+    status: "progress",
+    time: "2026-10-20T00:10:00Z",
+    details: { done: 50, total: 500, unit: "epochs" },
+    resources: null,
   };
+  const heartbeats = Array.from({ length: 10 }, (_, index) => heartbeatEvent(index));
 
-  expect(body.events).toHaveLength(5_000);
-  expect(body.events.every((event) => event.stage != null)).toBe(true);
+  const body = (await loadRun(
+    handlerWithLargeRecord([...stageEvents, ...heartbeats, workReport], []),
+  )) as unknown as RecordInternalsBody;
+
+  expect(body.events).toEqual(JSON.parse(JSON.stringify([...stageEvents, workReport])));
+});
+
+test("an unfinished run's internals from the collector's record keep the newest within a size limit", async () => {
+  const padding = "x".repeat(2_000);
+  const stageEvents = Array.from({ length: 6_000 }, (_, index) => ({
+    event_type: "stage",
+    stage: `stage-${index}`,
+    status: "completed",
+    time: new Date(Date.parse("2026-10-20T00:00:00Z") + index * 1_000).toISOString(),
+    sequence: index + 1,
+    details: { padding },
+  }));
+  const calibrationEvents = Array.from({ length: 6_000 }, (_, index) => ({ epoch: index, padding }));
+
+  const body = (await loadRun(
+    handlerWithLargeRecord(stageEvents, calibrationEvents),
+  )) as unknown as RecordInternalsBody;
+
   expect(body.events.at(-1)?.sequence).toBe(6_000);
-  expect(body.calibration_progress.events).toHaveLength(5_000);
   expect(body.calibration_progress.events.at(-1)?.epoch).toBe(5_999);
+  // Both lists together stay well within the platform's 4.5 MB response limit.
+  expect(JSON.stringify(body.events).length).toBeLessThanOrEqual(1_500_000);
+  expect(JSON.stringify(body.calibration_progress.events).length).toBeLessThanOrEqual(1_500_000);
 });
 
 test("a run whose copy records its end keeps the copy's stage events and calibration progress", async () => {

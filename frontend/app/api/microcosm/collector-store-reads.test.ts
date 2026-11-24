@@ -440,11 +440,16 @@ test("a run the store has no copy of has no documents and no calibration", async
 
 // A UK run that staged its dataset bundle: its run manifest declares the
 // bundle's receipt, and the receipt the bundle's diagnostics.
-function stagedBundleRun(runId: string, diagnosticsSha256: string, status = "uploaded") {
+function stagedBundleRun(
+  runId: string,
+  diagnosticsSha256: string,
+  status = "uploaded",
+  repository = "policyengine/populace-uk-private",
+) {
   const receipt = {
     status,
     run_id: runId,
-    repository: "policyengine/populace-uk-private",
+    repository,
     prefix: `staged/${runId}`,
     revision: "a".repeat(40),
     files: { "calibration_diagnostics.json": { sha256: diagnosticsSha256 } },
@@ -513,6 +518,12 @@ test("a run's calibration needs the tree to hold the diagnostics its files decla
     ["uk-store-bundle-newer", stagedBundleRun("uk-store-bundle-newer", otherSha256), false],
     // A staging that failed lands no bundle.
     ["uk-store-bundle-failed", stagedBundleRun("uk-store-bundle-failed", diagnosticsSha256, "failed"), false],
+    // Bundles are read only from the country's registered release repository.
+    [
+      "uk-store-bundle-elsewhere",
+      stagedBundleRun("uk-store-bundle-elsewhere", diagnosticsSha256, "uploaded", "someone/else"),
+      false,
+    ],
   ];
   for (const [runId, files, shown] of cases) {
     const store = serve(ukStagingStore(runId, files));
@@ -563,6 +574,35 @@ test("a finished run's target changes follow a replaced tree", async () => {
   const after = await loadStoredStagingTargetChangeDataset(US_RUN, US_RELEASE_ID, "us");
 
   expect(before?.candidate.calibrationProvenance).not.toEqual(after?.candidate.calibrationProvenance);
+});
+
+test("a run's target changes follow a changed declaration under the same tree", async () => {
+  const runId = "uk-store-redeclared";
+  const diagnosticsSha256 = fakeDocumentSha256(stagingDiagnosticsFixture());
+  const store = ukStagingStore(runId, {
+    "run_manifest.json": stagingRunManifest(runId, diagnosticsSha256),
+  });
+  store.addBuild({
+    country: "uk",
+    kind: "release",
+    releaseId: "microcosm-uk-2026-redeclared-20261020T000000Z",
+    latest: true,
+    files: { calibrationDiagnostics: stagingDiagnosticsFixture() },
+  });
+  serve(store);
+  const release = "microcosm-uk-2026-redeclared-20261020T000000Z";
+  const before = await loadStoredStagingTargetChangeDataset(runId, release, "uk");
+  // The run now declares other diagnostics than its tree holds.
+  store.addStagingRun({
+    country: "uk",
+    runId,
+    files: { "run_manifest.json": stagingRunManifest(runId, "b".repeat(64)) },
+  });
+
+  const after = await loadStoredStagingTargetChangeDataset(runId, release, "uk");
+
+  expect(before).not.toBeNull();
+  expect(after).toBeNull();
 });
 
 test("a store without the country's staging run copies says so", async () => {
