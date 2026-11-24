@@ -62,12 +62,12 @@ export function createMicrocosmReleasesHandler(
     // Per-attempt tags and releases published only as a tag are named only
     // by the tree manifest, which the folder listing also reads, so a failed
     // manifest read fails the listing.
-    const cuts = manifest
+    const tagged = manifest
       ? await dependencies
         .loadPublishedCutReleases(revalidate, country, manifest, folders)
         .catch(() => [])
       : [];
-    return mergeReleaseInventory(folders, cuts, latest);
+    return mergeReleaseInventory(folders, tagged, latest);
   }
 
   return async function GET(request: Request) {

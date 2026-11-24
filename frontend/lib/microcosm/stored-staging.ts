@@ -20,6 +20,7 @@ import {
   latestMicrocosmCalibrationSummary,
   latestMicrocosmTargetDiagnosticsPage,
   microcosmCountryGeography,
+  microcosmRepo,
   recordedReleaseInventory,
   type Calibration,
   type ReleaseEntry,
@@ -81,6 +82,7 @@ const NOT_UPLOADED = "This staging run has not uploaded calibration_diagnostics.
 // Face reader takes them.
 const STAGED_BUNDLE_LANDED = new Set(["uploaded", "already_staged"]);
 const SHA_256 = /^[0-9a-f]{64}$/;
+const GIT_COMMIT = /^[0-9a-f]{40}$/;
 
 function stringValue(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
@@ -364,7 +366,12 @@ function stagingTreeSource(
     !receipt ||
     receiptCopy?.sha256 !== stringValue(stagedArtifact?.sha256) ||
     !STAGED_BUNDLE_LANDED.has(String(receipt.status)) ||
-    stringValue(receipt.run_id) !== runId
+    stringValue(receipt.run_id) !== runId ||
+    // Where the old reader read the bundle: the country's registered release
+    // repository, under staged/<run ID>, at a commit.
+    stringValue(receipt.repository) !== microcosmRepo(country) ||
+    stringValue(receipt.prefix) !== `staged/${runId}` ||
+    !GIT_COMMIT.test(stringValue(receipt.revision) ?? "")
   ) {
     return null;
   }
@@ -697,15 +704,20 @@ const targetChangeCache = new Map<
 >();
 
 // The run's tree, its documents' status and its calibration, read once for
-// the target-change readers. The cache key names the tree, so a replaced
-// tree is never answered from an earlier one's cache entry.
+// the target-change readers. The cache key names the tree and the run's
+// declaration, so neither a replaced tree nor a changed declaration is
+// answered from an earlier cache entry.
 async function targetChangeCandidate(country: MicrocosmCountry, runId: string) {
   const [{ manifest }, documents] = await Promise.all([
     readStoreManifest(),
     readRunDocuments(country, runId, CALIBRATION_DOCUMENTS),
   ]);
+  const source = stagingTreeSource(documents, manifest, country, runId);
   return {
-    tree: stagingTreeEntry(manifest, country, runId)?.buildArtifactId ?? "none",
+    // The tree and the diagnostics the run declares for it.
+    tree: source
+      ? `${source.entry.buildArtifactId}:${source.declaredSha256 ?? "undeclared"}`
+      : "none",
     ttlSeconds: stagingTargetChangeCacheTtlSeconds(documents?.progress?.status),
     calibration: () => calibrationFromStore(country, runId, documents, manifest),
   };
