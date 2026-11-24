@@ -94,6 +94,13 @@ test("the installed package is the pinned release, not a link to a local copy", 
   }).toEqual({ version: pinnedVersion(), location: INSTALLED_PACKAGE });
 });
 
+test("no dashboard script runs the package's tree publisher: the collector builds and stores trees", () => {
+  const publisherScripts = Object.entries(frontendManifest().scripts)
+    .filter(([, command]) => command.includes("publish-calibration-tree"))
+    .map(([name]) => name);
+  expect(publisherScripts).toEqual([]);
+});
+
 test("the publisher script runs the installed package's publisher module", () => {
   const exportedPublisher = relative(
     FRONTEND_ROOT,

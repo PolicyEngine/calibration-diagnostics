@@ -290,7 +290,7 @@ def test_bun_script_detection_covers_repository_scripts_but_not_package_runners(
         "bun run lint",
         "bun test",
         "bun --no-install frontend/scripts/replay-build-run.ts",
-        'set -e\nbun run publish:calibration-tree -- "${args[@]}"',
+        'set -e\nbun run replay:build-run -- "${args[@]}"',
     ):
         assert BUN_SCRIPT_COMMAND.search(command), command
     for command in (
@@ -367,6 +367,86 @@ def test_calibration_smoke_invocation_reads_only_the_words_before_the_script():
         invocation = CALIBRATION_SMOKE_INVOCATION.search(command)
         assert invocation, command
         assert invocation.group("bun_words").split() == bun_words, command
+
+
+# The repository secrets and variable that only the dashboard's GitHub Actions
+# tree publisher read. The telemetry collector builds and stores calibration
+# trees instead, and these settings are deleted from the repository, so a
+# workflow that read one would get an empty value.
+FORMER_TREE_PUBLISHER_SETTINGS = (
+    ("secrets", "HF_TOKEN"),
+    ("secrets", "POPULACE_UK_STAGING_HF_TOKEN"),
+    ("secrets", "BLOB_READ_WRITE_TOKEN"),
+    ("vars", "CALIBRATION_TREE_BUILD_ENABLED"),
+)
+# Expressions that hand every secret or variable on at once, so a step or a
+# called workflow could read any of them.
+EVERY_SECRET_OR_VARIABLE = re.compile(
+    r"\btoJSON\s*\(\s*(?:secrets|vars)\s*\)|\bsecrets\s*:\s*inherit\b",
+    re.IGNORECASE,
+)
+# The tree publisher's entry points: the frontend script and the package
+# module it ran.
+TREE_PUBLISHER_COMMAND = re.compile(r"publish[:-]calibration-tree")
+
+
+def _reads_setting(text, context, name):
+    # GitHub expressions ignore case in context and property names, and accept
+    # both `secrets.NAME` and `secrets['NAME']`.
+    return re.search(
+        rf"\b{context}\s*(?:\.\s*{name}\b|\[\s*['\"]{name}['\"]\s*\])",
+        text,
+        re.IGNORECASE,
+    )
+
+
+def _workflow_files():
+    workflows = ROOT / ".github/workflows"
+    return sorted([*workflows.glob("*.yml"), *workflows.glob("*.yaml")])
+
+
+def test_setting_detection_covers_both_expression_forms_and_ignores_case():
+    for text in (
+        "${{ secrets.HF_TOKEN }}",
+        "${{ secrets['hf_token'] }}",
+        '${{ SECRETS [ "HF_TOKEN" ] }}',
+        "${{ Secrets.Hf_Token }}",
+    ):
+        assert _reads_setting(text, "secrets", "HF_TOKEN"), text
+    for text in (
+        "${{ secrets.HF_RELEASE_READ_TOKEN }}",
+        "${{ secrets.HF_TOKEN_2 }}",
+        "${{ vars.HF_TOKEN }}",
+        "${{ env.HF_TOKEN }}",
+    ):
+        assert not _reads_setting(text, "secrets", "HF_TOKEN"), text
+    assert EVERY_SECRET_OR_VARIABLE.search("${{ toJson(secrets) }}")
+    assert EVERY_SECRET_OR_VARIABLE.search("    secrets: inherit\n")
+    assert not EVERY_SECRET_OR_VARIABLE.search("${{ toJSON(steps) }}")
+
+
+def test_no_workflow_reads_the_former_tree_publisher_settings():
+    readers = []
+    for workflow_file in _workflow_files():
+        text = workflow_file.read_text()
+        readers.extend(
+            f"{workflow_file.name}: {context}.{name}"
+            for context, name in FORMER_TREE_PUBLISHER_SETTINGS
+            if _reads_setting(text, context, name)
+        )
+        readers.extend(
+            f"{workflow_file.name}: {expression.group(0)}"
+            for expression in EVERY_SECRET_OR_VARIABLE.finditer(text)
+        )
+    assert readers == []
+
+
+def test_no_workflow_runs_the_tree_publisher():
+    assert [
+        workflow_file.name
+        for workflow_file in _workflow_files()
+        if TREE_PUBLISHER_COMMAND.search(workflow_file.read_text())
+    ] == []
 
 
 def test_timestamp_migration_can_run_through_the_publication_workflow():
