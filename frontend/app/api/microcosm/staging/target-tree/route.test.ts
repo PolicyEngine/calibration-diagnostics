@@ -1,6 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
 
-import { FakeCollectorStore } from "@/lib/microcosm/test-support/fake-collector-store";
+import {
+  FakeCollectorStore,
+  fakeDocumentSha256,
+} from "@/lib/microcosm/test-support/fake-collector-store";
 import {
   stagingDiagnosticsFixture,
   stagingRunManifest,
@@ -29,7 +32,7 @@ test("builds the calibration tree from a staging run's stored diagnostics", asyn
   store.addStagingRun({
     country: "uk",
     runId,
-    files: { "run_manifest.json": stagingRunManifest(runId, "a".repeat(64)) },
+    files: { "run_manifest.json": stagingRunManifest(runId, fakeDocumentSha256(diagnostics)) },
   });
   restore = store.install();
 

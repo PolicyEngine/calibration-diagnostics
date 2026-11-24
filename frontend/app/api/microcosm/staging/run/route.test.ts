@@ -179,6 +179,44 @@ test("an unfinished run's stage events and calibration progress come from the co
   expect(body.run_manifest).toMatchObject({ artifacts: { a: {} } });
 });
 
+test("an unfinished run's events from the collector's record leave out heartbeats and keep the newest", async () => {
+  const detail = huggingFaceDetail();
+  const record = usFailedCollectorDocuments();
+  const stageEvents = Array.from({ length: 6_000 }, (_, index) => ({
+    stage: "calibrating",
+    status: "progress",
+    time: new Date(Date.parse("2026-10-20T00:00:00Z") + index * 1_000).toISOString(),
+    sequence: index + 1,
+  }));
+  const heartbeats = [{ stage: null, status: "progress", time: "2026-10-20T00:00:00Z" }];
+  const calibrationEvents = Array.from({ length: 6_000 }, (_, index) => ({ epoch: index, loss: 1 }));
+  const large = {
+    ...record,
+    events: [...heartbeats, ...stageEvents, ...heartbeats],
+    calibration_progress: { ...record.calibration_progress, events: calibrationEvents },
+  };
+  const get = createStagingRunHandler({
+    loadRun: async () => detail,
+    loadCollectorTimelines: async () => ({
+      timelines: new Map([[US_FAILED_RUN_ID, buildTimeline(record, INVESTIGATION_NOW_MS)]]),
+      documents: new Map([[US_FAILED_RUN_ID, large]]),
+      note: null,
+    }),
+    now: () => INVESTIGATION_NOW_MS,
+  });
+
+  const body = (await loadRun(get)) as unknown as {
+    events: { stage: string | null; sequence?: number }[];
+    calibration_progress: { events: { epoch: number }[] };
+  };
+
+  expect(body.events).toHaveLength(5_000);
+  expect(body.events.every((event) => event.stage != null)).toBe(true);
+  expect(body.events.at(-1)?.sequence).toBe(6_000);
+  expect(body.calibration_progress.events).toHaveLength(5_000);
+  expect(body.calibration_progress.events.at(-1)?.epoch).toBe(5_999);
+});
+
 test("a run whose copy records its end keeps the copy's stage events and calibration progress", async () => {
   const body = (await loadRun(handlerWithRecord("failed"))) as unknown as Record<string, unknown>;
 

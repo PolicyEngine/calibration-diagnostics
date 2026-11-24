@@ -7,7 +7,11 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import diagnosticsFixture from "@/lib/microcosm/fixtures/zz-release/calibration_diagnostics.json";
 import releaseManifestFixture from "@/lib/microcosm/fixtures/zz-release/release_manifest.json";
 import { clearBuildRunCaches, loadBuildRun, loadBuildRuns } from "@/lib/microcosm/build-runs";
-import { FakeCollectorStore } from "@/lib/microcosm/test-support/fake-collector-store";
+import {
+  FakeCollectorStore,
+  fakeDocumentSha256,
+} from "@/lib/microcosm/test-support/fake-collector-store";
+import { loadStoredStagingTargetChangeDataset } from "@/lib/microcosm/stored-staging";
 import {
   stagingDiagnosticsFixture,
   stagingRunManifest,
@@ -434,28 +438,145 @@ test("a run the store has no copy of has no documents and no calibration", async
   expect(store.huggingFaceRequests).toEqual([]);
 });
 
-test("a staged bundle run's calibration names its staged bundle as the source", async () => {
-  const runId = "uk-store-staged-run";
-  const diagnostics = stagingDiagnosticsFixture();
-  const manifest = stagingRunManifest(runId, null);
+// A UK run that staged its dataset bundle: its run manifest declares the
+// bundle's receipt, and the receipt the bundle's diagnostics.
+function stagedBundleRun(runId: string, diagnosticsSha256: string, status = "uploaded") {
+  const receipt = {
+    status,
+    run_id: runId,
+    repository: "policyengine/populace-uk-private",
+    prefix: `staged/${runId}`,
+    revision: "a".repeat(40),
+    files: { "calibration_diagnostics.json": { sha256: diagnosticsSha256 } },
+  };
+  const manifest = {
+    ...stagingRunManifest(runId, null),
+    artifacts: [
+      {
+        logical_name: "staged_dataset",
+        artifact_kind: "sampling_receipt",
+        contract_relative_path: "artifacts/staged_dataset.json",
+        media_type: "application/json",
+        sha256: fakeDocumentSha256(receipt),
+        classification: "aggregate",
+      },
+    ],
+  };
+  return { "run_manifest.json": manifest, "artifacts/staged_dataset.json": receipt };
+}
+
+function ukStagingStore(
+  runId: string,
+  runFiles: Parameters<FakeCollectorStore["addStagingRun"]>[0]["files"] | null,
+  options: { removed?: boolean } = {},
+): FakeCollectorStore {
   const store = new FakeCollectorStore();
   store.addBuild({
     country: "uk",
     kind: "staging",
     stagingRunId: runId,
     label: `${runId}-candidate`,
-    files: { calibrationDiagnostics: diagnostics },
+    files: { calibrationDiagnostics: stagingDiagnosticsFixture() },
   });
-  store.addStagingRun({ country: "uk", runId, files: { "run_manifest.json": manifest } });
+  if (runFiles) store.addStagingRun({ country: "uk", runId, files: runFiles, ...options });
+  else store.addStagingRun({ country: "uk", runId: `${runId}-other`, files: {} });
+  return store;
+}
+
+async function runCalibration(runId: string) {
+  const response = await stagingRun(request(`/staging/run?country=uk&id=${runId}`));
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  return { has_calibration: body.has_calibration, source: body.calibration?.source ?? null };
+}
+
+test("a staged bundle run's calibration names its staged bundle as the source", async () => {
+  const runId = "uk-store-staged-run";
+  const store = serve(
+    ukStagingStore(runId, stagedBundleRun(runId, fakeDocumentSha256(stagingDiagnosticsFixture()))),
+  );
+
+  expect(await runCalibration(runId)).toEqual({
+    has_calibration: true,
+    source: "huggingface_staged_bundle",
+  });
+  expect(store.huggingFaceRequests).toEqual([]);
+});
+
+test("a run's calibration needs the tree to hold the diagnostics its files declare", async () => {
+  const diagnosticsSha256 = fakeDocumentSha256(stagingDiagnosticsFixture());
+  const otherSha256 = "b".repeat(64);
+  const cases: [string, Parameters<FakeCollectorStore["addStagingRun"]>[0]["files"], boolean][] = [
+    ["uk-store-declared", { "run_manifest.json": stagingRunManifest("uk-store-declared", diagnosticsSha256) }, true],
+    // The tree was built from earlier diagnostics than the run now declares.
+    ["uk-store-newer", { "run_manifest.json": stagingRunManifest("uk-store-newer", otherSha256) }, false],
+    ["uk-store-bundle-newer", stagedBundleRun("uk-store-bundle-newer", otherSha256), false],
+    // A staging that failed lands no bundle.
+    ["uk-store-bundle-failed", stagedBundleRun("uk-store-bundle-failed", diagnosticsSha256, "failed"), false],
+  ];
+  for (const [runId, files, shown] of cases) {
+    const store = serve(ukStagingStore(runId, files));
+    const calibration = await runCalibration(runId);
+    restore?.();
+    restore = null;
+
+    expect({ runId, shown: calibration.has_calibration }).toEqual({ runId, shown });
+    expect(store.huggingFaceRequests).toEqual([]);
+  }
+});
+
+test("a run with a stored tree but no current copy of its files has no calibration", async () => {
+  const runId = "uk-store-uncopied";
+  for (const store of [
+    ukStagingStore(runId, null),
+    ukStagingStore(
+      runId,
+      { "run_manifest.json": stagingRunManifest(runId, fakeDocumentSha256(stagingDiagnosticsFixture())) },
+      { removed: true },
+    ),
+  ]) {
+    serve(store);
+    const calibration = await runCalibration(runId);
+    const tree = await stagingTargetTree(request(`/staging/target-tree?country=uk&run=${runId}`));
+    restore?.();
+    restore = null;
+
+    expect(calibration.has_calibration).toBe(false);
+    expect(tree.status).toBe(404);
+  }
+});
+
+test("a finished run's target changes follow a replaced tree", async () => {
+  const store = usStore();
+  serve(store);
+  const before = await loadStoredStagingTargetChangeDataset(US_RUN, US_RELEASE_ID, "us");
+  store.addBuild({
+    country: "us",
+    kind: "staging",
+    stagingRunId: US_RUN,
+    label: US_CANDIDATE,
+    variant: "rebuilt",
+    replaceStagingRun: true,
+    files: { calibrationDiagnostics: { ...diagnosticsFixture, n_records: 2501 } },
+  });
+
+  const after = await loadStoredStagingTargetChangeDataset(US_RUN, US_RELEASE_ID, "us");
+
+  expect(before?.candidate.calibrationProvenance).not.toEqual(after?.candidate.calibrationProvenance);
+});
+
+test("a store without the country's staging run copies says so", async () => {
+  const store = new FakeCollectorStore();
   serve(store);
 
-  const response = await stagingRun(request(`/staging/run?country=uk&id=${runId}`));
+  const runs = await stagingRuns(request("/staging/runs?country=uk"));
+  const run = await stagingRun(request("/staging/run?country=uk&id=uk-store-anything"));
+  const builds = await loadBuildRuns("staging", "uk");
 
-  expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({
-    has_calibration: true,
-    calibration: { source: "huggingface_staged_bundle", release_id: `${runId}-candidate` },
-  });
+  expect(runs.status).toBe(200);
+  expect(await runs.json()).toMatchObject({ available: false, runs: [] });
+  expect(await run.json()).toMatchObject({ available: false, has_calibration: false });
+  expect(builds.problems.map((problem) => problem.run_id)).toEqual(["hugging-face-history"]);
   expect(store.huggingFaceRequests).toEqual([]);
 });
 

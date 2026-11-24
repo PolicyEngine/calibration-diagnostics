@@ -57,6 +57,11 @@ function bytesOf(document: Document): Uint8Array {
   );
 }
 
+/** The SHA-256 the store records for a document added here: of its JSON text. */
+export function fakeDocumentSha256(document: Document): string {
+  return sha256(bytesOf(document));
+}
+
 function sha256(bytes: Uint8Array | string): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -83,6 +88,10 @@ export interface FakeBuild {
   hfRepo?: string;
   updatedAt?: string | null;
   latest?: boolean;
+  /** A staging build that takes the place of the run's earlier tree. */
+  replaceStagingRun?: boolean;
+  /** Names the build apart from another of the same run. */
+  variant?: string;
   /** The build's original files, by the name the store keeps them under. */
   files: Partial<Record<CalibrationTreeSourceFile, Document>>;
 }
@@ -108,7 +117,9 @@ export class FakeCollectorStore {
   /** Adds a build to the tree manifest and stores its original files; returns its entry. */
   addBuild(build: FakeBuild): CalibrationTreeManifestEntry {
     const source = build.kind === "release" ? build.releaseId! : build.stagingRunId!;
-    const buildArtifactId = fakeBuildId(`${build.country}:${build.kind}:${source}`);
+    const buildArtifactId = fakeBuildId(
+      `${build.country}:${build.kind}:${source}${build.variant ? `:${build.variant}` : ""}`,
+    );
     const entry: CalibrationTreeManifestEntry = {
       buildArtifactId,
       kind: build.kind,
@@ -130,6 +141,7 @@ export class FakeCollectorStore {
       build.country,
       entry,
       build.latest === true,
+      { replaceStagingRun: build.replaceStagingRun === true },
     );
     for (const [file, document] of Object.entries(build.files)) {
       this.objects.set(
