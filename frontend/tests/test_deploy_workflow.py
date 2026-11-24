@@ -377,9 +377,6 @@ FORMER_TREE_PUBLISHER_SETTINGS = {
     "secrets": {"HF_TOKEN", "POPULACE_UK_STAGING_HF_TOKEN", "BLOB_READ_WRITE_TOKEN"},
     "vars": {"CALIBRATION_TREE_BUILD_ENABLED"},
 }
-# A `${{ ... }}` expression inside a workflow value. An `if:` value is an
-# expression even without these delimiters.
-WORKFLOW_EXPRESSION = re.compile(r"\$\{\{(.*?)\}\}", re.DOTALL)
 # A use of the secrets or vars context, with the name it reads when that name
 # is written out: `secrets.NAME` or `secrets['NAME']`, in any letter case, as
 # GitHub accepts. Any other use (the whole context, a `.*` filter or a computed
@@ -397,15 +394,37 @@ TREE_PUBLISHER_GUARD = "frontend/tests/test_deploy_workflow.py"
 
 
 def _string_values(node, key=None):
-    """Each string in a parsed workflow, with the mapping key it is under."""
+    """Each string in a parsed workflow, mapping keys included, with the
+    mapping key it is under (None for a key itself)."""
     if isinstance(node, dict):
         for child_key, child in node.items():
+            yield None, child_key
             yield from _string_values(child, child_key)
     elif isinstance(node, list):
         for child in node:
             yield from _string_values(child, key)
     elif isinstance(node, str):
         yield key, node
+
+
+def _workflow_expressions(text):
+    """The `${{ ... }}` expressions in a workflow string. A `}}` inside a
+    single-quoted string literal, as in format('{{0}}'), does not end one;
+    an unterminated expression runs to the end of the string."""
+    expressions = []
+    start = text.find("${{")
+    while start != -1:
+        position = start + len("${{")
+        in_string_literal = False
+        while position < len(text):
+            if text[position] == "'":
+                in_string_literal = not in_string_literal
+            elif not in_string_literal and text.startswith("}}", position):
+                break
+            position += 1
+        expressions.append(text[start + len("${{") : position])
+        start = text.find("${{", position)
+    return expressions
 
 
 def _former_tree_publisher_setting_reads(workflow_text):
@@ -417,7 +436,8 @@ def _former_tree_publisher_setting_reads(workflow_text):
     workflow = yaml.load(workflow_text, Loader=yaml.BaseLoader)
     reads = []
     for key, value in _string_values(workflow):
-        expressions = [value] if key == "if" else WORKFLOW_EXPRESSION.findall(value)
+        # An `if:` value is an expression even without the `${{ }}` delimiters.
+        expressions = [value] if key == "if" else _workflow_expressions(value)
         for expression in expressions:
             for reference in CONTEXT_REFERENCE.finditer(expression):
                 context = reference.group("context").lower()
