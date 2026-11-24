@@ -2,8 +2,9 @@
 // readers, the Blob I/O and the publisher) has one source, in
 // PolicyEngine/microcosm-collector, published to npm as
 // @policyengine/calibration-tree. The dashboard installs one published
-// version from npm and keeps no copy of its own. The collector runs the
-// package's publisher; the dashboard only reads what it stores.
+// version from npm and keeps no copy of its own. The collector builds and
+// stores calibration trees with the package's worker and publication modules;
+// the dashboard only reads what it stores.
 import { expect, test } from "bun:test";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -91,13 +92,6 @@ test("the installed package is the pinned release, not a link to a local copy", 
     version: installedManifest.version,
     location: relative(FRONTEND_ROOT, realpathSync(join(FRONTEND_ROOT, INSTALLED_PACKAGE))),
   }).toEqual({ version: pinnedVersion(), location: INSTALLED_PACKAGE });
-});
-
-test("no dashboard script runs the package's tree publisher: the collector builds and stores trees", () => {
-  const publisherScripts = Object.entries(frontendManifest().scripts)
-    .filter(([, command]) => command.includes("publish-calibration-tree"))
-    .map(([name]) => name);
-  expect(publisherScripts).toEqual([]);
 });
 
 test("lint typechecks the dashboard alone; the collector typechecks the package", () => {

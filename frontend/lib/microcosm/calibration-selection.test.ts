@@ -76,7 +76,7 @@ const NOTHING_LOADED: ComparisonMapBuildSources = {
   comparisonReleaseId: undefined,
   candidateBuildArtifactId: undefined,
 };
-// A local-area candidate the publisher has not built a tree for yet.
+// A local-area candidate the collector has not built a tree for yet.
 const MANIFEST_LOADED: ComparisonMapBuildSources = {
   builds: PUBLISHED_BUILDS,
   latestReleaseBuildArtifactId: "national-build",

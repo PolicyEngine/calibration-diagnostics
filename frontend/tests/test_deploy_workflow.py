@@ -270,7 +270,7 @@ def test_every_bun_script_step_runs_after_its_job_installs_locked_frontend_depen
     # @policyengine/calibration-tree, only through frontend/node_modules, so a
     # job must install before it runs repository code with Bun.
     uninstalled_steps = []
-    for workflow_file in sorted((ROOT / ".github/workflows").glob("*.yml")):
+    for workflow_file in _workflow_files():
         workflow = yaml.load(workflow_file.read_text(), Loader=yaml.BaseLoader)
         for job_name, job in workflow["jobs"].items():
             installed = False
@@ -371,45 +371,66 @@ def test_calibration_smoke_invocation_reads_only_the_words_before_the_script():
 
 # The repository secrets and variable that only the dashboard's GitHub Actions
 # tree publisher read. The telemetry collector builds and stores calibration
-# trees instead, and these settings are deleted from the repository, so a
-# workflow that read one would get an empty value.
-FORMER_TREE_PUBLISHER_SETTINGS = (
-    ("secrets", "HF_TOKEN"),
-    ("secrets", "POPULACE_UK_STAGING_HF_TOKEN"),
-    ("secrets", "BLOB_READ_WRITE_TOKEN"),
-    ("vars", "CALIBRATION_TREE_BUILD_ENABLED"),
-)
-# Expressions that hand every secret or variable on at once, so a step or a
-# called workflow could read any of them.
-EVERY_SECRET_OR_VARIABLE = re.compile(
-    r"\btoJSON\s*\(\s*(?:secrets|vars)\s*\)|\bsecrets\s*:\s*inherit\b",
+# trees instead. These settings are to be deleted from the repository's
+# settings, after which a workflow that read one would get an empty value.
+FORMER_TREE_PUBLISHER_SETTINGS = {
+    "secrets": {"HF_TOKEN", "POPULACE_UK_STAGING_HF_TOKEN", "BLOB_READ_WRITE_TOKEN"},
+    "vars": {"CALIBRATION_TREE_BUILD_ENABLED"},
+}
+# A `${{ ... }}` expression inside a workflow value. An `if:` value is an
+# expression even without these delimiters.
+WORKFLOW_EXPRESSION = re.compile(r"\$\{\{(.*?)\}\}", re.DOTALL)
+# A use of the secrets or vars context, with the name it reads when that name
+# is written out: `secrets.NAME` or `secrets['NAME']`, in any letter case, as
+# GitHub accepts. Any other use (the whole context, a `.*` filter or a computed
+# index) could read any setting.
+CONTEXT_REFERENCE = re.compile(
+    r"(?<![\w.])(?P<context>secrets|vars)\b"
+    r"(?:\s*\.\s*(?P<property>[A-Za-z_][A-Za-z0-9_]*)\b|\s*\[\s*'(?P<index>[^']*)'\s*\])?",
     re.IGNORECASE,
 )
-# The tree publisher's entry points: the frontend script and the package
-# module it ran.
+# The tree publisher's entry points: the package's own script name and its
+# module's name.
 TREE_PUBLISHER_COMMAND = re.compile(r"publish[:-]calibration-tree")
+# This module looks for the publisher's entry points, so it names them.
+TREE_PUBLISHER_GUARD = "frontend/tests/test_deploy_workflow.py"
 
 
-def _reads_setting(text, context, name):
-    # GitHub expressions ignore case in context and property names, and accept
-    # both `secrets.NAME` and `secrets['NAME']`.
-    return re.search(
-        rf"\b{context}\s*(?:\.\s*{name}\b|\[\s*['\"]{name}['\"]\s*\])",
-        text,
-        re.IGNORECASE,
-    )
+def _string_values(node, key=None):
+    """Each string in a parsed workflow, with the mapping key it is under."""
+    if isinstance(node, dict):
+        for child_key, child in node.items():
+            yield from _string_values(child, child_key)
+    elif isinstance(node, list):
+        for child in node:
+            yield from _string_values(child, key)
+    elif isinstance(node, str):
+        yield key, node
 
 
 def _former_tree_publisher_setting_reads(workflow_text):
-    reads = [
-        f"{context}.{name}"
-        for context, name in FORMER_TREE_PUBLISHER_SETTINGS
-        if _reads_setting(workflow_text, context, name)
-    ]
-    reads.extend(
-        expression.group(0)
-        for expression in EVERY_SECRET_OR_VARIABLE.finditer(workflow_text)
-    )
+    """Each read of a former tree publisher setting in a workflow, and each use
+    of the secrets or vars context that could read any setting.
+
+    It reads the parsed values, so YAML quoting and escapes are decoded first.
+    """
+    workflow = yaml.load(workflow_text, Loader=yaml.BaseLoader)
+    reads = []
+    for key, value in _string_values(workflow):
+        expressions = [value] if key == "if" else WORKFLOW_EXPRESSION.findall(value)
+        for expression in expressions:
+            for reference in CONTEXT_REFERENCE.finditer(expression):
+                context = reference.group("context").lower()
+                name = reference.group("property") or reference.group("index")
+                if name is None:
+                    reads.append(f"any {context} setting: {expression.strip()}")
+                elif name.upper() in FORMER_TREE_PUBLISHER_SETTINGS[context]:
+                    reads.append(f"{context}.{name.upper()}")
+    jobs = workflow.get("jobs", {}) if isinstance(workflow, dict) else {}
+    for job_name, job in jobs.items():
+        passed_secrets = job.get("secrets") if isinstance(job, dict) else None
+        if isinstance(passed_secrets, str) and passed_secrets.strip() == "inherit":
+            reads.append(f"jobs.{job_name}.secrets: inherit")
     return reads
 
 
@@ -419,11 +440,13 @@ def _workflow_files():
 
 
 def _files_naming_the_tree_publisher(files):
+    """The paths, among (path, text) pairs, whose text names an entry point of
+    the tree publisher: workflows, the scripts they run, the frontend manifest
+    and documents alike."""
     return [
         relative_path
         for relative_path, text in files
-        if relative_path.startswith(".github/workflows/")
-        and TREE_PUBLISHER_COMMAND.search(text)
+        if relative_path != TREE_PUBLISHER_GUARD and TREE_PUBLISHER_COMMAND.search(text)
     ]
 
 
@@ -505,7 +528,9 @@ def test_publisher_detection_reads_every_file_except_its_own_guard():
     ]
 
 
-def test_no_workflow_runs_the_tree_publisher():
+def test_no_repository_file_names_the_tree_publisher():
+    # The collector is the only writer of the calibration tree store, so
+    # nothing here runs the package's publisher.
     assert _files_naming_the_tree_publisher(_checkout_files()) == []
 
 
