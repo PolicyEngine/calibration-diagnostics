@@ -477,6 +477,10 @@ READS_A_FORMER_TREE_PUBLISHER_SETTING = (
     "env:\n  EVERYTHING: ${{ join(secrets.*, ' ') }}\n",
     "env:\n  TOKEN: ${{ secrets[format('POPULACE_{0}_STAGING_HF_TOKEN', matrix.country)] }}\n",
     "jobs:\n  call:\n    uses: ./.github/workflows/other.yml\n    secrets: 'inherit'\n",
+    # A `}}` inside a quoted string does not end the expression.
+    "env:\n  BODY: ${{ format('{{\"token\":\"{0}\"}}', secrets.HF_TOKEN) }}\n",
+    # GitHub evaluates expressions in mapping keys too.
+    'env:\n  "${{ secrets.HF_TOKEN }}": present\n',
 )
 # Workflow fragments that read none of them.
 READS_NO_FORMER_TREE_PUBLISHER_SETTING = (
