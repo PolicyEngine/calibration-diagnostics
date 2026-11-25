@@ -315,7 +315,16 @@ test("an unfinished run's events from the collector's record leave out heartbeat
   // A stage row whose details hold `done` but no `total`: not a progress
   // report.
   const doneOnly = { ...stageChange(3, "export_dataset"), details: { done: true } };
-  const calibration = [calibrationEvent(1), calibrationEvent(2)];
+  // Nor is one whose details hold `total` but no `done`.
+  const totalOnly = { ...stageChange(5, "export_dataset"), details: { total: 4 } };
+  // A stage end the emitter adds when the next stage starts.
+  const emitterStageEnd = {
+    ...stageChange(1, "target_compilation"),
+    message: null,
+    details: { stage_span: { occurrence: 1, closed_by: "next_stage_started", awake_seconds: 60 } },
+  };
+  // A calibration event is never a progress report, whatever its details.
+  const calibration = [calibrationEvent(1), { ...calibrationEvent(2), details: { done: 2, total: 9 } }];
   const heartbeats = Array.from({ length: 10 }, (_, index) => heartbeatEvent(index));
 
   const body = (await loadRun(
@@ -327,6 +336,7 @@ test("an unfinished run's events from the collector's record leave out heartbeat
         stages[1],
         graphNodeReport(1),
         graphNodeReport(2),
+        emitterStageEnd,
         stages[2],
         calibration[0],
         stageUpdate,
@@ -335,6 +345,7 @@ test("an unfinished run's events from the collector's record leave out heartbeat
         ...heartbeats.slice(5),
         scoringBatchReport(1),
         doneOnly,
+        totalOnly,
       ],
       [],
     ),
@@ -347,14 +358,44 @@ test("an unfinished run's events from the collector's record leave out heartbeat
         stages[0],
         retainedRow,
         stages[1],
+        emitterStageEnd,
         stages[2],
         calibration[0],
         stageUpdate,
         calibration[1],
         doneOnly,
+        totalOnly,
       ]),
     ),
   );
+});
+
+test("heartbeats whose reading the collector dropped are left out", async () => {
+  // A heartbeat reading that doesn't match the collector's model (from an
+  // emitter newer than the collector) is removed and named in
+  // `dropped_emitter_details`; the heartbeat keeps any sleep it carries.
+  const withoutReading = Array.from({ length: 4 }, (_, index) => ({
+    ...heartbeatEvent(index),
+    details:
+      index % 2 === 0
+        ? { dropped_emitter_details: ["reading"] }
+        : { sleep: { asleep_seconds: 120 }, dropped_emitter_details: ["reading"] },
+  }));
+  // A stage end whose span the collector dropped is still a stage change.
+  const stageEndWithoutSpan = {
+    ...stageChange(1, "target_compilation"),
+    details: { dropped_emitter_details: ["stage_span"] },
+  };
+  const stages = [stageChange(0, "created"), stageChange(2, "calibrating")];
+
+  const body = (await loadRun(
+    handlerWithLargeRecord(
+      [stages[0], ...withoutReading.slice(0, 2), stageEndWithoutSpan, ...withoutReading.slice(2), stages[1]],
+      [],
+    ),
+  )) as unknown as RecordInternalsBody;
+
+  expect(body.events).toEqual(JSON.parse(JSON.stringify([stages[0], stageEndWithoutSpan, stages[1]])));
 });
 
 test("a long record's progress reports no longer crowd out the run's stages", async () => {
@@ -405,7 +446,9 @@ test("calibration events past the size limit give way before stage changes", asy
   expect(keptCalibration.length).toBeLessThan(10_000);
   // The newest calibration events are the ones kept, in the record's order.
   expect((keptCalibration.at(-1)?.details as { epoch: number }).epoch).toBe(10_000);
+  // They fill what the stage changes leave of the limit.
   expect(JSON.stringify(body.events).length).toBeLessThanOrEqual(1_500_000);
+  expect(JSON.stringify(body.events).length).toBeGreaterThan(1_490_000);
 });
 
 test("an unfinished run's internals from the collector's record keep the newest within a size limit", async () => {
