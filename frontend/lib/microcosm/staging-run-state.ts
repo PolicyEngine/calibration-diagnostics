@@ -81,10 +81,10 @@ function newestWithin<T>(items: readonly T[], used = 1): { kept: T[]; size: numb
 
 /**
  * An unfinished run's Stage timeline events and calibration progress, from
- * the collector's record. The events are what the run's own events file
- * holds: its stage changes, including the stage rows a build sends with a
- * status of its own, and its calibration events, in the record's order;
- * heartbeats and progress reports are left out. Within
+ * the collector's record. The events are the record's stage changes,
+ * including the stage rows a build sends with a status of its own, and its
+ * calibration events, in the record's order; heartbeats and progress
+ * reports, which the run's own events file never holds, are left out. Within
  * `RECORD_EVENTS_JSON_LIMIT`, the newest stage changes are kept first and
  * the newest calibration events fill what is left, so calibration never
  * crowds out the run's stages. The calibration progress keeps its newest
