@@ -79,8 +79,8 @@ function huggingFaceRunState(detail: StagingRunDetail): HuggingFaceRunState {
 // events and the calibration progress come from the collector's record (read
 // API v2) when it has one (`recordInternals`: its stage changes and
 // calibration events, without the heartbeats and progress reports a run's
-// events file never holds); `run_internals_source` says which. The progress document and the run manifest, with its uploaded
-// files, stay the copy's.
+// events file never holds); `run_internals_source` says which. The progress
+// document and the run manifest, with its uploaded files, stay the copy's.
 export function createStagingRunHandler(
   dependencies: StagingRunRouteDependencies = {
     loadRun: loadStoredStagingRun,

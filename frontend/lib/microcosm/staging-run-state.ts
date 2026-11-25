@@ -54,7 +54,8 @@ function isHeartbeat(event: JsonDocument): boolean {
 // A progress report as the collector serves it in a run's documents: an
 // event that is not a calibration event and whose details hold both `done`
 // and `total`, the counts of a stage's work, whatever its status. Builds send
-// these only to the emitter: the US builder's scoring batches with status
+// these only to the emitter: the US builder's work counters (engine batches
+// in target compilation, scoring batches after export) with status
 // `progress`, the UK builders' graph nodes with status `completed`. A run's
 // own events file never holds one; a long record holds thousands. The emitter
 // and the collector read a progress report's counts by the same two keys.

@@ -312,6 +312,9 @@ test("an unfinished run's events from the collector's record leave out heartbeat
   // A stage update with a message and nothing else, as a stage transition
   // can send: neither a heartbeat nor a progress report.
   const stageUpdate = { ...stageChange(2, "calibrating"), status: "progress", message: "Fitting weights." };
+  // A stage row whose details hold `done` but no `total`: not a progress
+  // report.
+  const doneOnly = { ...stageChange(3, "export_dataset"), details: { done: true } };
   const calibration = [calibrationEvent(1), calibrationEvent(2)];
   const heartbeats = Array.from({ length: 10 }, (_, index) => heartbeatEvent(index));
 
@@ -325,19 +328,31 @@ test("an unfinished run's events from the collector's record leave out heartbeat
         graphNodeReport(1),
         graphNodeReport(2),
         stages[2],
+        calibration[0],
         stageUpdate,
-        ...calibration,
+        calibration[1],
         scoringBatchReport(0),
         ...heartbeats.slice(5),
         scoringBatchReport(1),
+        doneOnly,
       ],
       [],
     ),
   )) as unknown as RecordInternalsBody;
 
+  // In the record's order, calibration events among the stage changes.
   expect(body.events).toEqual(
     JSON.parse(
-      JSON.stringify([stages[0], retainedRow, stages[1], stages[2], stageUpdate, ...calibration]),
+      JSON.stringify([
+        stages[0],
+        retainedRow,
+        stages[1],
+        stages[2],
+        calibration[0],
+        stageUpdate,
+        calibration[1],
+        doneOnly,
+      ]),
     ),
   );
 });
