@@ -146,8 +146,9 @@ def _releases_record(content: bytes) -> dict[str, Any]:
 
     The rules are the telemetry collector's ``parse_releases_record``
     (``telemetry_collector/releases_record.py`` in
-    PolicyEngine/microcosm-collector), which refuses exactly what the
-    calibration tree package's parser refuses: a record larger than 4 MiB or
+    PolicyEngine/microcosm-collector, as of its commit ``370c91b``), which
+    refuses exactly what the calibration tree package's parser refuses: a
+    record larger than 4 MiB or
     not a readable JSON document; one without exactly its keys at every level
     or with a ``schema_version`` other than 1; a release or build name that is
     not a safe identifier; an invalid role; a malformed build; a ``current``
@@ -276,9 +277,16 @@ def resolve_microcosm_release(
 
         def read(relative_path: str) -> bytes:
             candidate = root.joinpath(*PurePosixPath(relative_path).parts)
-            if not candidate.is_file():
+            # Only a path with nothing at it is absent. A directory or a
+            # broken link (a Hugging Face cache snapshot copied away from
+            # its blobs) is refused, so it never selects latest.json.
+            if not candidate.exists() and not candidate.is_symlink():
                 raise FileNotFoundError(
                     f"Microcosm release artifact does not exist: {candidate}"
+                )
+            if not candidate.is_file():
+                raise ValueError(
+                    f"Microcosm {relative_path} is not a regular file: {candidate}"
                 )
             return candidate.read_bytes()
 
@@ -294,6 +302,9 @@ def resolve_microcosm_release(
     latest: dict | None = None
     releases_record: dict | None = None
     selection_sha256: dict[str, str] = {}
+    # The release and build the release manifest must name, in the
+    # releases.json layout only.
+    selected_names: tuple[str, str] | None = None
     if record_bytes is not None:
         releases_record = _releases_record(record_bytes)
         release = releases_record["default"]
@@ -304,6 +315,7 @@ def resolve_microcosm_release(
             raise _refuse_record(
                 f"names no current build of its default release {release}."
             )
+        selected_names = (release, build)
         release_id = f"{release}/{build}"
         artifact_paths = {
             label: f"releases/{release_id}/{label}.json"
@@ -335,16 +347,16 @@ def resolve_microcosm_release(
         label: _json_document(content, label.replace("_", " "))
         for label, content in artifact_bytes.items()
     }
-    if releases_record is not None:
+    if selected_names is not None:
         named = (
             documents["release_manifest"].get("release"),
             documents["release_manifest"].get("build"),
         )
-        if named != (release, build):
+        if named != selected_names:
             raise ValueError(
                 f"Microcosm {artifact_paths['release_manifest']} does not name "
-                f"release {release!r} and build {build!r}: {named[0]!r}, "
-                f"{named[1]!r}"
+                f"release {selected_names[0]!r} and build {selected_names[1]!r}: "
+                f"{named[0]!r}, {named[1]!r}"
             )
     else:
         build_id = documents["build_manifest"].get("build_id")
