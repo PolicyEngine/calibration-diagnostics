@@ -89,6 +89,61 @@ def write_release(path: Path) -> None:
     )
 
 
+BUILD_FOLDER_RELEASE = "microcosm-be-2025-fixture"
+BUILD_FOLDER_BUILD = "microcosm-be-2025-fixture-20261125T000000Z"
+
+
+def write_build_folder_release(path: Path) -> None:
+    """A release repository in the layout BE moves to: ``releases.json`` and
+    ``releases/<release>/<build>/``, with no ``latest.json``."""
+
+    folder = path / "releases" / BUILD_FOLDER_RELEASE / BUILD_FOLDER_BUILD
+    folder.mkdir(parents=True)
+    documents = {
+        "build_manifest.json": {
+            "release": BUILD_FOLDER_RELEASE,
+            "build": BUILD_FOLDER_BUILD,
+            "chronicle": {"commit": "fixture-chronicle"},
+        },
+        "release_manifest.json": {
+            "schema_version": 1,
+            "release": BUILD_FOLDER_RELEASE,
+            "build": BUILD_FOLDER_BUILD,
+        },
+        "calibration_diagnostics.json": {
+            "targets": [
+                {
+                    "metadata": {
+                        "chronicle_record_ids": ["record-a", "record-b"]
+                    }
+                }
+            ]
+        },
+    }
+    for filename, payload in documents.items():
+        (folder / filename).write_text(json.dumps(payload))
+    (path / "releases.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "default": BUILD_FOLDER_RELEASE,
+                "releases": {
+                    BUILD_FOLDER_RELEASE: {
+                        "role": "national",
+                        "current": BUILD_FOLDER_BUILD,
+                        "builds": {
+                            BUILD_FOLDER_BUILD: {
+                                "published_at": "2026-11-25T00:00:00+00:00",
+                                "withdrawn": False,
+                            }
+                        },
+                    }
+                },
+            }
+        )
+    )
+
+
 def checkpoint_payload(source_id: str, supported_second_row: bool) -> dict:
     labels = {
         "microcosm_be_v04_axiom": "Microcosm-BE v0.4 × Axiom rules engine",
@@ -207,3 +262,54 @@ def test_be_end_to_end_publishes_three_source_frontend_bundle(
         *manifest["partitions"]["facts"],
     ):
         assert hashlib.sha256((bundle / partition["path"]).read_bytes()).hexdigest() == partition["sha256"]
+
+
+def test_be_run_summary_records_the_build_releases_json_selects(
+    tmp_path: Path,
+) -> None:
+    snapshot = tmp_path / "snapshot"
+    write_snapshot(
+        snapshot,
+        (
+            fact("a", "record-a", "10"),
+            fact("b", "record-b", "20"),
+            fact("c", "record-c", "40"),
+        ),
+    )
+    release = tmp_path / "release"
+    write_build_folder_release(release)
+    checkpoints: list[Path] = []
+    for source_id in BE_SOURCE_IDS:
+        path = tmp_path / f"{source_id}.json"
+        path.write_text(
+            json.dumps(checkpoint_payload(source_id, supported_second_row=True))
+        )
+        checkpoints.append(path)
+
+    output = tmp_path / "run"
+    run(
+        snapshot,
+        None,
+        None,
+        output,
+        jurisdictions=["BE"],
+        precomputed_checkpoints=checkpoints,
+        microcosm_release_dir=release,
+    )
+
+    folder = f"releases/{BUILD_FOLDER_RELEASE}/{BUILD_FOLDER_BUILD}"
+    recorded = json.loads((output / "summary.json").read_text())[
+        "microcosm_be_release"
+    ]
+    assert recorded["release_id"] == f"{BUILD_FOLDER_RELEASE}/{BUILD_FOLDER_BUILD}"
+    assert recorded["resolver_provenance"] == "local_release_directory"
+    assert recorded["artifact_paths"] == {
+        "build_manifest": f"{folder}/build_manifest.json",
+        "release_manifest": f"{folder}/release_manifest.json",
+        "calibration_diagnostics": f"{folder}/calibration_diagnostics.json",
+    }
+    assert recorded["artifact_sha256"] == {
+        label: hashlib.sha256((release / path).read_bytes()).hexdigest()
+        for label, path in recorded["artifact_paths"].items()
+    }
+    assert recorded["calibration_target_record_id_count"] == 2
