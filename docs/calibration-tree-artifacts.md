@@ -369,10 +369,17 @@ built its tree and, when the run's files declare the diagnostics' digest (in
 a structured run manifest or a staged bundle's receipt), only while the tree
 holds those diagnostics. While a run's copy records no end and the page's
 state for it comes from the collector's record, its Stage timeline and
-calibration progress come from that record too, without heartbeats, and only
-the newest events of each that fit a size limit. The release pages read
-each build's copies of its original files and the copy of `releases.json` the
-same way.
+calibration progress come from that record too. The Stage timeline lists the
+record's stage changes, including the stage ends the emitter adds, and its
+calibration events, in the record's order. It leaves out heartbeats
+(including those whose reading the collector removed) and progress reports,
+which no run's events file holds; a progress report is an event other than a
+calibration event whose details hold both `done` and `total`, whatever its
+status. Within a size limit, the newest stage changes are kept first and the
+newest calibration events fill what is left; the calibration progress keeps
+its newest events within a limit of its own of the same size. The release
+pages read each build's copies of its original files and the copy of
+`releases.json` the same way.
 
 ## Browser loading
 
