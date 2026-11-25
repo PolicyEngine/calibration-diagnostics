@@ -2,6 +2,7 @@ import email.message
 import hashlib
 import io
 import json
+import re
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -360,49 +361,194 @@ def rename_build(new_name: str) -> Callable[[dict], None]:
 
 
 BROKEN_RECORDS = {
-    "larger than 4 MiB": b" " * (4 * 1024 * 1024) + json.dumps(releases_record()).encode(),
-    "not JSON": b'{"schema_version": 1,',
-    "NaN": json.dumps(releases_record()).replace('"schema_version": 1', '"schema_version": NaN').encode(),
-    "not an object": b"[]",
-    "extra key": record_bytes(assign("extra", value=1)),
-    "missing key": record_bytes(remove("default")),
-    "schema_version 2": record_bytes(assign("schema_version", value=2)),
-    "schema_version true": record_bytes(assign("schema_version", value=True)),
-    "releases not an object": record_bytes(assign("releases", value=[])),
-    "unsafe release name": record_bytes(rename_release("../escape")),
-    "release missing key": record_bytes(remove("releases", OTHER_RELEASE, "role")),
-    "invalid role": record_bytes(assign("releases", OTHER_RELEASE, "role", value="National")),
-    "current not a string": record_bytes(assign("releases", OTHER_RELEASE, "current", value=1)),
-    "builds not an object": record_bytes(assign("releases", OTHER_RELEASE, "builds", value=[])),
-    "unsafe build name": record_bytes(rename_build("a/b")),
-    "build missing withdrawn": record_bytes(
-        remove("releases", OTHER_RELEASE, "builds", OTHER_RELEASE_BUILD, "withdrawn")
+    "larger than 4 MiB": (
+        b" " * (4 * 1024 * 1024) + json.dumps(releases_record()).encode(),
+        "larger than 4194304 bytes",
     ),
-    "empty published_at": record_bytes(
-        assign("releases", OTHER_RELEASE, "builds", OTHER_RELEASE_BUILD, "published_at", value="")
+    "not JSON": (b'{"schema_version": 1,', "not a readable JSON document"),
+    "invalid UTF-8": (b'{"default": "\xff"}', "not a readable JSON document"),
+    "nested too deeply": (
+        b"[" * 100_000 + b"]" * 100_000,
+        "not a readable JSON document",
     ),
-    "withdrawn not a boolean": record_bytes(
-        assign("releases", OTHER_RELEASE, "builds", OTHER_RELEASE_BUILD, "withdrawn", value="false")
+    "NaN": (
+        json.dumps(releases_record())
+        .replace('"schema_version": 1', '"schema_version": NaN')
+        .encode(),
+        "not a readable JSON document",
     ),
-    "default not a string": record_bytes(assign("default", value=1)),
-    "default not listed": record_bytes(assign("default", value="microcosm-be-2099")),
-    "current not listed": record_bytes(
-        assign("releases", OTHER_RELEASE, "current", value="unlisted-build")
+    "not an object": (b"[]", "must have exactly default, releases, schema_version"),
+    "extra key": (
+        record_bytes(assign("extra", value=1)),
+        "must have exactly default, releases, schema_version",
     ),
-    "current withdrawn": record_bytes(
-        assign("releases", OTHER_RELEASE, "builds", OTHER_RELEASE_BUILD, "withdrawn", value=True)
+    "missing key": (
+        record_bytes(remove("default")),
+        "must have exactly default, releases, schema_version",
+    ),
+    "schema_version 2": (
+        record_bytes(assign("schema_version", value=2)),
+        "schema_version must be 1",
+    ),
+    "schema_version true": (
+        record_bytes(assign("schema_version", value=True)),
+        "schema_version must be 1",
+    ),
+    "releases not an object": (
+        record_bytes(assign("releases", value=[])),
+        "releases must be an object",
+    ),
+    "unsafe release name": (
+        record_bytes(rename_release("../escape")),
+        "a release name is not a safe identifier",
+    ),
+    "release missing key": (
+        record_bytes(remove("releases", OTHER_RELEASE, "role")),
+        f"release {OTHER_RELEASE} must have builds, current, role",
+    ),
+    "invalid role": (
+        record_bytes(assign("releases", OTHER_RELEASE, "role", value="National")),
+        f"release {OTHER_RELEASE} has an invalid role",
+    ),
+    "current not a string": (
+        record_bytes(assign("releases", OTHER_RELEASE, "current", value=1)),
+        f"release {OTHER_RELEASE} current must be a build or null",
+    ),
+    "builds not an object": (
+        record_bytes(assign("releases", OTHER_RELEASE, "builds", value=[])),
+        f"release {OTHER_RELEASE} builds must be an object",
+    ),
+    "unsafe build name": (
+        record_bytes(rename_build("a/b")),
+        "a build name is not a safe identifier",
+    ),
+    "build missing withdrawn": (
+        record_bytes(
+            remove("releases", OTHER_RELEASE, "builds", OTHER_RELEASE_BUILD, "withdrawn")
+        ),
+        f"build {OTHER_RELEASE_BUILD} of {OTHER_RELEASE} is malformed",
+    ),
+    "empty published_at": (
+        record_bytes(
+            assign(
+                "releases", OTHER_RELEASE, "builds", OTHER_RELEASE_BUILD,
+                "published_at", value="",
+            )
+        ),
+        f"build {OTHER_RELEASE_BUILD} of {OTHER_RELEASE} is malformed",
+    ),
+    "withdrawn not a boolean": (
+        record_bytes(
+            assign(
+                "releases", OTHER_RELEASE, "builds", OTHER_RELEASE_BUILD,
+                "withdrawn", value="false",
+            )
+        ),
+        f"build {OTHER_RELEASE_BUILD} of {OTHER_RELEASE} is malformed",
+    ),
+    "default not a string": (
+        record_bytes(assign("default", value=1)),
+        "default must be a release name or null",
+    ),
+    "default not listed": (
+        record_bytes(assign("default", value="microcosm-be-2099")),
+        "default microcosm-be-2099 is not listed",
+    ),
+    "current not listed": (
+        record_bytes(
+            assign("releases", OTHER_RELEASE, "current", value="unlisted-build")
+        ),
+        f"current build unlisted-build of {OTHER_RELEASE} is not listed",
+    ),
+    "current withdrawn": (
+        record_bytes(
+            assign(
+                "releases", OTHER_RELEASE, "builds", OTHER_RELEASE_BUILD,
+                "withdrawn", value=True,
+            )
+        ),
+        f"current build {OTHER_RELEASE_BUILD} of {OTHER_RELEASE} is withdrawn",
     ),
 }
 
 
 @pytest.mark.parametrize(
-    "content", list(BROKEN_RECORDS.values()), ids=list(BROKEN_RECORDS)
+    ("content", "message"), list(BROKEN_RECORDS.values()), ids=list(BROKEN_RECORDS)
 )
-def test_releases_json_breaking_the_record_rules_is_refused(content: bytes) -> None:
-    with pytest.raises(ValueError, match="releases.json"):
+def test_releases_json_breaking_the_record_rules_is_refused(
+    content: bytes, message: str
+) -> None:
+    """Each record is refused by its own rule, named in the message."""
+
+    with pytest.raises(ValueError, match=re.escape(f"releases.json: {message}")):
         resolve_microcosm_release(
             artifact_reader=reader_of(build_folder_documents(content))
         )
+
+
+def test_releases_json_with_a_leading_byte_order_mark_is_read() -> None:
+    content = b"\xef\xbb\xbf" + json.dumps(releases_record()).encode()
+
+    release = resolve_microcosm_release(
+        artifact_reader=reader_of(build_folder_documents(content))
+    )
+
+    assert release.release_id == f"{RELEASE}/{BUILD}"
+
+
+def make_directory(record_path: Path) -> None:
+    record_path.mkdir()
+
+
+def make_broken_link(record_path: Path) -> None:
+    record_path.symlink_to(record_path.parent / "missing-blob")
+
+
+def make_link_loop(record_path: Path) -> None:
+    record_path.symlink_to(record_path)
+
+
+@pytest.mark.parametrize(
+    "make_record_path",
+    [make_directory, make_broken_link, make_link_loop],
+    ids=["directory", "broken link", "link loop"],
+)
+def test_local_releases_json_that_is_not_a_regular_file_is_refused(
+    tmp_path: Path, make_record_path: Callable[[Path], None]
+) -> None:
+    write_tree(tmp_path, release_documents())
+    make_record_path(tmp_path / "releases.json")
+
+    with pytest.raises(ValueError, match="releases.json is not a regular file"):
+        resolve_microcosm_release(tmp_path)
+
+
+def test_local_releases_json_may_be_a_link_to_a_file(tmp_path: Path) -> None:
+    """A Hugging Face cache snapshot links each file to a blob elsewhere."""
+
+    snapshot = tmp_path / "snapshot"
+    documents = build_folder_documents()
+    write_tree(snapshot, {
+        path: content for path, content in documents.items() if path != "releases.json"
+    })
+    blob = tmp_path / "blobs" / "releases-record"
+    blob.parent.mkdir()
+    blob.write_bytes(documents["releases.json"])
+    (snapshot / "releases.json").symlink_to(blob)
+
+    release = resolve_microcosm_release(snapshot)
+
+    assert release.release_id == f"{RELEASE}/{BUILD}"
+
+
+def test_latest_json_layout_refuses_a_release_manifest_build_that_is_not_an_object() -> None:
+    documents = release_documents()
+    documents["releases/fixture-release/release_manifest.json"] = json.dumps(
+        {"build": "fixture-release"}
+    ).encode()
+
+    with pytest.raises(ValueError, match="do not match latest release_id"):
+        resolve_microcosm_release(artifact_reader=reader_of(documents))
 
 
 def test_hugging_face_reader_reports_an_absent_file_as_missing(
