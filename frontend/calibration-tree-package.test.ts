@@ -2,8 +2,9 @@
 // readers, the Blob I/O and the publisher) has one source, in
 // PolicyEngine/microcosm-collector, published to npm as
 // @policyengine/calibration-tree. The dashboard installs one published
-// version from npm, keeps no copy of its own, and runs the installed
-// package's publisher.
+// version from npm and keeps no copy of its own. The collector builds and
+// stores calibration trees with the package's worker and publication modules;
+// the dashboard only reads what it stores.
 import { expect, test } from "bun:test";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -11,7 +12,6 @@ import { join, relative } from "node:path";
 const FRONTEND_ROOT = import.meta.dir;
 const PACKAGE_NAME = "@policyengine/calibration-tree";
 const INSTALLED_PACKAGE = join("node_modules", "@policyengine", "calibration-tree");
-const PUBLISHER_MODULE = join(INSTALLED_PACKAGE, "src", "publish-calibration-tree.ts");
 // An exact release, such as 0.1.0: no range, tag, path or workspace protocol.
 const EXACT_RELEASE = /^\d+\.\d+\.\d+$/;
 // Code and tests, whose paths are read when they run.
@@ -92,20 +92,6 @@ test("the installed package is the pinned release, not a link to a local copy", 
     version: installedManifest.version,
     location: relative(FRONTEND_ROOT, realpathSync(join(FRONTEND_ROOT, INSTALLED_PACKAGE))),
   }).toEqual({ version: pinnedVersion(), location: INSTALLED_PACKAGE });
-});
-
-test("the publisher script runs the installed package's publisher module", () => {
-  const exportedPublisher = relative(
-    FRONTEND_ROOT,
-    Bun.resolveSync(`${PACKAGE_NAME}/publish-calibration-tree`, FRONTEND_ROOT),
-  );
-  expect({
-    script: frontendManifest().scripts["publish:calibration-tree"],
-    exportedPublisher,
-  }).toEqual({
-    script: `bun run ${PUBLISHER_MODULE}`,
-    exportedPublisher: PUBLISHER_MODULE,
-  });
 });
 
 test("lint typechecks the dashboard alone; the collector typechecks the package", () => {

@@ -270,7 +270,7 @@ def test_every_bun_script_step_runs_after_its_job_installs_locked_frontend_depen
     # @policyengine/calibration-tree, only through frontend/node_modules, so a
     # job must install before it runs repository code with Bun.
     uninstalled_steps = []
-    for workflow_file in sorted((ROOT / ".github/workflows").glob("*.yml")):
+    for workflow_file in _workflow_files():
         workflow = yaml.load(workflow_file.read_text(), Loader=yaml.BaseLoader)
         for job_name, job in workflow["jobs"].items():
             installed = False
@@ -290,7 +290,7 @@ def test_bun_script_detection_covers_repository_scripts_but_not_package_runners(
         "bun run lint",
         "bun test",
         "bun --no-install frontend/scripts/replay-build-run.ts",
-        'set -e\nbun run publish:calibration-tree -- "${args[@]}"',
+        'set -e\nbun run replay:build-run -- "${args[@]}"',
     ):
         assert BUN_SCRIPT_COMMAND.search(command), command
     for command in (
@@ -369,90 +369,193 @@ def test_calibration_smoke_invocation_reads_only_the_words_before_the_script():
         assert invocation.group("bun_words").split() == bun_words, command
 
 
-def test_timestamp_migration_can_run_through_the_publication_workflow():
-    workflow = yaml.load(
-        (ROOT / ".github/workflows/publish-calibration-tree.yml").read_text(),
-        Loader=yaml.BaseLoader,
-    )
-    inputs = workflow["on"]["workflow_dispatch"]["inputs"]
-    assert "migrate-timestamps" in inputs["event_kind"]["options"]
-    script = next(
-        step["run"]
-        for step in workflow["jobs"]["publish"]["steps"]
-        if step.get("name") == "Build, validate, and publish"
-    )
-    assert "--migrate-release-timestamps" in script
-
-
-@pytest.mark.parametrize(
-    ("event_kind", "expected_mode", "include_sha"),
-    [
-        ("manual", "--reconcile-releases", False),
-        ("staging", "--reconcile-staging", True),
-        ("migrate-timestamps", "--migrate-release-timestamps", False),
-    ],
+# The repository secrets and variable that only the dashboard's GitHub Actions
+# tree publisher read. The telemetry collector builds and stores calibration
+# trees instead. These settings are to be deleted from the repository's
+# settings, after which a workflow that read one would get an empty value.
+FORMER_TREE_PUBLISHER_SETTINGS = {
+    "secrets": {"HF_TOKEN", "POPULACE_UK_STAGING_HF_TOKEN", "BLOB_READ_WRITE_TOKEN"},
+    "vars": {"CALIBRATION_TREE_BUILD_ENABLED"},
+}
+# A use of the secrets or vars context, with the name it reads when that name
+# is written out: `secrets.NAME` or `secrets['NAME']`, in any letter case, as
+# GitHub accepts. Any other use (the whole context, a `.*` filter or a computed
+# index) could read any setting.
+CONTEXT_REFERENCE = re.compile(
+    r"(?<![\w.])(?P<context>secrets|vars)\b"
+    r"(?:\s*\.\s*(?P<property>[A-Za-z_][A-Za-z0-9_]*)\b|\s*\[\s*'(?P<index>[^']*)'\s*\])?",
+    re.IGNORECASE,
 )
-def test_publication_dispatch_preserves_dry_run_and_selects_one_mode(
-    tmp_path, event_kind, expected_mode, include_sha
-):
-    workflow = yaml.load(
-        (ROOT / ".github/workflows/publish-calibration-tree.yml").read_text(),
-        Loader=yaml.BaseLoader,
-    )
-    script = next(
-        step["run"]
-        for step in workflow["jobs"]["publish"]["steps"]
-        if step.get("name") == "Build, validate, and publish"
-    )
-    for name, value in {
-        "country": "uk",
-        "event_kind": event_kind,
-        "hf_commit_sha": "a" * 40,
-        "dry_run": "true",
-    }.items():
-        script = script.replace("${{ inputs." + name + " }}", value)
-    arguments_file = tmp_path / "arguments.json"
-    stub = tmp_path / "bun"
-    stub.write_text(
-        "#!/usr/bin/env python3\n"
-        "import json, os, sys\n"
-        "from pathlib import Path\n"
-        "Path(os.environ['ARGUMENTS_FILE']).write_text(json.dumps(sys.argv[1:]))\n"
-    )
-    stub.chmod(0o755)
-    result = subprocess.run(
-        ["bash", "-c", script],
-        env={
-            **os.environ,
-            "PATH": f"{tmp_path}:{os.environ['PATH']}",
-            "ARGUMENTS_FILE": str(arguments_file),
-        },
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0
-    expected = [
-        "run",
-        "publish:calibration-tree",
-        "--",
-        "--country",
-        "uk",
-        expected_mode,
+# The tree publisher's entry points: the package's own script name and its
+# module's name.
+TREE_PUBLISHER_COMMAND = re.compile(r"publish[:-]calibration-tree")
+# This module looks for the publisher's entry points, so it names them.
+TREE_PUBLISHER_GUARD = "frontend/tests/test_deploy_workflow.py"
+
+
+def _string_values(node, key=None):
+    """Each string in a parsed workflow, mapping keys included, with the
+    mapping key it is under (None for a key itself)."""
+    if isinstance(node, dict):
+        for child_key, child in node.items():
+            yield None, child_key
+            yield from _string_values(child, child_key)
+    elif isinstance(node, list):
+        for child in node:
+            yield from _string_values(child, key)
+    elif isinstance(node, str):
+        yield key, node
+
+
+def _workflow_expressions(text):
+    """The `${{ ... }}` expressions in a workflow string. A `}}` inside a
+    single-quoted string literal, as in format('{{0}}'), does not end one;
+    an unterminated expression runs to the end of the string."""
+    expressions = []
+    start = text.find("${{")
+    while start != -1:
+        position = start + len("${{")
+        in_string_literal = False
+        while position < len(text):
+            if text[position] == "'":
+                in_string_literal = not in_string_literal
+            elif not in_string_literal and text.startswith("}}", position):
+                break
+            position += 1
+        expressions.append(text[start + len("${{") : position])
+        start = text.find("${{", position)
+    return expressions
+
+
+def _former_tree_publisher_setting_reads(workflow_text):
+    """Each read of a former tree publisher setting in a workflow, and each use
+    of the secrets or vars context that could read any setting.
+
+    It reads the parsed values, so YAML quoting and escapes are decoded first.
+    """
+    workflow = yaml.load(workflow_text, Loader=yaml.BaseLoader)
+    reads = []
+    for key, value in _string_values(workflow):
+        # An `if:` value is an expression even without the `${{ }}` delimiters.
+        expressions = [value] if key == "if" else _workflow_expressions(value)
+        for expression in expressions:
+            for reference in CONTEXT_REFERENCE.finditer(expression):
+                context = reference.group("context").lower()
+                name = reference.group("property") or reference.group("index")
+                if name is None:
+                    reads.append(f"any {context} setting: {expression.strip()}")
+                elif name.upper() in FORMER_TREE_PUBLISHER_SETTINGS[context]:
+                    reads.append(f"{context}.{name.upper()}")
+    jobs = workflow.get("jobs", {}) if isinstance(workflow, dict) else {}
+    for job_name, job in jobs.items():
+        passed_secrets = job.get("secrets") if isinstance(job, dict) else None
+        if isinstance(passed_secrets, str) and passed_secrets.strip() == "inherit":
+            reads.append(f"jobs.{job_name}.secrets: inherit")
+    return reads
+
+
+def _workflow_files():
+    workflows = ROOT / ".github/workflows"
+    return sorted([*workflows.glob("*.yml"), *workflows.glob("*.yaml")])
+
+
+def _files_naming_the_tree_publisher(files):
+    """The paths, among (path, text) pairs, whose text names an entry point of
+    the tree publisher: workflows, the scripts they run, the frontend manifest
+    and documents alike."""
+    return [
+        relative_path
+        for relative_path, text in files
+        if relative_path != TREE_PUBLISHER_GUARD and TREE_PUBLISHER_COMMAND.search(text)
     ]
-    if include_sha:
-        expected.extend(["--sha", "a" * 40])
-    expected.append("--dry-run")
-    assert json.loads(arguments_file.read_text()) == expected
 
 
-def test_publisher_retains_its_separate_write_credential():
-    workflow = yaml.load(
-        (ROOT / ".github/workflows/publish-calibration-tree.yml").read_text(),
-        Loader=yaml.BaseLoader,
+def _checkout_files():
+    """Each file a checkout of the next commit would contain, with its text."""
+    listing = subprocess.run(
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
     )
-    publisher = workflow["jobs"]["publish"]
-    assert publisher["env"]["HF_TOKEN"] == "${{ secrets.HF_TOKEN }}"
+    for relative_path in listing.stdout.decode().split("\0"):
+        file_path = ROOT / relative_path
+        if relative_path and file_path.is_file():
+            yield relative_path, file_path.read_text(errors="ignore")
+
+
+# Workflow fragments that read one of the former tree publisher's settings, or
+# could read any setting, in the forms GitHub accepts.
+READS_A_FORMER_TREE_PUBLISHER_SETTING = (
+    "env:\n  TOKEN: ${{ secrets.HF_TOKEN }}\n",
+    "env:\n  TOKEN: ${{ secrets['hf_token'] }}\n",
+    "env:\n  TOKEN: ${{ Secrets . Blob_Read_Write_Token }}\n",
+    "jobs:\n  publish:\n    if: vars.CALIBRATION_TREE_BUILD_ENABLED != 'FALSE'\n",
+    # A YAML escape: the value GitHub reads is `secrets.HF_TOKEN`.
+    'env:\n  TOKEN: "${{ secrets.\\x48F_TOKEN }}"\n',
+    "env:\n  EVERYTHING: ${{ toJSON(secrets) }}\n",
+    "env:\n  EVERYTHING: ${{ join(secrets.*, ' ') }}\n",
+    "env:\n  TOKEN: ${{ secrets[format('POPULACE_{0}_STAGING_HF_TOKEN', matrix.country)] }}\n",
+    "jobs:\n  call:\n    uses: ./.github/workflows/other.yml\n    secrets: 'inherit'\n",
+    # A `}}` inside a quoted string does not end the expression.
+    "env:\n  BODY: ${{ format('{{\"token\":\"{0}\"}}', secrets.HF_TOKEN) }}\n",
+    # GitHub evaluates expressions in mapping keys too.
+    'env:\n  "${{ secrets.HF_TOKEN }}": present\n',
+)
+# Workflow fragments that read none of them.
+READS_NO_FORMER_TREE_PUBLISHER_SETTING = (
+    "env:\n  TOKEN: ${{ secrets.HF_RELEASE_READ_TOKEN }}\n",
+    "env:\n  TOKEN: ${{ secrets.HF_TOKEN_2 }}\n",
+    "env:\n  TOKEN: ${{ env.HF_TOKEN }}\n",
+    "env:\n  NAME: ${{ vars.TELEMETRY_SERVICE }}\n",
+    "steps:\n  - run: gcloud secrets versions access latest --secret=HF_TOKEN\n",
+    "jobs:\n  call:\n    uses: ./.github/workflows/other.yml\n    secrets:\n      TOKEN: ${{ secrets.HF_RELEASE_READ_TOKEN }}\n",
+)
+
+
+def test_setting_detection_covers_the_forms_github_accepts():
+    assert {
+        fragment: bool(_former_tree_publisher_setting_reads(fragment))
+        for fragment in READS_A_FORMER_TREE_PUBLISHER_SETTING
+    } == {fragment: True for fragment in READS_A_FORMER_TREE_PUBLISHER_SETTING}
+    assert {
+        fragment: _former_tree_publisher_setting_reads(fragment)
+        for fragment in READS_NO_FORMER_TREE_PUBLISHER_SETTING
+    } == {fragment: [] for fragment in READS_NO_FORMER_TREE_PUBLISHER_SETTING}
+
+
+def test_no_workflow_reads_the_former_tree_publisher_settings():
+    assert [
+        f"{workflow_file.name}: {read}"
+        for workflow_file in _workflow_files()
+        for read in _former_tree_publisher_setting_reads(workflow_file.read_text())
+    ] == []
+
+
+def test_publisher_detection_reads_every_file_except_its_own_guard():
+    files = [
+        (".github/scripts/trees.sh", "bun run publish:calibration-tree --country uk\n"),
+        (
+            "frontend/scripts/trees.ts",
+            'await import("@policyengine/calibration-tree/publish-calibration-tree");\n',
+        ),
+        (".github/workflows/trees.yml", "run: bun run publish:calibration-tree\n"),
+        ("frontend/package.json", '"trees": "bun run publish:calibration-tree"\n'),
+        ("frontend/tests/test_deploy_workflow.py", "publish:calibration-tree\n"),
+        ("docs/trees.md", "The collector builds the trees.\n"),
+    ]
+    assert _files_naming_the_tree_publisher(files) == [
+        ".github/scripts/trees.sh",
+        "frontend/scripts/trees.ts",
+        ".github/workflows/trees.yml",
+        "frontend/package.json",
+    ]
+
+
+def test_no_repository_file_names_the_tree_publisher():
+    # The collector is the only writer of the calibration tree store, so
+    # nothing here runs the package's publisher.
+    assert _files_naming_the_tree_publisher(_checkout_files()) == []
 
 
 @pytest.mark.parametrize("exit_code", [0, 17])

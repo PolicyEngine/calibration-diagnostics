@@ -28,7 +28,7 @@ def _environment():
 def test_missing_release_credential_stops_deployment_without_printing_secrets():
     environment = _environment()
     environment.pop("HF_RELEASE_READ_TOKEN")
-    environment["HF_TOKEN"] = "test-publisher-token"
+    environment["HF_TOKEN"] = "test-other-hf-token"
     result = subprocess.run(
         ["bash", str(SCRIPT), "require-configuration"],
         env=environment,

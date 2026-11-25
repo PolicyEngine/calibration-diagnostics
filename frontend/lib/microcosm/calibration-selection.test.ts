@@ -76,7 +76,7 @@ const NOTHING_LOADED: ComparisonMapBuildSources = {
   comparisonReleaseId: undefined,
   candidateBuildArtifactId: undefined,
 };
-// A local-area candidate the publisher has not built a tree for yet.
+// A local-area candidate the collector has not built a tree for yet.
 const MANIFEST_LOADED: ComparisonMapBuildSources = {
   builds: PUBLISHED_BUILDS,
   latestReleaseBuildArtifactId: "national-build",
@@ -174,7 +174,7 @@ test("the Staging page names the release a candidate is compared with", () => {
 test("the fallback note says the dashboard has no local-area build, not that none was published", () => {
   // The fallback is chosen from the dashboard's build manifest alone. A
   // local-area release published on Hugging Face whose calibration tree the
-  // dashboard has not built yet (tree publishing paused, or its role
+  // collector has not built yet (no build has covered it, or its role is
   // unreadable) also lands here, so the note must not say that no local-area
   // release has been published.
   const fallback = stagingComparisonBaseline({

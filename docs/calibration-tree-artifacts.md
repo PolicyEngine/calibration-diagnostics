@@ -172,14 +172,6 @@ nothing else does so automatically.
 The collector's README describes both paths, in "Building trees from
 submissions" and "Queuing calibration tree builds".
 
-`.github/workflows/publish-calibration-tree.yml` and the
-`publish:calibration-tree` script remain only for deployments from before the
-webhook stopped dispatching that workflow: such a deployment, whether it is being
-replaced or was restored by a rollback, answers Hugging Face with an error if the
-workflow is missing. Current code does not start it, and its job does nothing
-while the GitHub repository variable `CALIBRATION_TREE_BUILD_ENABLED` is `FALSE`.
-Both are removed once no deployment production could return to dispatches it.
-
 ### Release builds
 
 ```text
