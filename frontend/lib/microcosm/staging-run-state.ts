@@ -18,10 +18,11 @@ import type { StagingRunSummary } from "@policyengine/calibration-tree/staging-a
 
 export type RunStateSource = "collector" | "hugging_face";
 
-// An unfinished run's events and calibration events from the collector's
-// record are kept newest first up to this many characters of JSON each, so
-// the Candidate tab's answer stays well within the platform's 4.5 MB
-// response limit. A record can hold far more than a run's copied files.
+// The most characters of JSON an unfinished run's Stage timeline events, and
+// separately its calibration progress events, from the collector's record
+// may take (see `recordInternals`), so the Candidate tab's answer stays well
+// within the platform's 4.5 MB response limit. A record can hold far more
+// than a run's copied files.
 export const RECORD_EVENTS_JSON_LIMIT = 1_500_000;
 
 type JsonDocument = Record<string, unknown>;
@@ -34,15 +35,17 @@ function jsonObject(value: unknown): JsonDocument | null {
 
 // A heartbeat as the collector serves it in a run's documents: a `progress`
 // event that is not a calibration event and carries the emitter's machine
-// reading or, from emitters before 0.14.0, no message and no details beside
-// its resource sample. It names the stage the run is in. A run's own events
-// file never holds one. (A heartbeat whose reading the collector dropped
-// looks like an older emitter's and is left out the same way only when it
-// has no message.)
+// reading, or a reading the collector removed because it didn't match the
+// collector's model (named in `dropped_emitter_details`; only a heartbeat's
+// details hold a reading), or, from emitters before 0.14.0, no message and
+// no details beside its resource sample. It names the stage the run is in.
+// A run's own events file never holds one.
 function isHeartbeat(event: JsonDocument): boolean {
   if (event.event_type === "calibration" || event.status !== "progress") return false;
   const details = jsonObject(event.details);
   if (jsonObject(details?.reading)) return true;
+  const dropped = details?.dropped_emitter_details;
+  if (Array.isArray(dropped) && dropped.includes("reading")) return true;
   const message = typeof event.message === "string" ? event.message.trim() : "";
   return (
     message === "" &&
@@ -89,7 +92,7 @@ function newestWithin<T>(items: readonly T[], used = 1): { kept: T[]; size: numb
  * `RECORD_EVENTS_JSON_LIMIT`, the newest stage changes are kept first and
  * the newest calibration events fill what is left, so calibration never
  * crowds out the run's stages. The calibration progress keeps its newest
- * events within the same limit.
+ * events within a limit of its own of the same size.
  */
 export function recordInternals(record: {
   events: JsonDocument[];
