@@ -1,9 +1,11 @@
-// Test support: a US fiscal refresh build's staging run as the version 2
-// writer stages it (PolicyEngine/microcosm#1135): version 3 documents that
-// name the run's country, operation, pipeline, candidate, release and run
-// kind, and result files under `artifacts/`, each declared in the run manifest
-// with its SHA-256. The digests are of each document's JSON text, as the fake
-// collector store records them.
+// Test support: a US fiscal refresh build's staging run in the shape the
+// version 2 writer stages it (PolicyEngine/microcosm#1135): version 3
+// documents that name the run's country, operation, pipeline, candidate,
+// release and run kind, and result files under `artifacts/`, each declared in
+// the run manifest with its SHA-256. It is reduced to what the Candidate tab
+// reads: four of the result files the writer declares, stage events only, and
+// a candidate ID apart from the release ID. The digests are of each
+// document's JSON text, as the fake collector store records them.
 import { fakeDocumentSha256 } from "@/lib/microcosm/test-support/fake-collector-store";
 
 type JsonObject = Record<string, unknown>;

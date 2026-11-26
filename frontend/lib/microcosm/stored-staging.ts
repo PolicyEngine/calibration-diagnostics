@@ -4,7 +4,9 @@
 // Each gives the answer the package's Hugging Face reader of the same name
 // gives for the same files (`loadStagingRuns`, `loadStagingRun`,
 // `loadStagingCalibration` and the rest), and none reads Hugging Face. The
-// copies hold what a run's files said when the collector last copied them;
+// one difference: a version 2 or 3 run's reform validation is the copy its
+// run manifest declares under `artifacts/`, which the package's 0.1.5 Hugging
+// Face reader does not read. The copies hold what a run's files said when the collector last copied them;
 // an unfinished run's current state comes from the collector's telemetry
 // when a page is requested (`staging-run-state.ts`).
 import { getCalibrationTreeBlob } from "@policyengine/calibration-tree/calibration-tree-blob";
@@ -228,6 +230,11 @@ export async function copiedRunDocuments(
   const calibrationProgress =
     calibrationDocument && parseStagingCalibrationProgress(calibrationDocument);
   const events = parseStagingEvents(eventBytes && new TextDecoder().decode(eventBytes));
+  // The documents' own version: a run whose summary records none may still
+  // hold version 2 or 3 documents, which never hold a top-level copy.
+  const structuredDocuments = [progress, runManifest, calibrationProgress, ...events].some(
+    (document) => isStructuredStagingDocument(document),
+  );
   validateStagingRunConsistency(record.runId, {
     progress,
     runManifest,
@@ -240,11 +247,13 @@ export async function copiedRunDocuments(
     runManifest,
     calibrationProgress,
     events,
-    reformValidation:
-      !structured ||
-      declaresCopy(runManifest, REFORM_VALIDATION_ARTIFACT, copiedFile(record, reformValidationName))
-        ? stagingJsonObjectOrNull(reformBytes)
-        : null,
+    reformValidation: (
+      structured
+        ? declaresCopy(runManifest, REFORM_VALIDATION_ARTIFACT, copiedFile(record, reformValidationName))
+        : !structuredDocuments
+    )
+      ? stagingJsonObjectOrNull(reformBytes)
+      : null,
     stagedDatasetReceipt: stagingJsonObjectOrNull(receiptBytes),
   };
 }
