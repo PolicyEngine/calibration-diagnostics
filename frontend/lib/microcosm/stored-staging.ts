@@ -132,10 +132,16 @@ export interface CopiedRunDocuments {
   stagedDatasetReceipt: JsonObject | null;
 }
 
-// Where a version 2 or 3 run's reform validation is copied: under its path in
-// the run folder, as its run manifest declares it. Version 1 runs write
-// `reform_validation.json` at the folder's top level.
-const DECLARED_REFORM_VALIDATION = "artifacts/reform_validation.json";
+// Where a version 2 or 3 run's reform validation is copied: under the path in
+// the run folder its run manifest declares for the artifact. Version 1 runs
+// write `reform_validation.json` at the folder's top level.
+const REFORM_VALIDATION_ARTIFACT = "reform_validation";
+
+function declaredArtifactPath<Name extends string>(logicalName: Name) {
+  return `artifacts/${logicalName}.json` as const;
+}
+
+const DECLARED_REFORM_VALIDATION = declaredArtifactPath(REFORM_VALIDATION_ARTIFACT);
 
 type CopiedFileName = StagingRunFileName | typeof DECLARED_REFORM_VALIDATION;
 
@@ -193,6 +199,9 @@ const CALIBRATION_DOCUMENTS: readonly StagingRunFileName[] = [
 /**
  * One run's copied documents, parsed and checked as the Hugging Face reader
  * parses and checks them. `names` limits what is read; the rest is absent.
+ * A version 2 or 3 run's reform validation is the copy its run manifest
+ * declares under `artifacts/`, which the package's 0.1.5 Hugging Face reader
+ * does not read.
  */
 export async function copiedRunDocuments(
   record: StagingRunRecord,
@@ -232,7 +241,8 @@ export async function copiedRunDocuments(
     calibrationProgress,
     events,
     reformValidation:
-      !structured || declaresCopy(runManifest, "reform_validation", copiedFile(record, reformValidationName))
+      !structured ||
+      declaresCopy(runManifest, REFORM_VALIDATION_ARTIFACT, copiedFile(record, reformValidationName))
         ? stagingJsonObjectOrNull(reformBytes)
         : null,
     stagedDatasetReceipt: stagingJsonObjectOrNull(receiptBytes),
@@ -252,7 +262,7 @@ function declaresCopy(
   if (!copy || !isStructuredStagingDocument(runManifest)) return false;
   const artifact = objectOrNull(objectOrNull(runManifest?.artifacts)?.[logicalName]);
   return (
-    stringValue(artifact?.path) === `artifacts/${logicalName}.json` &&
+    stringValue(artifact?.path) === declaredArtifactPath(logicalName) &&
     stringValue(artifact?.sha256) === copy.sha256
   );
 }
