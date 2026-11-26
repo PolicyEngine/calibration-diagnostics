@@ -20,14 +20,23 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Iterator
+from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Final, Literal
+
+import numpy as np
 
 from release_history import ATTEMPT_FORMAT_VERSION, LABELS_FORMAT_VERSION, PRODUCER_VERSION
 from release_history.canonical import document_bytes, file_sha256, write_atomic
-from release_history.document import measured_point, measurement_id, refused_document
+from release_history.document import RunFacts, measured_point, measurement_id, refused_document
+from release_history.documents import (
+    AttemptReportDocument,
+    EngineIdentity,
+    Environment,
+    LabelsDocument,
+    Provenance,
+)
 from release_history.engine import EngineMismatchError, engine_identity, environment, panel_document
 from release_history.export import export_csv
 from release_history.local_store import (
@@ -53,6 +62,7 @@ from release_history.releases import (
     OpenedRelease,
     Point,
     ReleaseRefusedError,
+    ReleaseSource,
     TransientError,
     download_verified,
     open_release,
@@ -70,6 +80,9 @@ EXIT_RUN_FAILED = 3
 # The only refusals a file itself causes: stored, so the file shows as a gap.
 FILE_REFUSALS = frozenset({"disclosure_source_ids_missing", "disclosure_source_ids_misaligned"})
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
+
+LABELS_KIND: Final = "release_history.labels"
+ATTEMPT_KIND: Final = "release_history.attempt"
 
 
 def _now() -> str:
@@ -100,7 +113,7 @@ def _producer_commit() -> str | None:
 
 
 @contextlib.contextmanager
-def quiet(log_path: Path) -> Iterator[None]:
+def quiet(log_path: Path) -> Generator[None]:
     """Send this process's stdout and stderr to a private log file."""
     log_path.parent.mkdir(parents=True, exist_ok=True)
     sys.stdout.flush()
@@ -211,14 +224,18 @@ def cmd_validate_spec(args: argparse.Namespace) -> int:
     return 0 if not problems else 1
 
 
-def labels_document(spec: Spec) -> dict[str, Any]:
+def labels_document(spec: Spec) -> LabelsDocument:
     """What the page shows for each reform: replaceable, so a corrected label needs no panel."""
     return {
         "format_version": LABELS_FORMAT_VERSION,
-        "kind": "release_history.labels",
+        "kind": LABELS_KIND,
         "country": spec.country,
         "reforms": {
-            reform.id: {"label": reform.label, "source": reform.source} for reform in spec.reforms
+            reform.id: {
+                "label": reform.label,
+                "source": dict(reform.source) if reform.source is not None else None,
+            }
+            for reform in spec.reforms
         },
     }
 
@@ -344,18 +361,17 @@ def dataset_columns(path: Path) -> list[str]:
     except (ImportError, OSError, ValueError):
         pass
     try:
-        import h5py
-
+        # Installed with each country's engine, not with the shared producer.
+        h5py = importlib.import_module("h5py")
         with h5py.File(path, "r") as handle:
-            names.update(handle.keys())
+            names.update(str(name) for name in handle.keys())
     except (ImportError, OSError):
         pass
     return sorted(names)
 
 
-def source_ids_for(spec: Spec, path: Path, household_ids: Any) -> Any:
+def source_ids_for(spec: Spec, path: Path, household_ids: np.ndarray | None) -> np.ndarray:
     """Each household's survey source id, aligned with the simulation's households."""
-    import numpy as np
     import pandas as pd
 
     key = f"/{spec.household_entity}"
@@ -373,7 +389,7 @@ def source_ids_for(spec: Spec, path: Path, household_ids: Any) -> Any:
     return table[chosen].to_numpy()
 
 
-def _point_from_args(args: argparse.Namespace, spec: Spec, hub: HubClient) -> Point:
+def _point_from_args(args: argparse.Namespace, spec: Spec, hub: ReleaseSource) -> Point:
     if args.build_dir:
         # A Microcosm post-build step: the build is not published, so there is no commit.
         return Point(
@@ -420,28 +436,32 @@ class AttemptReport:
     def path(self) -> Path | None:
         return self.folder / f"{self.digest}.json" if self.digest else None
 
-    def write(self, status: str, stage: str, reason: str, error_class: str | None = None) -> None:
-        if self.path is None or self.point is None:
+    def write(
+        self,
+        status: Literal["interrupted", "failed"],
+        stage: str,
+        reason: str,
+        error_class: str | None = None,
+    ) -> None:
+        if self.path is None or self.point is None or self.digest is None:
             return
-        write_replace(
-            self.path,
-            {
-                "format_version": ATTEMPT_FORMAT_VERSION,
-                "kind": "release_history.attempt",
-                "country": self.country,
-                "panel_id": self.panel_id,
-                "digest": self.digest,
-                "build_id": self.point.build_id,
-                "attempt": self.point.attempt,
-                "last_attempt": self.point.last_attempt,
-                "status": status,
-                "stage": stage,
-                "reason": reason,
-                "error_class": error_class,
-                "at": _now(),
-                "producer": {"version": PRODUCER_VERSION, "commit": self.commit},
-            },
-        )
+        report: AttemptReportDocument = {
+            "format_version": ATTEMPT_FORMAT_VERSION,
+            "kind": ATTEMPT_KIND,
+            "country": self.country,
+            "panel_id": self.panel_id,
+            "digest": self.digest,
+            "build_id": self.point.build_id,
+            "attempt": self.point.attempt,
+            "last_attempt": self.point.last_attempt,
+            "status": status,
+            "stage": stage,
+            "reason": reason,
+            "error_class": error_class,
+            "at": _now(),
+            "producer": {"version": PRODUCER_VERSION, "commit": self.commit},
+        }
+        write_replace(self.path, report)
 
     def started(self, stage: str) -> None:
         self.write("interrupted", stage, "interrupted")
@@ -489,12 +509,12 @@ class _MeasureRun:
 
     args: argparse.Namespace
     spec: Spec
-    engine: dict[str, Any]
+    engine: EngineIdentity
     panel_id: str
     folder: Path
-    env: dict[str, Any]
+    env: Environment
     producer_commit: str | None
-    hub: HubClient | LocalBuildFolder
+    hub: ReleaseSource
     report: AttemptReport
     workdir: Path
     log_path: Path
@@ -503,7 +523,7 @@ class _MeasureRun:
     point: Point | None = None
     h5_path: Path | None = None
 
-    def runtime(self) -> dict[str, Any]:
+    def runtime(self) -> RunFacts:
         return {
             "started_at": self.started,
             "finished_at": _now(),
@@ -650,7 +670,7 @@ def _fetch(run: _MeasureRun, opened: OpenedRelease) -> Path:
         raise _AttemptFailedError("download", refusal.reason) from refusal
 
 
-def _store_gap(run: _MeasureRun, provenance: dict[str, Any], target: Path, reason: str) -> int:
+def _store_gap(run: _MeasureRun, provenance: Provenance, target: Path, reason: str) -> int:
     """The file's own source ids are missing or misaligned: the file causes it, so it is
     stored, and shows as a gap."""
     document = refused_document(
@@ -677,10 +697,10 @@ def _store_gap(run: _MeasureRun, provenance: dict[str, Any], target: Path, reaso
 
 def _store_point(
     run: _MeasureRun,
-    provenance: dict[str, Any],
+    provenance: Provenance,
     target: Path,
     result: Measurement,
-    source_ids: Any,
+    source_ids: np.ndarray | None,
     columns: list[str],
 ) -> int:
     """The measured point, after the spec's disclosure policy, and a warning on the run's

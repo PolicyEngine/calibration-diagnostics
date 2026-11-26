@@ -57,8 +57,9 @@ def test_one_baseline_simulation_and_one_per_reform():
         "reform:benefit_up",
     ]
     # The add reform is the model's own baseline value plus the delta.
-    applied = result.reforms["tax_up"]["applied"]["gov.tax.rate"]
-    assert applied == {"2026-01-01.2026-12-31": pytest.approx(0.3)}
+    applied = result.reforms["tax_up"]["applied"]
+    assert applied is not None
+    assert applied["gov.tax.rate"] == {"2026-01-01.2026-12-31": pytest.approx(0.3)}
 
 
 def test_a_crashing_reform_is_a_gap_never_a_zero():
@@ -66,7 +67,8 @@ def test_a_crashing_reform_is_a_gap_never_a_zero():
     result = measure(parse_spec(fake_spec_dict()), backend)
     assert result.status == "partial"
     assert result.reforms["tax_up"]["status"] == "error"
-    assert result.reforms["tax_up"]["error"]["class"] == "RuntimeError"
+    error = result.reforms["tax_up"]["error"]
+    assert error is not None and error["class"] == "RuntimeError"
     assert not [cell for cell in result.cells if cell.output.startswith("reform/tax_up/")]
     assert result.reforms["benefit_up"]["status"] == "ok"
 
@@ -89,8 +91,9 @@ def test_an_unknown_reform_parameter_is_an_error_for_that_reform_only():
     )
     result = measure(spec, FakeBackend())
     assert result.reforms["bad"]["status"] == "error"
-    assert result.reforms["bad"]["error"]["stage"] == "reform_definition"
-    assert result.reforms["bad"]["error"]["name"] == "gov.tax.missing"
+    error = result.reforms["bad"]["error"]
+    assert error is not None
+    assert (error["stage"], error["name"]) == ("reform_definition", "gov.tax.missing")
     assert result.reforms["tax_up"]["status"] == "ok"
 
 

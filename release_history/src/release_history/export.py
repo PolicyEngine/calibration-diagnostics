@@ -19,8 +19,13 @@ import datetime as dt
 import io
 import json
 from pathlib import Path
-from typing import Any
 
+from release_history.documents import (
+    PointDocument,
+    SeriesBuild,
+    SeriesRecord,
+    TimelineDocument,
+)
 from release_history.local_store import country_dir, panel_dir, panels, read_points
 
 POINT_COLUMNS = [
@@ -63,61 +68,65 @@ TIMELINE_COLUMNS = [
 _LAST = dt.datetime.max.replace(tzinfo=dt.UTC)
 
 
-def _published(build: dict[str, Any] | None) -> dt.datetime:
+def _published(build: SeriesBuild | None) -> dt.datetime:
+    if build is None:
+        return _LAST
     try:
-        moment = dt.datetime.fromisoformat((build or {})["published_at"])
-    except (KeyError, TypeError, ValueError):
+        moment = dt.datetime.fromisoformat(build["published_at"])
+    except ValueError:
         return _LAST
     return moment if moment.tzinfo else moment.replace(tzinfo=dt.UTC)
 
 
+def _build_order(build: SeriesBuild | None) -> tuple[dt.datetime, str]:
+    return _published(build), build["build_id"] if build else ""
+
+
 def point_rows(
-    points: list[dict[str, Any]], series: dict[str, Any] | None = None
-) -> list[dict[str, Any]]:
+    points: list[PointDocument], series: SeriesRecord | None = None
+) -> list[dict[str, object]]:
     """One row per build and cell; a point no listed build names gets rows with no build."""
-    builds: dict[str, list[dict[str, Any]]] = {}
-    for build in (series or {}).get("builds") or []:
-        if build.get("listing_status") == "ok" and build.get("digest"):
+    builds: dict[str, list[SeriesBuild]] = {}
+    for build in series["builds"] if series else []:
+        if build["listing_status"] == "ok" and build["digest"]:
             builds.setdefault(build["digest"], []).append(build)
-    pairs = [
-        (build, point)
-        for point in points
-        for build in sorted(
-            builds.get(point["file"]["sha256"]) or [None],
-            key=lambda build: (_published(build), (build or {}).get("build_id") or ""),
-        )
-    ]
+    pairs: list[tuple[SeriesBuild | None, PointDocument]] = []
+    for point in points:
+        listed: list[SeriesBuild | None] = [*builds.get(point["file"]["sha256"], [])] or [None]
+        pairs += [(build, point) for build in sorted(listed, key=_build_order)]
     pairs.sort(key=lambda pair: (_published(pair[0]), pair[1]["measurement_id"]))
-    rows = []
+    rows: list[dict[str, object]] = []
     for build, point in pairs:
-        for cell in point.get("cells") or []:
+        for cell in point["cells"]:
             rows.append(
                 {
-                    "build_id": (build or {}).get("build_id"),
-                    "published_at": (build or {}).get("published_at"),
-                    "measurement_id": point.get("measurement_id"),
+                    "build_id": build["build_id"] if build else None,
+                    "published_at": build["published_at"] if build else None,
+                    "measurement_id": point["measurement_id"],
                     "h5_sha256": point["file"]["sha256"],
-                    "point_status": point.get("status"),
-                    "period": cell.get("period"),
-                    "output": cell.get("output"),
-                    "unit": cell.get("unit"),
-                    "value": cell.get("value"),
-                    "status": cell.get("status"),
-                    "reason": cell.get("reason"),
+                    "point_status": point["status"],
+                    "period": cell["period"],
+                    "output": cell["output"],
+                    "unit": cell["unit"],
+                    "value": cell["value"],
+                    "status": cell["status"],
+                    "reason": cell["reason"],
                 }
             )
     return rows
 
 
-def timeline_rows(timeline: dict[str, Any]) -> list[dict[str, Any]]:
+def timeline_rows(timeline: TimelineDocument) -> list[dict[str, object]]:
     """One row per build and output, from the TypeScript side's camelCase timeline."""
-    builds = {build["buildId"]: build for build in timeline.get("builds") or []}
-    rows = []
-    for output in timeline.get("outputs") or []:
-        reference = output.get("reference") or {}
+    builds = {build["buildId"]: build for build in timeline["builds"]}
+    rows: list[dict[str, object]] = []
+    for output in timeline["outputs"]:
+        reference = output["reference"]
         # The official figure in the model's sign convention, when it has a value.
-        reference_value = reference.get("modelSignValue", reference.get("value"))
-        for entry in output.get("values") or []:
+        reference_value = (
+            reference.get("modelSignValue", reference.get("value")) if reference else None
+        )
+        for entry in output["values"]:
             build = builds[entry["buildId"]]
             rows.append(
                 {
@@ -130,19 +139,19 @@ def timeline_rows(timeline: dict[str, Any]) -> list[dict[str, Any]]:
                     "measurement_id": build["measurementId"],
                     "reference_model_compatibility": build["referenceModelCompatibility"],
                     "unknown_columns": ";".join(build["unknownColumns"] or []),
-                    "period": output.get("period"),
-                    "output": output.get("output"),
-                    "unit": output.get("unit"),
-                    "value": entry.get("value"),
-                    "status": entry.get("status"),
-                    "compared_with": entry.get("comparedWith"),
-                    "change": entry.get("change"),
-                    "relative_change": entry.get("relativeChange"),
-                    "change_points": entry.get("changePoints"),
-                    "change_status": entry.get("changeStatus"),
-                    "reference_status": reference.get("status"),
+                    "period": output["period"],
+                    "output": output["output"],
+                    "unit": output["unit"],
+                    "value": entry["value"],
+                    "status": entry["status"],
+                    "compared_with": entry["comparedWith"],
+                    "change": entry["change"],
+                    "relative_change": entry["relativeChange"],
+                    "change_points": entry["changePoints"],
+                    "change_status": entry["changeStatus"],
+                    "reference_status": reference["status"] if reference else None,
                     "reference_value": reference_value,
-                    "reference_basis": reference.get("basis"),
+                    "reference_basis": reference.get("basis") if reference else None,
                 }
             )
     return rows

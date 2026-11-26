@@ -1,4 +1,4 @@
-"""Canonical JSON digests and file hashing.
+"""Canonical JSON digests, file hashing, and reading upstream JSON.
 
 The digest convention is the one `frontend/scripts/hosted_release.py` uses for
 manifests (sorted keys, compact separators, ASCII escapes), so an id computed
@@ -11,10 +11,22 @@ import hashlib
 import json
 import os
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 DIGEST_ALGORITHM = "sha256-json-sort-keys-compact-ascii-escaped-utf8"
+
+
+def json_object(value: object) -> Mapping[str, Any]:
+    """A JSON object from an upstream document (a manifest, a record), or an empty one
+    when the value is absent or not an object."""
+    return cast(Mapping[str, Any], value) if isinstance(value, Mapping) else {}
+
+
+def json_list(value: object) -> list[Any]:
+    """A JSON array from an upstream document, or an empty one when it is not an array."""
+    return cast(list[Any], value) if isinstance(value, list) else []
 
 
 def canonical_json(value: Any) -> str:

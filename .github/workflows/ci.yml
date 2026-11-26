@@ -41,6 +41,8 @@ jobs:
       - run: uv run --frozen pytest -q
       - run: uv run --frozen ruff check src tests
       - run: uv run --frozen ruff format --check src tests
+      # Strict on the producer, the standard mode on its tests ([tool.pyright]).
+      - run: uv run --frozen pyright
       # Each country's spec and references against its own pinned engine; no data.
       - name: Validate each country's spec on its engine
         run: |

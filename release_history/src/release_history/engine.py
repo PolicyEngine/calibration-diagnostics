@@ -23,14 +23,16 @@ import json
 import platform
 from importlib import metadata
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from release_history import PANEL_FORMAT_VERSION, POINT_FORMAT_VERSION, PRODUCER_VERSION
 from release_history.canonical import DIGEST_ALGORITHM, file_sha256, json_sha256
+from release_history.documents import EngineIdentity, Environment, PanelDocument, PanelKey
 from release_history.spec import Spec, measurement_definition
 
 BUNDLE_MANIFEST = "policyengine/data/bundle/manifest.json"
 CORE_PACKAGE = "policyengine-core"
+PANEL_KIND: Final = "release_history.panel"
 
 
 class EngineMismatchError(RuntimeError):
@@ -50,7 +52,7 @@ def _installed(package: str) -> str:
         raise EngineMismatchError(f"{package} is not installed") from error
 
 
-def engine_identity(spec: Spec, bundle: dict[str, Any] | None = None) -> dict[str, Any]:
+def engine_identity(spec: Spec, bundle: dict[str, Any] | None = None) -> EngineIdentity:
     """The engine a panel runs on, refusing any drift from the bundle's pins."""
     bundle = bundle if bundle is not None else bundle_manifest()
     version = bundle["policyengine_version"]
@@ -76,7 +78,7 @@ def engine_identity(spec: Spec, bundle: dict[str, Any] | None = None) -> dict[st
     }
 
 
-def panel_key(spec: Spec, engine: dict[str, Any]) -> dict[str, Any]:
+def panel_key(spec: Spec, engine: EngineIdentity) -> PanelKey:
     """Exactly the inputs the panel id hashes."""
     return {
         "country": spec.country,
@@ -89,11 +91,11 @@ def panel_key(spec: Spec, engine: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def panel_id(spec: Spec, engine: dict[str, Any]) -> str:
+def panel_id(spec: Spec, engine: EngineIdentity) -> str:
     return json_sha256(panel_key(spec, engine))
 
 
-def environment(lockfile: Path | None = None) -> dict[str, Any]:
+def environment(lockfile: Path | None = None) -> Environment:
     """The resolved environment a point ran on; recorded on each point, not hashed."""
     packages = sorted(
         f"{dist.metadata['Name']}=={dist.version}"
@@ -109,11 +111,11 @@ def environment(lockfile: Path | None = None) -> dict[str, Any]:
     }
 
 
-def panel_document(spec: Spec, engine: dict[str, Any]) -> dict[str, Any]:
+def panel_document(spec: Spec, engine: EngineIdentity) -> PanelDocument:
     """Written once: the panel key, the hashed definition and the engine it names."""
     return {
         "format_version": PANEL_FORMAT_VERSION,
-        "kind": "release_history.panel",
+        "kind": PANEL_KIND,
         "panel_id": panel_id(spec, engine),
         "panel_key": panel_key(spec, engine),
         "digest_algorithm": DIGEST_ALGORITHM,

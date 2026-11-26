@@ -17,6 +17,7 @@ import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -46,14 +47,12 @@ class FakeBrackets:
 
 
 def fake_parameters() -> Any:
-    tree = type("Node", (), {})()
-    tree.gov = type("Node", (), {})()
-    tree.gov.tax = type("Node", (), {})()
-    tree.gov.tax.rate = FakeParameter(0.2)
-    tree.gov.tax.rates = FakeBrackets([0.2, 0.4])
-    tree.gov.benefit = type("Node", (), {})()
-    tree.gov.benefit.amount = FakeParameter(100.0)
-    return tree
+    return SimpleNamespace(
+        gov=SimpleNamespace(
+            tax=SimpleNamespace(rate=FakeParameter(0.2), rates=FakeBrackets([0.2, 0.4])),
+            benefit=SimpleNamespace(amount=FakeParameter(100.0)),
+        )
+    )
 
 
 def _project(entity: str, values: np.ndarray) -> np.ndarray:
@@ -111,6 +110,7 @@ def baseline_world(rate: float = 0.2, benefit: float = 100.0) -> dict[str, tuple
 class FakeSim:
     world: Mapping[str, tuple[str, np.ndarray]]
     parameters: Any = field(default_factory=fake_parameters)
+    bundle: dict[str, Any] = field(default_factory=dict[str, Any])
     closed: bool = False
 
     def values(self, variable: str, period: int, map_to: str | None = None) -> np.ndarray:
@@ -210,7 +210,8 @@ FAKE_COMMIT = "c" * 40
 
 @dataclass
 class FakeHub:
-    """The `HubClient` calls the producer makes, answered from files held in memory."""
+    """A `ReleaseSource` like `HubClient`: the calls the producer makes, answered from files
+    held in memory at one commit."""
 
     files: dict[str, bytes] = field(default_factory=dict)
     commit: str = FAKE_COMMIT
@@ -219,7 +220,7 @@ class FakeHub:
     def put_json(self, path: str, value: Any) -> None:
         self.files[path] = json.dumps(value, sort_keys=True).encode("utf-8")
 
-    def _get(self, commit: str, path: str) -> bytes:
+    def _get(self, commit: str | None, path: str) -> bytes:
         if commit != self.commit:
             raise ReleaseRefusedError("error", "repository_or_revision_unreadable")
         if path not in self.files:
@@ -230,14 +231,16 @@ class FakeHub:
     def resolve_revision(self, repo: str, revision: str) -> str:
         return self.commit
 
-    def read_json(self, repo: str, commit: str, path: str, directory: Path) -> tuple[Any, str]:
+    def read_json(
+        self, repo: str, commit: str | None, path: str, directory: Path
+    ) -> tuple[Any, str]:
         data = self._get(commit, path)
         return json.loads(data), hashlib.sha256(data).hexdigest()
 
-    def file_size(self, repo: str, commit: str, path: str) -> int | None:
+    def file_size(self, repo: str, commit: str | None, path: str) -> int | None:
         return len(self.files[path]) if path in self.files else None
 
-    def download(self, repo: str, commit: str, path: str, directory: Path) -> Path:
+    def download(self, repo: str, commit: str | None, path: str, directory: Path) -> Path:
         local = Path(directory) / path
         local.parent.mkdir(parents=True, exist_ok=True)
         local.write_bytes(self._get(commit, path))

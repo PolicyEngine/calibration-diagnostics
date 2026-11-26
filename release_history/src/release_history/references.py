@@ -27,7 +27,7 @@ from typing import Any
 import yaml
 
 from release_history import REFERENCES_FORMAT_VERSION
-from release_history.canonical import file_sha256, json_sha256
+from release_history.canonical import file_sha256, json_list, json_object, json_sha256
 from release_history.spec import Spec, countries_dir, jsonable
 
 BASES = ("outturn", "forecast", "post_behavioural", "partial", "approximation", "mechanical")
@@ -69,14 +69,14 @@ def validate_references(spec: Spec, references: Mapping[str, Any]) -> list[str]:
         ("baseline", [item.id for item in spec.baseline]),
         ("reforms", [reform.id for reform in spec.reforms]),
     ):
-        entries = references.get(section) or {}
+        entries = json_object(references.get(section))
         for missing in sorted(set(ids) - set(entries)):
             problems.append(f"{section}.{missing}: no reference entry")
         for extra in sorted(set(entries) - set(ids)):
             problems.append(f"{section}.{extra}: not in the spec")
         for key, entry in entries.items():
             try:
-                kind = _entry_kind(entry or {}, f"{section}.{key}")
+                kind = _entry_kind(json_object(entry), f"{section}.{key}")
             except ReferencesError as error:
                 problems.append(str(error))
                 continue
@@ -86,22 +86,22 @@ def validate_references(spec: Spec, references: Mapping[str, Any]) -> list[str]:
 
 
 def _wanted(references: Mapping[str, Any]) -> set[str]:
-    wanted = set()
+    wanted: set[str] = set()
     for section in ("baseline", "reforms"):
-        for entry in (references.get(section) or {}).values():
-            wanted.update(entry.get("chronicle_records") or [])
+        for entry in json_object(references.get(section)).values():
+            wanted.update(json_list(json_object(entry).get("chronicle_records")))
     return wanted
 
 
-def scan_facts(lines: Iterable[bytes], wanted: set[str]) -> dict[str, list[dict[str, Any]]]:
+def scan_facts(lines: Iterable[bytes], wanted: set[str]) -> dict[str, list[Mapping[str, Any]]]:
     """Facts whose source record id is wanted, or begins with a wanted record-set id."""
-    found: dict[str, list[dict[str, Any]]] = {key: [] for key in wanted}
+    found: dict[str, list[Mapping[str, Any]]] = {key: [] for key in wanted}
     needles = [key.encode("utf-8") for key in wanted]
     for line in lines:
         if not any(needle in line for needle in needles):
             continue
-        fact = json.loads(line)
-        record = (fact.get("lineage") or {}).get("source_record_id") or ""
+        fact = json_object(json.loads(line))
+        record = json_object(fact.get("lineage")).get("source_record_id") or ""
         for key in wanted:
             if record == key or record.startswith(f"{key}."):
                 found[key].append(fact)
@@ -110,7 +110,7 @@ def scan_facts(lines: Iterable[bytes], wanted: set[str]) -> dict[str, list[dict[
 
 def _fact_summary(fact: Mapping[str, Any]) -> dict[str, Any]:
     return {
-        "source_record_id": (fact.get("lineage") or {}).get("source_record_id"),
+        "source_record_id": json_object(fact.get("lineage")).get("source_record_id"),
         "semantic_fact_key": fact.get("semantic_fact_key"),
         "label": fact.get("label"),
         "period": fact.get("period"),
@@ -132,10 +132,8 @@ def resolve(
     problems = validate_references(spec, references)
     if problems:
         raise ReferencesError("; ".join(problems))
-    pin = references.get("chronicle") or {}
+    pin = json_object(references.get("chronicle"))
     wanted = _wanted(references)
-    if wanted and facts_path is None:
-        raise ReferencesError("chronicle_records need --facts, a Chronicle consumer_facts.jsonl")
     if check_digests and pin and facts_path is not None:
         if pin.get("facts_sha256") and file_sha256(facts_path) != pin["facts_sha256"]:
             raise ReferencesError("the facts file is not the pinned Chronicle artifact")
@@ -145,8 +143,12 @@ def resolve(
             and (file_sha256(manifest_path) != pin["manifest_sha256"])
         ):
             raise ReferencesError("the artifact manifest is not the pinned one")
-    found: dict[str, list[dict[str, Any]]] = {}
+    found: dict[str, list[Mapping[str, Any]]] = {}
     if wanted:
+        if facts_path is None:
+            raise ReferencesError(
+                "chronicle_records need --facts, a Chronicle consumer_facts.jsonl"
+            )
         with facts_path.open("rb") as stream:
             found = scan_facts(stream, wanted)
     lock: dict[str, Any] = {
@@ -160,7 +162,8 @@ def resolve(
         "reforms": {},
     }
     for section in ("baseline", "reforms"):
-        for key, entry in (references.get(section) or {}).items():
+        for key, value in json_object(references.get(section)).items():
+            entry = json_object(value)
             out: dict[str, Any] = {
                 "basis": entry.get("basis"),
                 "output": entry.get("output", "budgetary_impact" if section == "reforms" else None),
@@ -173,8 +176,8 @@ def resolve(
                     status="citation", citation=entry["citation"], registry=entry.get("registry")
                 )
             else:
-                records = entry["chronicle_records"]
-                facts = []
+                records = json_list(entry["chronicle_records"])
+                facts: list[dict[str, Any]] = []
                 for record in records:
                     matches = found.get(record, [])
                     if len(matches) != 1:

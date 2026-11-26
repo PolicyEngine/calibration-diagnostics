@@ -23,7 +23,6 @@ import hashlib
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any
 
 from microcosm_emitter_interface.releases import (
     RELEASES_RECORD_PATH,
@@ -34,7 +33,8 @@ from microcosm_emitter_interface.releases import (
 )
 
 from release_history import SERIES_FORMAT_VERSION
-from release_history.releases import HubClient, ReleaseRefusedError, national_artifact
+from release_history.documents import SeriesBuild, SeriesLine, SeriesRecord
+from release_history.releases import ReleaseRefusedError, ReleaseSource, national_artifact
 from release_history.spec import Spec, utc_date
 
 KIND = "release_history.series"
@@ -65,7 +65,7 @@ def parse_record(content: bytes) -> ReleasesRecord:
 
 
 def read_record(
-    hub: HubClient, repo: str, commit: str, folder: Path
+    hub: ReleaseSource, repo: str, commit: str, folder: Path
 ) -> tuple[ReleasesRecord | None, str | None]:
     """The parsed record and its file's sha256, or (None, None) when the repository has no
     releases.json at that commit. Any other failure raises: a series is never listed from a
@@ -80,21 +80,23 @@ def read_record(
 
 def build_series(
     spec: Spec,
-    hub: HubClient,
+    hub: ReleaseSource,
     *,
     listed_at: str,
     revision: str = "main",
     workdir: Path | None = None,
-) -> dict[str, Any]:
+) -> SeriesRecord:
     """The country's series record at the current head of `revision`."""
     repo = spec.release_repo
     commit = hub.resolve_revision(repo, revision)
+    if commit is None:
+        raise SeriesError("A series is listed at a commit of a published release repository.")
     own_workdir = workdir is None
     folder = workdir or Path(tempfile.mkdtemp(prefix="rh-series-"))
     try:
         record, record_sha = read_record(hub, repo, commit, folder)
-        lines = []
-        builds = []
+        lines: list[SeriesLine] = []
+        builds: list[SeriesBuild] = []
         for line in spec.series_releases:
             release = record.releases.get(line) if record else None
             lines.append(
@@ -104,7 +106,7 @@ def build_series(
                     "role": release.role if release else None,
                 }
             )
-            if release is None:
+            if record is None or release is None:
                 continue
             listed = sorted(
                 release.builds.items(), key=lambda item: (item[1].published_at, item[0])
@@ -138,7 +140,7 @@ def build_series(
 
 
 def _listed_build(
-    hub: HubClient,
+    hub: ReleaseSource,
     repo: str,
     commit: str,
     folder: Path,
@@ -147,9 +149,9 @@ def _listed_build(
     release: ReleaseEntry,
     build: str,
     facts: BuildEntry,
-) -> dict[str, Any]:
+) -> SeriesBuild:
     directory = f"{line}/{build}"
-    entry: dict[str, Any] = {
+    entry: SeriesBuild = {
         "build_id": directory,
         "release": line,
         "build": build,
@@ -170,13 +172,10 @@ def _listed_build(
             repo, commit, f"releases/{directory}/release_manifest.json", folder
         )
     except FileNotFoundError:
-        entry.update(listing_status="refused", listing_reason="release_manifest_missing")
-        return entry
+        return {**entry, "listing_status": "refused", "listing_reason": "release_manifest_missing"}
     entry["release_manifest_sha256"] = manifest_sha
     try:
         artifact = national_artifact(manifest, directory)
     except ReleaseRefusedError as refusal:
-        entry.update(listing_status="refused", listing_reason=refusal.reason)
-        return entry
-    entry.update(digest=artifact.sha256, dataset_path=artifact.path)
-    return entry
+        return {**entry, "listing_status": "refused", "listing_reason": refusal.reason}
+    return {**entry, "digest": artifact.sha256, "dataset_path": artifact.path}

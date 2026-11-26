@@ -1,12 +1,14 @@
 """The series record: the builds `releases.json` lists, each mapped to its data file."""
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
 from microcosm_emitter_interface.releases import MAX_RECORD_BYTES
 
 from release_history import cli
+from release_history.documents import SeriesRecord
 from release_history.releases import ReleaseRefusedError
 from release_history.series import SeriesError, build_series, parse_record
 from release_history.spec import parse_spec
@@ -24,11 +26,11 @@ from .fakes import (
 LISTED_AT = "2026-11-12T00:00:00Z"
 
 
-def holds(document: dict, **expected) -> bool:
+def holds(document: Mapping[str, object], **expected: object) -> bool:
     return {key: document[key] for key in expected} == expected
 
 
-def fixture_series(tmp_path: Path) -> dict:
+def fixture_series(tmp_path: Path) -> SeriesRecord:
     spec = parse_spec(fixture_series_spec_dict())
     return build_series(spec, fixture_repo(), listed_at=LISTED_AT, workdir=tmp_path)
 

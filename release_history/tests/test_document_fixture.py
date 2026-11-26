@@ -10,7 +10,13 @@ import numpy as np
 
 from release_history.canonical import json_sha256
 from release_history.disclosure import apply_policy
-from release_history.document import measurement_document, measurement_id, refused_document
+from release_history.document import (
+    RunFacts,
+    measurement_document,
+    measurement_id,
+    refused_document,
+)
+from release_history.documents import Environment, PointDocument, Provenance
 from release_history.measure import measure
 from release_history.releases import NationalArtifact, OpenedRelease, Point, point_provenance
 from release_history.spec import parse_spec
@@ -27,14 +33,14 @@ from .fakes import (
 PANEL = "f" * 64
 BUILD = f"{FIXTURE_LINE}/zz-build-20261101"
 PACKAGES = ["policyengine-core==3.33.3", "policyengine-zz==1.0.0"]
-ENV = {
+ENV: Environment = {
     "python": "3.12.0",
     "platform": "fixture",
     "packages": PACKAGES,
     "packages_sha256": json_sha256(PACKAGES),
     "uv_lock_sha256": "0" * 64,
 }
-RUNTIME = {
+RUNTIME: RunFacts = {
     "started_at": "2026-11-09T00:00:00Z",
     "finished_at": "2026-11-09T00:00:01Z",
     "seconds": 1.0,
@@ -54,7 +60,7 @@ def fixture_spec():
     )
 
 
-def fixture_provenance(sha256: str = FIXTURE_FILES[0]) -> dict:
+def fixture_provenance(sha256: str = FIXTURE_FILES[0]) -> Provenance:
     point = Point(
         build_id=BUILD,
         release_directory=BUILD,
@@ -77,7 +83,7 @@ def fixture_provenance(sha256: str = FIXTURE_FILES[0]) -> dict:
     return point_provenance(opened, "policyengine-zz", "1.0.0")
 
 
-def fixture_document() -> dict:
+def fixture_document() -> PointDocument:
     spec = fixture_spec()
     result = measure(spec, FakeBackend())
     withheld = apply_policy(

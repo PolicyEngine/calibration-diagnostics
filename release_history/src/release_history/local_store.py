@@ -21,10 +21,11 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 from release_history.canonical import document_bytes, write_atomic
+from release_history.documents import PointDocument
 
 PREFIX = "release-history"
 _POINT_NAME = re.compile(r"^[0-9a-f]{64}\.json$")
@@ -42,7 +43,7 @@ def panel_dir(root: Path, country: str, panel_id: str) -> Path:
     return country_dir(root, country) / panel_id
 
 
-def write_once(path: Path, document: dict[str, Any]) -> bool:
+def write_once(path: Path, document: Mapping[str, object]) -> bool:
     """Write a document unless one is there; returns whether it wrote."""
     if path.exists():
         return False
@@ -50,7 +51,7 @@ def write_once(path: Path, document: dict[str, Any]) -> bool:
     return True
 
 
-def write_immutable(path: Path, document: dict[str, Any]) -> bool:
+def write_immutable(path: Path, document: Mapping[str, object]) -> bool:
     """Write a document; refuse a different document at the same path."""
     data = document_bytes(document)
     if path.exists():
@@ -61,19 +62,20 @@ def write_immutable(path: Path, document: dict[str, Any]) -> bool:
     return True
 
 
-def write_replace(path: Path, document: dict[str, Any]) -> None:
+def write_replace(path: Path, document: Mapping[str, object]) -> None:
     write_atomic(path, document_bytes(document))
 
 
-def read_points(root: Path, country: str, panel_id: str) -> list[dict[str, Any]]:
+def read_points(root: Path, country: str, panel_id: str) -> list[PointDocument]:
+    """A panel's stored points, as the producer wrote them (`schemas/point.schema.json`)."""
     folder = panel_dir(root, country, panel_id)
     if not folder.is_dir():
         return []
-    return [
-        json.loads(path.read_text(encoding="utf-8"))
-        for path in sorted(folder.glob("*.json"))
-        if _POINT_NAME.match(path.name)
-    ]
+    points: list[PointDocument] = []
+    for path in sorted(folder.glob("*.json")):
+        if _POINT_NAME.match(path.name):
+            points.append(json.loads(path.read_text(encoding="utf-8")))
+    return points
 
 
 def panels(root: Path, country: str) -> list[str]:

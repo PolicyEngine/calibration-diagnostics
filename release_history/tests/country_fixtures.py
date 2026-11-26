@@ -22,7 +22,8 @@ from typing import Any
 
 from release_history.canonical import json_sha256
 from release_history.cli import labels_document
-from release_history.document import measured_point, refused_document
+from release_history.document import RunFacts, measured_point, refused_document
+from release_history.documents import EngineIdentity, Environment, Provenance
 from release_history.engine import panel_document
 from release_history.measure import measure
 from release_history.releases import Point, open_release, point_provenance
@@ -36,7 +37,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 LISTED_AT = "2026-11-12T00:00:00Z"
 COMMIT = "c" * 40
 PACKAGES = ["policyengine-core==3.33.3"]
-ENV = {
+ENV: Environment = {
     "python": "3.12.0",
     "platform": "synthetic",
     "packages": PACKAGES,
@@ -45,14 +46,14 @@ ENV = {
 }
 MODEL_VERSION = "1.0.0"
 H5 = b"a synthetic national file"
-RUNTIME = {
+RUNTIME: RunFacts = {
     "started_at": "2026-11-12T00:00:00Z",
     "finished_at": "2026-11-12T00:10:00Z",
     "seconds": 600.0,
     "runner": "synthetic",
 }
 # A run within 20% of the spec's time limit (5,400 of 6,600 seconds), so a point records it.
-NEAR_LIMIT_RUNTIME = {
+NEAR_LIMIT_RUNTIME: RunFacts = {
     **RUNTIME,
     "finished_at": "2026-11-12T01:30:00Z",
     "seconds": 5400.0,
@@ -69,7 +70,7 @@ def synthetic_digest(country: str, name: str) -> str:
     return hashlib.sha256(f"synthetic file {country} {name}".encode()).hexdigest()
 
 
-def synthetic_engine(spec: Spec) -> dict[str, Any]:
+def synthetic_engine(spec: Spec) -> EngineIdentity:
     return {
         "policyengine": "6.16.1",
         "bundle_sha256": "b" * 64,
@@ -102,7 +103,7 @@ def _builds(spec: Spec) -> dict[str, dict[str, Any]]:
     }
 
 
-def _provenance(spec: Spec, hub: Any, build_id: str, sha256: str, workdir: Path) -> dict[str, Any]:
+def _provenance(spec: Spec, hub: Any, build_id: str, sha256: str, workdir: Path) -> Provenance:
     """What the measure command records for a file, read through `open_release`."""
     point = Point(
         build_id=build_id,

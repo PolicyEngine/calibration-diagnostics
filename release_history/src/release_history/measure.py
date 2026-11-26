@@ -26,11 +26,12 @@ import math
 import traceback
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 
 from release_history.disclosure import RESIDUAL, Cell, Table
+from release_history.documents import JsonValue, ReformError, ReformRecord, SimulationRecord
 from release_history.reforms import behaviour_dict, merged, reform_dict
 from release_history.simulate import Backend, PeakMemory, SimulationView, WarningLog
 from release_history.spec import BaselineItem, ReformSpec, Spec
@@ -51,17 +52,24 @@ class MeasurementError(RuntimeError):
         self.error = error
 
 
-def error_record(stage: str, error: BaseException) -> dict[str, Any]:
-    """An error as stored: its class, its stage and a model name if it names one.
+def error_record(stage: str, error: BaseException) -> ReformError:
+    """An error as stored: its class, its stage, a model name if it names one, and the
+    file and line it was raised at.
 
     Exception text can carry values, so it is never stored or printed. The one
     exception is a missing variable or parameter, whose message is a name.
     """
-    record: dict[str, Any] = {"stage": stage, "class": type(error).__name__}
-    name = getattr(error, "args", ())
-    if isinstance(error, LookupError) and name and isinstance(name[0], str):
-        if " " not in name[0].strip("'\"") and len(name[0]) < 200:
-            record["name"] = name[0].strip("'\"")
+    record: ReformError = {
+        "stage": stage,
+        "class": type(error).__name__,
+        "name": None,
+        "where": None,
+    }
+    arguments = error.args
+    if isinstance(error, LookupError) and arguments and isinstance(arguments[0], str):
+        name = arguments[0].strip("'\"")
+        if " " not in name and len(arguments[0]) < 200:
+            record["name"] = name
     frames = traceback.extract_tb(error.__traceback__)
     if frames:
         last = frames[-1]
@@ -70,8 +78,22 @@ def error_record(stage: str, error: BaseException) -> dict[str, Any]:
 
 
 def _finite(value: float) -> float | None:
-    value = float(value)
-    return value if math.isfinite(value) else None
+    number = float(value)
+    return number if math.isfinite(number) else None
+
+
+def _kept(array: np.ndarray | None, what: str) -> np.ndarray:
+    """An array the baseline keeps for the reform outputs that need it."""
+    if array is None:
+        raise ValueError(f"the baseline kept no {what}")
+    return array
+
+
+def _named(variable: str | None, what: str) -> str:
+    """A variable the spec names for the outputs it asks for (`parse_spec` checks it does)."""
+    if variable is None:
+        raise ValueError(f"the spec names no {what}")
+    return variable
 
 
 @dataclass
@@ -165,13 +187,17 @@ class BaselinePeriod:
     """What the reform outputs need from the baseline, for one period."""
 
     frame: Frame
-    programme: dict[str, tuple[str, np.ndarray]] = field(default_factory=dict)
-    targets: dict[str, tuple[str, np.ndarray]] = field(default_factory=dict)
+    programme: dict[str, tuple[str, np.ndarray]] = field(
+        default_factory=dict[str, tuple[str, np.ndarray]]
+    )
+    targets: dict[str, tuple[str, np.ndarray]] = field(
+        default_factory=dict[str, tuple[str, np.ndarray]]
+    )
     budget: np.ndarray | None = None
     net_income: np.ndarray | None = None
     decile: np.ndarray | None = None
-    poverty: dict[str, np.ndarray] = field(default_factory=dict)
-    groups: dict[str, np.ndarray] = field(default_factory=dict)
+    poverty: dict[str, np.ndarray] = field(default_factory=dict[str, np.ndarray])
+    groups: dict[str, np.ndarray] = field(default_factory=dict[str, np.ndarray])
 
 
 def _entities_needed(spec: Spec, sim: SimulationView) -> set[str]:
@@ -234,7 +260,7 @@ def _baseline_cells(
         return Cell(output, period, item.unit, value, supports=supports)
 
     if item.by == "income_decile":
-        entity_decile = household_decile[positions]
+        entity_decile = _kept(household_decile, "income decile")[positions]
         return [
             cell(group & (entity_decile == decile), f"baseline/{item.id}/decile_{decile}")
             for decile in DECILES
@@ -261,8 +287,10 @@ def _keep_baseline(spec: Spec, sim: SimulationView, frame: Frame, period: int) -
     if "budget" in levels:
         kept.budget = _budget(spec, sim, period)
     if "distribution" in levels or "poverty" in levels:
-        kept.net_income = entity_values(sim, spec.household_net_income, period, household)
-        kept.decile = entity_values(sim, spec.income_decile, period, household).astype(int)
+        net_income = _named(spec.household_net_income, "household_net_income")
+        kept.net_income = entity_values(sim, net_income, period, household)
+        decile = _named(spec.income_decile, "income_decile")
+        kept.decile = entity_values(sim, decile, period, household).astype(int)
     if "poverty" in levels:
         for measure, variable in spec.poverty.items():
             kept.poverty[measure] = entity_values(sim, variable, period, household).astype(bool)
@@ -347,7 +375,7 @@ def _reform_cells(
 
 def _target_cells(run: ReformPeriod) -> list[Cell]:
     """The change in each target variable's weighted total."""
-    cells = []
+    cells: list[Cell] = []
     for variable in run.reform.targets:
         entity, before = run.base.targets[variable]
         delta = entity_values(run.sim, variable, run.period, entity, run.frame) - before
@@ -359,7 +387,7 @@ def _budget_cells(run: ReformPeriod) -> tuple[list[Cell], Table]:
     """The budgetary impact and each programme's part of it. The table ties the parts to
     the impact: what no programme explains is a hidden residual."""
     spec, frame, period = run.spec, run.frame, run.period
-    budget_delta = _budget(spec, run.sim, period) - run.base.budget
+    budget_delta = _budget(spec, run.sim, period) - _kept(run.base.budget, "budget")
     total = f"{run.prefix}/budgetary_impact"
     cells = [
         Cell(
@@ -371,7 +399,7 @@ def _budget_cells(run: ReformPeriod) -> tuple[list[Cell], Table]:
         )
     ]
     residual = budget_delta.copy()
-    parts = []
+    parts: list[str] = []
     for item in spec.baseline:
         if not item.is_programme:
             continue
@@ -392,13 +420,16 @@ def _distribution_cells(run: ReformPeriod) -> tuple[list[Cell], Table]:
     """Households and people gaining and losing, the change in net income, and its relative
     change in each income decile. The table ties the deciles to the total: households
     outside every decile are hidden."""
-    spec, frame, period, base = run.spec, run.frame, run.period, run.base
+    spec, frame, period = run.spec, run.frame, run.period
+    base_income = _kept(run.base.net_income, "net income")
+    base_decile = _kept(run.base.decile, "income decile")
     household_weights = run.household_weights
     person_weights = frame.weights["person"]
     person_positions = frame.positions["person"]
-    after_income = entity_values(run.sim, spec.household_net_income, period, spec.household_entity)
-    delta = after_income - base.net_income
-    cells = []
+    net_income = _named(spec.household_net_income, "household_net_income")
+    after_income = entity_values(run.sim, net_income, period, spec.household_entity)
+    delta = after_income - base_income
+    cells: list[Cell] = []
     gaining, losing = delta >= GAIN_THRESHOLD, delta <= -GAIN_THRESHOLD
     for name, mask in (("gaining", gaining), ("losing", losing)):
         cells.append(
@@ -420,7 +451,7 @@ def _distribution_cells(run: ReformPeriod) -> tuple[list[Cell], Table]:
             )
         )
     changed = _changed(delta)
-    before_total = float(np.sum(household_weights * base.net_income))
+    before_total = float(np.sum(household_weights * base_income))
     total = f"{run.prefix}/net_income_change_pct"
     cells.append(
         Cell(
@@ -433,10 +464,10 @@ def _distribution_cells(run: ReformPeriod) -> tuple[list[Cell], Table]:
             supports=[changed],
         )
     )
-    parts = []
+    parts: list[str] = []
     for decile in DECILES:
-        in_decile = base.decile == decile
-        before_decile = float(np.sum(household_weights[in_decile] * base.net_income[in_decile]))
+        in_decile = base_decile == decile
+        before_decile = float(np.sum(household_weights[in_decile] * base_income[in_decile]))
         part = f"{run.prefix}/decile_relative_change/decile_{decile}"
         cells.append(
             Cell(
@@ -452,7 +483,7 @@ def _distribution_cells(run: ReformPeriod) -> tuple[list[Cell], Table]:
             )
         )
         parts.append(part)
-    outside = ~np.isin(base.decile, DECILES)
+    outside = ~np.isin(base_decile, DECILES)
     return cells, Table(period, total, parts, hidden=[changed & outside])
 
 
@@ -463,15 +494,15 @@ def _poverty_cells(run: ReformPeriod) -> tuple[list[Cell], list[Table]]:
     spec, frame, period = run.spec, run.frame, run.period
     person_positions = frame.positions["person"]
     person_weights = frame.weights["person"]
-    cells = []
-    tables = []
+    cells: list[Cell] = []
+    tables: list[Table] = []
     for measure, variable in spec.poverty.items():
         after = entity_values(run.sim, variable, period, spec.household_entity).astype(bool)
         moved = after.astype(int) - run.base.poverty[measure].astype(int)
         status_changed = moved != 0
         person_moved = moved[person_positions]
         in_part_groups = np.zeros(person_positions.size, dtype=bool)
-        parts = []
+        parts: list[str] = []
         for group, group_variable in spec.groups.items():
             members = (
                 np.ones(person_positions.size, dtype=bool)
@@ -506,23 +537,29 @@ def _poverty_cells(run: ReformPeriod) -> tuple[list[Cell], list[Table]]:
 
 @dataclass
 class Measurement:
-    cells: list[Cell] = field(default_factory=list)
-    tables: list[Table] = field(default_factory=list)
-    baseline_status: dict[str, Any] = field(default_factory=lambda: {"status": "ok"})
-    reforms: dict[str, dict[str, Any]] = field(default_factory=dict)
-    simulations: list[dict[str, Any]] = field(default_factory=list)
-    warnings: set[str] = field(default_factory=set)
+    """What a measured file gives: its cells and the tables that tie them, each reform's
+    record, each simulation's cost, and facts about the model it ran on. A failed baseline
+    raises instead, so the baseline always ran."""
+
+    cells: list[Cell] = field(default_factory=list[Cell])
+    tables: list[Table] = field(default_factory=list[Table])
+    reforms: dict[str, ReformRecord] = field(default_factory=dict[str, ReformRecord])
+    simulations: list[SimulationRecord] = field(default_factory=list[SimulationRecord])
+    warnings: set[str] = field(default_factory=set[str])
     household_ids: np.ndarray | None = None
-    engine_bundle: dict[str, Any] = field(default_factory=dict)
-    model_variables: set[str] = field(default_factory=set)
+    engine_bundle: dict[str, Any] = field(default_factory=dict[str, Any])
+    model_variables: set[str] = field(default_factory=set[str])
 
     @property
-    def status(self) -> str:
-        if self.baseline_status["status"] != "ok":
-            return "error"
+    def status(self) -> Literal["ok", "partial"]:
+        """`partial` when a reform failed."""
         if any(record["status"] != "ok" for record in self.reforms.values()):
             return "partial"
         return "ok"
+
+
+def _ignore_progress(stage: str) -> None:
+    return None
 
 
 def measure(
@@ -533,7 +570,7 @@ def measure(
 ) -> Measurement:
     """Run the baseline and every reform. Raises MeasurementError if the baseline fails."""
     result = Measurement()
-    note = on_progress or (lambda _message: None)
+    note = on_progress or _ignore_progress
     note("baseline")
     kept, definitions = _measure_baseline(spec, backend, result)
     for reform in spec.reforms:
@@ -563,9 +600,8 @@ def _measure_baseline(
                 result.cells.extend(_baseline_period_cells(spec, sim, frame, period))
                 kept[period] = _keep_baseline(spec, sim, frame, period)
             result.household_ids = kept[spec.periods[0]].frame.household_ids
-            result.engine_bundle = getattr(sim, "bundle", {}) or {}
-            names = getattr(sim, "variable_names", None)
-            result.model_variables = set(names()) if callable(names) else set()
+            result.engine_bundle = dict(sim.bundle)
+            result.model_variables = set(sim.variable_names())
         except Exception as error:  # noqa: BLE001
             raise MeasurementError("baseline", error) from error
         finally:
@@ -589,7 +625,7 @@ def _reform_definitions(
 ) -> dict[str, dict[str, dict[str, Any]]]:
     """Each reform's parameter changes with the spec's behaviour; a reform whose definition
     fails is recorded as an error, with no simulation."""
-    definitions = {}
+    definitions: dict[str, dict[str, dict[str, Any]]] = {}
     for reform in spec.reforms:
         try:
             definitions[reform.id] = merged(
@@ -599,8 +635,9 @@ def _reform_definitions(
         except Exception as error:  # noqa: BLE001
             result.reforms[reform.id] = {
                 "status": "error",
-                "error": error_record("reform_definition", error),
                 "definition_sha256": reform.definition_sha256,
+                "applied": None,
+                "error": error_record("reform_definition", error),
             }
     return definitions
 
@@ -608,10 +645,12 @@ def _reform_definitions(
 def _baseline_period_cells(
     spec: Spec, sim: SimulationView, frame: Frame, period: int
 ) -> list[Cell]:
-    cells = []
+    cells: list[Cell] = []
     for item in spec.baseline:
         household_decile = (
-            entity_values(sim, spec.income_decile, period, spec.household_entity).astype(int)
+            entity_values(
+                sim, _named(spec.income_decile, "income_decile"), period, spec.household_entity
+            ).astype(int)
             if item.by == "income_decile"
             else None
         )
@@ -628,16 +667,18 @@ def _measure_reform(
     result: Measurement,
 ) -> None:
     """One reform's simulation: its cells in every period, or its error and no cells."""
-    record: dict[str, Any] = {
+    record: ReformRecord = {
         "status": "ok",
         "definition_sha256": reform.definition_sha256,
         "applied": _applied(definition),
+        "error": None,
     }
     with PeakMemory() as memory, WarningLog() as log:
         sim = None
         try:
             sim = backend.build(definition)
-            cells, tables = [], []
+            cells: list[Cell] = []
+            tables: list[Table] = []
             for period in spec.periods:
                 base = kept[period]
                 ids = np.asarray(sim.values(spec.household_id_variable, period))
@@ -660,7 +701,7 @@ def _measure_reform(
     result.simulations.append(_simulation_record(f"reform:{reform.id}", memory))
 
 
-def _simulation_record(label: str, memory: PeakMemory) -> dict[str, Any]:
+def _simulation_record(label: str, memory: PeakMemory) -> SimulationRecord:
     return {
         "label": label,
         "seconds": round(memory.seconds, 2),
@@ -668,9 +709,9 @@ def _simulation_record(label: str, memory: PeakMemory) -> dict[str, Any]:
     }
 
 
-def _applied(reform: Mapping[str, Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+def _applied(reform: Mapping[str, Mapping[str, Any]]) -> dict[str, JsonValue]:
     """The reform as applied: absolute values per period (public parameters only)."""
-    out: dict[str, dict[str, Any]] = {}
+    out: dict[str, JsonValue] = {}
     for path, values in reform.items():
         out[path] = {
             key: (

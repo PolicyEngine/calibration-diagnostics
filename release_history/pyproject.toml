@@ -23,8 +23,12 @@ release-history = "release_history.cli:main"
 [dependency-groups]
 dev = [
     "jsonschema>=4.21,<5",
+    "pandas-stubs>=3.1.0.261029",
+    "pyright==1.1.414",
     "pytest>=8.3,<9",
     "ruff>=0.6,<1",
+    "types-psutil>=7.2.2.20261122",
+    "types-pyyaml>=6.0.12.20261122",
 ]
 
 [build-system]
@@ -43,3 +47,12 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "N", "B", "UP"]
+
+[tool.pyright]
+# Strict on the producer; the tests (fakes, monkeypatching) in the standard mode.
+include = ["src", "tests"]
+strict = ["src"]
+typeCheckingMode = "standard"
+pythonVersion = "3.13"
+venvPath = "."
+venv = ".venv"

@@ -37,6 +37,9 @@ class SimulationView(Protocol):
     @property
     def parameters(self) -> Any: ...
 
+    @property
+    def bundle(self) -> Mapping[str, Any]: ...
+
     def close(self) -> None: ...
 
 
@@ -84,7 +87,7 @@ class PolicyEngineBackend:
 
     module: str
     dataset_path: str
-    options: Mapping[str, Any] = field(default_factory=dict)
+    options: Mapping[str, Any] = field(default_factory=dict[str, Any])
 
     def build(self, reform: Mapping[str, Mapping[str, Any]] | None) -> PolicyEngineSimulation:
         policyengine = importlib.import_module("policyengine")

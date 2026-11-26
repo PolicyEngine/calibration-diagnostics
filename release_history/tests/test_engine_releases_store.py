@@ -248,7 +248,9 @@ def test_provenance_reads_both_manifest_layouts():
         assert point["file"] == {"sha256": SHA, "bytes": 100}
     old, new = old_point["fetched_from"]["declared"], new_point["fetched_from"]["declared"]
     assert new_point["fetched_from"]["build_id"] == "line/attempt-20261107T020434Z-eeb6093e"
-    assert new_point["fetched_from"]["build_manifest"]["path"] == (
+    build_manifest = new_point["fetched_from"]["build_manifest"]
+    assert build_manifest is not None
+    assert build_manifest["path"] == (
         "releases/line/attempt-20261107T020434Z-eeb6093e/build_manifest.json"
     )
     assert new_point["fetched_from"]["dataset"] == {
@@ -263,14 +265,17 @@ def test_provenance_reads_both_manifest_layouts():
     )
     assert new["build"] == "attempt-20261107T020434Z-eeb6093e"
     assert new["cut_tag"] == "line-20261107T020434Z-eeb6093e"
-    assert new["migrated_from"]["commit"] == "d" * 40
+    migrated = new["migrated_from"]
+    assert isinstance(migrated, dict) and migrated["commit"] == "d" * 40
     for declared in (old, new):
         assert declared["built_with_model"] == model
         assert declared["built_at"] == "2026-11-07T03:22:40+00:00"
         assert declared["reference_model_compatibility"] == "inside"
     assert old["build_provenance"] is None
-    assert new["build_provenance"]["attempt_id"] == "attempt-20261107T020434Z-eeb6093e"
-    assert new["build_provenance"]["n_targets"] == 1214
+    provenance = new["build_provenance"]
+    assert provenance is not None
+    assert provenance["attempt_id"] == "attempt-20261107T020434Z-eeb6093e"
+    assert provenance["n_targets"] == 1214
     assert "published_at" not in json.dumps(new_point)
 
 

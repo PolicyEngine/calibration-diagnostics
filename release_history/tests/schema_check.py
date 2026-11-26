@@ -3,6 +3,7 @@
 import json
 from functools import cache
 from pathlib import Path
+from typing import Any
 
 from jsonschema import Draft202012Validator
 
@@ -17,5 +18,5 @@ def validator(kind: str) -> Draft202012Validator:
     return Draft202012Validator(document)
 
 
-def errors(kind: str, document: object) -> list[str]:
+def errors(kind: str, document: Any) -> list[str]:
     return [error.message for error in validator(kind).iter_errors(document)]

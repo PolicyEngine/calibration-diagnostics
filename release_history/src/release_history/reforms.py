@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from release_history.spec import ReformSpec
 
@@ -71,7 +71,7 @@ def reform_dict(
     for path, value in reform.parameters.items():
         parameter_node(parameters, path)  # refuse unknown paths early
         if isinstance(value, Mapping):
-            out[path] = dict(value)
+            out[path] = dict(cast(Mapping[str, Any], value))
         else:
             out[path] = {period_key(period): value for period in periods}
     return out

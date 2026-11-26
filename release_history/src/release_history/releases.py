@@ -25,14 +25,20 @@ import json
 import os
 import re
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, cast
 
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 
-from release_history.canonical import file_sha256, json_sha256
+from release_history.canonical import file_sha256, json_list, json_object, json_sha256
+from release_history.documents import (
+    BuildProvenance,
+    Compatibility,
+    PlannedPointDocument,
+    Provenance,
+)
 
 # The Xet transfer cache filled the hosted runtime's disk; keep plain LFS downloads.
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
@@ -92,7 +98,10 @@ class Point:
             last_attempt=bool(value.get("last_attempt", True)),
         )
 
-    def to_json(self) -> dict[str, Any]:
+    def to_json(self) -> PlannedPointDocument:
+        """The point as a plan names it: only a published build's listed file is planned."""
+        if self.hf_commit is None or self.digest is None:
+            raise ValueError("Only a published build's listed file can be planned.")
         return {
             "build_id": self.build_id,
             "release_directory": self.release_directory,
@@ -108,7 +117,7 @@ def release_role(manifest: Mapping[str, Any]) -> dict[str, bool]:
     """The dashboard's release summary rule (`releaseRole` in the calibration-tree package)."""
     is_default = manifest.get("is_default")
     dataset_role = manifest.get("dataset_role")
-    national = (manifest.get("default_datasets") or {}).get("national")
+    national = json_object(manifest.get("default_datasets")).get("national")
     default = is_default is True or (is_default is None and dataset_role is None and bool(national))
     local_area = isinstance(dataset_role, str) and "local_area" in dataset_role
     return {"is_default": default, "is_local_area": local_area}
@@ -125,11 +134,11 @@ def national_artifact(manifest: Mapping[str, Any], release_directory: str) -> Na
     role = release_role(manifest)
     if not role["is_default"] or role["is_local_area"]:
         raise ReleaseRefusedError("skipped", "not_default_national")
-    key = (manifest.get("default_datasets") or {}).get("national")
-    artifacts = manifest.get("artifacts") or {}
-    artifact = artifacts.get(key) if isinstance(key, str) else None
-    if not isinstance(artifact, Mapping):
+    key = json_object(manifest.get("default_datasets")).get("national")
+    artifacts = json_object(manifest.get("artifacts"))
+    if not isinstance(key, str) or not isinstance(artifacts.get(key), Mapping):
         raise ReleaseRefusedError("error", "national_artifact_missing")
+    artifact = json_object(artifacts[key])
     if artifact.get("kind", "microdata") != "microdata":
         raise ReleaseRefusedError("error", "national_artifact_not_microdata")
     path, sha256 = artifact.get("path"), artifact.get("sha256")
@@ -139,13 +148,11 @@ def national_artifact(manifest: Mapping[str, Any], release_directory: str) -> Na
     return NationalArtifact(key=key, path=in_repo, sha256=str(sha256))
 
 
-def compatibility(manifest: Mapping[str, Any], package: str, version: str) -> str:
+def compatibility(manifest: Mapping[str, Any], package: str, version: str) -> Compatibility:
     """Whether the reference model is inside the release's declared range."""
-    declared = [
-        entry
-        for entry in manifest.get("compatible_model_packages") or []
-        if isinstance(entry, Mapping) and entry.get("name") == package
-    ]
+    # An entry that is not an object names no package, so it is never declared.
+    entries = [json_object(entry) for entry in json_list(manifest.get("compatible_model_packages"))]
+    declared = [entry for entry in entries if entry.get("name") == package]
     if not declared:
         return "undeclared"
     try:
@@ -155,12 +162,13 @@ def compatibility(manifest: Mapping[str, Any], package: str, version: str) -> st
     return "inside" if inside else "outside"
 
 
-def build_provenance(build_manifest: Mapping[str, Any] | None) -> dict[str, Any] | None:
+def build_provenance(build_manifest: Mapping[str, Any] | None) -> BuildProvenance | None:
     """The build facts a later "why did it move" tool joins on; pointers, not copies."""
     if not build_manifest:
         return None
-    calibration = build_manifest.get("calibration") or {}
-    code = build_manifest.get("code") or {}
+    calibration = json_object(build_manifest.get("calibration"))
+    code = json_object(build_manifest.get("code"))
+    target_surface = json_object(calibration.get("target_surface"))
     # A build folder's build manifest names its build in "build"; a tagged one has "attempt_id".
     build_name = build_manifest.get("build")
     return {
@@ -168,12 +176,35 @@ def build_provenance(build_manifest: Mapping[str, Any] | None) -> dict[str, Any]
         "code_commit": code.get("git_commit"),
         "attempt_id": build_manifest.get("attempt_id")
         or (build_name if isinstance(build_name, str) else None),
-        "target_surface_sha256": (calibration.get("target_surface") or {}).get("sha256"),
-        "n_targets": (calibration.get("target_surface") or {}).get("n_targets"),
-        "target_registry_version": (calibration.get("target_registry") or {}).get("version"),
+        "target_surface_sha256": target_surface.get("sha256"),
+        "n_targets": target_surface.get("n_targets"),
+        "target_registry_version": json_object(calibration.get("target_registry")).get("version"),
         "household_weight_year": calibration.get("household_weight_year"),
         "runtime": build_manifest.get("runtime"),
     }
+
+
+class ReleaseSource(Protocol):
+    """Where a release's files are read from: the Hub at one commit (`HubClient`), or a build
+    folder on disk before it is published (`LocalBuildFolder`, which has no commit)."""
+
+    def resolve_revision(self, repo: str, revision: str) -> str | None: ...
+
+    def file_size(self, repo: str, commit: str | None, path: str) -> int | None: ...
+
+    def download(self, repo: str, commit: str | None, path: str, directory: Path) -> Path: ...
+
+    def read_json(
+        self, repo: str, commit: str | None, path: str, directory: Path
+    ) -> tuple[Any, str]: ...
+
+
+def _at_commit(commit: str | None) -> str:
+    """A Hub read is always at a resolved commit: without one, the Hub would read the
+    branch's moving head."""
+    if commit is None:
+        raise ValueError("A Hub read needs a resolved commit.")
+    return commit
 
 
 class HubClient:
@@ -182,7 +213,7 @@ class HubClient:
     def __init__(self, token: str | None = None) -> None:
         self.token = token or os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
 
-    def _call(self, function, *args, **kwargs):
+    def _call[**P, R](self, function: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
         for attempt in range(TRANSIENT_TRIES):
             try:
                 return function(*args, **kwargs)
@@ -207,14 +238,14 @@ class HubClient:
         )
         return str(info.sha)
 
-    def file_size(self, repo: str, commit: str, path: str) -> int | None:
+    def file_size(self, repo: str, commit: str | None, path: str) -> int | None:
         from huggingface_hub import HfApi
 
         infos = self._call(
             HfApi(token=self.token).get_paths_info,
             repo,
             [path],
-            revision=commit,
+            revision=_at_commit(commit),
             repo_type="dataset",
         )
         for info in infos:
@@ -223,22 +254,26 @@ class HubClient:
                 return int(size)
         return None
 
-    def download(self, repo: str, commit: str, path: str, directory: Path) -> Path:
-        from huggingface_hub import hf_hub_download
+    def download(self, repo: str, commit: str | None, path: str, directory: Path) -> Path:
+        # Its `user_agent: Dict` parameter has no type arguments; it returns the local path.
+        from huggingface_hub import hf_hub_download  # pyright: ignore[reportUnknownVariableType]
 
+        fetch = cast(Callable[..., str], hf_hub_download)
         return Path(
             self._call(
-                hf_hub_download,
+                fetch,
                 repo_id=repo,
                 filename=path,
-                revision=commit,
+                revision=_at_commit(commit),
                 repo_type="dataset",
                 token=self.token,
                 local_dir=str(directory),
             )
         )
 
-    def read_json(self, repo: str, commit: str, path: str, directory: Path) -> tuple[Any, str]:
+    def read_json(
+        self, repo: str, commit: str | None, path: str, directory: Path
+    ) -> tuple[Any, str]:
         local = self.download(repo, commit, path, directory)
         data = local.read_bytes()
         return json.loads(data), file_sha256(local)
@@ -308,7 +343,7 @@ class OpenedRelease:
     size_bytes: int | None
 
 
-def open_release(hub: HubClient, point: Point, workdir: Path) -> OpenedRelease:
+def open_release(hub: ReleaseSource, point: Point, workdir: Path) -> OpenedRelease:
     folder = f"releases/{point.release_directory}"
     manifest_path = f"{folder}/release_manifest.json"
     try:
@@ -339,7 +374,7 @@ def open_release(hub: HubClient, point: Point, workdir: Path) -> OpenedRelease:
     )
 
 
-def download_verified(hub: HubClient, opened: OpenedRelease, workdir: Path) -> Path:
+def download_verified(hub: ReleaseSource, opened: OpenedRelease, workdir: Path) -> Path:
     """Download the national H5 at the pinned commit; refuse it on a sha256 mismatch."""
     local = hub.download(
         opened.point.hf_repo, opened.point.hf_commit, opened.artifact.path, workdir
@@ -351,7 +386,7 @@ def download_verified(hub: HubClient, opened: OpenedRelease, workdir: Path) -> P
     return local
 
 
-def point_provenance(opened: OpenedRelease, model_package: str, model_version: str) -> dict:
+def point_provenance(opened: OpenedRelease, model_package: str, model_version: str) -> Provenance:
     """What a point records about its file: the file itself, and where it was fetched from.
 
     Only facts that cannot change after the measurement. `file` is the file alone (its
@@ -367,9 +402,12 @@ def point_provenance(opened: OpenedRelease, model_package: str, model_version: s
     # release (microcosm#1534, #1537) names its build there as a string, keeps the facts at the
     # top level, and records the tag it was moved from, if any, in "migrated_from".
     named = manifest.get("build")
-    build = named if isinstance(named, Mapping) else {}
-    migrated = manifest.get("migrated_from")
-    migrated = dict(migrated) if isinstance(migrated, Mapping) else None
+    build = json_object(named)
+    migrated = (
+        dict(json_object(manifest["migrated_from"]))
+        if isinstance(manifest.get("migrated_from"), Mapping)
+        else None
+    )
     return {
         "fetched_from": {
             "build_id": opened.point.build_id,
@@ -382,13 +420,13 @@ def point_provenance(opened: OpenedRelease, model_package: str, model_version: s
             },
             "build_manifest": (
                 {"path": opened.build_manifest_path, "sha256": opened.build_manifest_sha256}
-                if opened.build_manifest_path
+                if opened.build_manifest_path and opened.build_manifest_sha256
                 else None
             ),
             "dataset": {"key": opened.artifact.key, "path": opened.artifact.path},
             "declared": {
                 "build": build.get("build_id") or (named if isinstance(named, str) else None),
-                "cut_tag": build.get("cut_tag") or (migrated or {}).get("tag"),
+                "cut_tag": build.get("cut_tag") or (migrated.get("tag") if migrated else None),
                 "migrated_from": migrated,
                 "built_at": build.get("built_at") or manifest.get("built_at"),
                 "built_with_model": build.get("built_with_model_package")

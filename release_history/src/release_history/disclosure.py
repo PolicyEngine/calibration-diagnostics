@@ -21,8 +21,11 @@ What is stored is a status and a reason per cell, never a support count.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Literal
 
 import numpy as np
+
+from release_history.documents import CellDocument, CellUnit
 
 SMALL_CELL = "small_cell"
 COMPLEMENTARY = "complementary"
@@ -35,28 +38,27 @@ class Cell:
 
     output: str
     period: int
-    unit: str
+    unit: CellUnit
     value: float | None
-    status: str = "ok"
+    status: Literal["ok", "withheld"] = "ok"
     reason: str | None = None
-    supports: list[np.ndarray] = field(default_factory=list, repr=False)
+    supports: list[np.ndarray] = field(default_factory=list[np.ndarray], repr=False)
 
     def withhold(self, reason: str) -> None:
         self.status = "withheld"
         self.reason = reason
         self.value = None
 
-    def to_json(self) -> dict:
-        out: dict = {
+    def document(self) -> CellDocument:
+        """The cell as a point stores it: every key present, a null reason when it has none."""
+        return {
             "output": self.output,
             "period": self.period,
             "unit": self.unit,
             "value": self.value,
             "status": self.status,
+            "reason": self.reason,
         }
-        if self.reason is not None:
-            out["reason"] = self.reason
-        return out
 
 
 @dataclass
@@ -66,7 +68,7 @@ class Table:
     period: int
     total: str | None
     parts: list[str]
-    hidden: list[np.ndarray] = field(default_factory=list, repr=False)
+    hidden: list[np.ndarray] = field(default_factory=list[np.ndarray], repr=False)
     reason: str = COMPLEMENTARY
 
 

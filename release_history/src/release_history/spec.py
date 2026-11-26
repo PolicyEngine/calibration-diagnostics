@@ -33,12 +33,13 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
 from release_history import SPEC_FORMAT_VERSION
 from release_history.canonical import json_sha256
+from release_history.documents import CellUnit, DisclosurePolicy, RunnerLimits
 
 OUTPUT_LEVELS = ("targets", "budget", "distribution", "poverty")
 STATS = ("sum", "count", "mean", "population")
@@ -65,14 +66,19 @@ def measurement_definition(raw: Mapping[str, Any]) -> dict[str, Any]:
     """The part of a spec that decides the numbers; the panel id hashes this."""
     definition = {key: value for key, value in raw.items() if key not in _UNHASHED_KEYS}
     for section in ("baseline", "reforms"):
-        if isinstance(definition.get(section), list):
+        items: object = definition.get(section)
+        if isinstance(items, list):
             definition[section] = [
-                {key: value for key, value in item.items() if key not in _DISPLAY_KEYS}
-                if isinstance(item, Mapping)
-                else item
-                for item in definition[section]
+                _without_display_keys(item) for item in cast(list[object], items)
             ]
     return definition
+
+
+def _without_display_keys(item: object) -> object:
+    if not isinstance(item, Mapping):
+        return item
+    entry = cast(Mapping[str, Any], item)
+    return {key: value for key, value in entry.items() if key not in _DISPLAY_KEYS}
 
 
 class SpecError(ValueError):
@@ -85,7 +91,7 @@ class BaselineItem:
     variables: tuple[str, ...]
     stat: str
     kind: str
-    unit: str
+    unit: CellUnit
     entity: str | None = None
     where: str | None = None
     by: str | None = None
@@ -155,7 +161,7 @@ class Spec:
     baseline: tuple[BaselineItem, ...]
     reforms: tuple[ReformSpec, ...]
     outputs: tuple[str, ...]
-    disclosure_policy: str
+    disclosure_policy: DisclosurePolicy
     min_source_households: int
     source_id_columns: tuple[str, ...]
     max_dataset_bytes: int | None
@@ -172,7 +178,7 @@ class Spec:
             return f"{period}-{(period + 1) % 100:02d}"
         return str(period)
 
-    def runner_limits(self) -> dict[str, Any]:
+    def runner_limits(self) -> RunnerLimits:
         """The limits a point runs under, recorded on the point (`runtime.limits`)."""
         return {
             "seconds": self.max_seconds,
@@ -210,39 +216,57 @@ def _require(mapping: Mapping[str, Any], key: str, where: str) -> Any:
     return mapping[key]
 
 
-def _identifier(value: Any, where: str) -> str:
+def _mapping(value: object, error: str) -> Mapping[str, Any]:
+    """A part of the spec that must be a mapping, typed as one."""
+    if not isinstance(value, Mapping):
+        raise SpecError(error)
+    return cast(Mapping[str, Any], value)
+
+
+def _section(raw: Mapping[str, Any], key: str, where: str) -> Mapping[str, Any]:
+    """An optional mapping in the spec: empty when absent or empty."""
+    value = raw.get(key)
+    if not value:
+        return {}
+    return _mapping(value, f"{where}: must be a mapping.")
+
+
+def _identifier(value: object, where: str) -> str:
     if not isinstance(value, str) or not _IDENTIFIER.match(value):
         raise SpecError(f"{where}: '{value}' must be a lower-case identifier.")
     return value
 
 
-def _names(value: Any, where: str) -> tuple[str, ...]:
+def _names(value: object, where: str) -> tuple[str, ...]:
+    """A name or a list of names, as a tuple; absent is none."""
     if value is None:
         return ()
-    if isinstance(value, str):
-        value = [value]
-    if not isinstance(value, list) or not all(isinstance(name, str) and name for name in value):
+    items = [value] if isinstance(value, str) else value
+    if not isinstance(items, list):
         raise SpecError(f"{where}: must be a name or a list of names.")
-    return tuple(value)
+    names: list[str] = []
+    for name in cast(list[object], items):
+        if not isinstance(name, str) or not name:
+            raise SpecError(f"{where}: must be a name or a list of names.")
+        names.append(name)
+    return tuple(names)
 
 
-def _numbers(value: Any, where: str) -> dict[str, float]:
+def _numbers(value: object, where: str) -> dict[str, float]:
     if value is None:
         return {}
-    if not isinstance(value, Mapping):
-        raise SpecError(f"{where}: must map parameter paths to numbers.")
-    out = {}
-    for path, number in value.items():
+    numbers = _mapping(value, f"{where}: must map parameter paths to numbers.")
+    out: dict[str, float] = {}
+    for path, number in numbers.items():
         if isinstance(number, bool) or not isinstance(number, int | float):
             raise SpecError(f"{where}: '{path}' must be a number.")
         out[str(path)] = float(number)
     return out
 
 
-def _baseline_item(raw: Any, index: int) -> BaselineItem:
+def _baseline_item(value: object, index: int) -> BaselineItem:
     where = f"baseline[{index}]"
-    if not isinstance(raw, Mapping):
-        raise SpecError(f"{where}: must be a mapping.")
+    raw = _mapping(value, f"{where}: must be a mapping.")
     item_id = _identifier(_require(raw, "id", where), f"{where}.id")
     variables = _names(raw.get("variables", raw.get("variable")), f"{where}.variable")
     stat = _require(raw, "stat", where)
@@ -274,16 +298,17 @@ def _baseline_item(raw: Any, index: int) -> BaselineItem:
     )
 
 
-def _reform(raw: Any, index: int, default_outputs: tuple[str, ...]) -> ReformSpec:
+def _reform(value: object, index: int, default_outputs: tuple[str, ...]) -> ReformSpec:
     where = f"reforms[{index}]"
-    if not isinstance(raw, Mapping):
-        raise SpecError(f"{where}: must be a mapping.")
+    raw = _mapping(value, f"{where}: must be a mapping.")
     reform_id = _identifier(_require(raw, "id", where), f"{where}.id")
     add = _numbers(raw.get("add"), f"{where}.add")
     scale = _numbers(raw.get("scale"), f"{where}.scale")
-    parameters = raw.get("parameters") or {}
-    if not isinstance(parameters, Mapping):
-        raise SpecError(f"{where}.parameters: must map parameter paths to values.")
+    parameters: Mapping[str, Any] = (
+        _mapping(raw["parameters"], f"{where}.parameters: must map parameter paths to values.")
+        if raw.get("parameters")
+        else {}
+    )
     if not (add or scale or parameters):
         raise SpecError(f"{where}: needs at least one of 'add', 'scale' or 'parameters'.")
     paths = [*add, *scale, *parameters]
@@ -308,22 +333,23 @@ def _reform(raw: Any, index: int, default_outputs: tuple[str, ...]) -> ReformSpe
     )
 
 
-def jsonable(value: Any) -> Any:
+def jsonable(value: object) -> Any:
     """YAML dates (an unquoted 2026-01-01) become ISO strings; tuples become lists."""
     if isinstance(value, Mapping):
-        return {str(jsonable(key)): jsonable(item) for key, item in value.items()}
+        mapping = cast(Mapping[object, object], value)
+        return {str(jsonable(key)): jsonable(item) for key, item in mapping.items()}
     if isinstance(value, list | tuple):
-        return [jsonable(item) for item in value]
-    if hasattr(value, "isoformat") and not isinstance(value, str):
-        return value.isoformat()
+        return [jsonable(item) for item in cast(list[object] | tuple[object, ...], value)]
+    isoformat = getattr(value, "isoformat", None)
+    if callable(isoformat) and not isinstance(value, str):
+        return isoformat()
     return value
 
 
-def parse_spec(raw: Mapping[str, Any], *, expected_country: str | None = None) -> Spec:
+def parse_spec(document: object, *, expected_country: str | None = None) -> Spec:
     """Validate a spec document and return it parsed. Raises SpecError."""
-    if not isinstance(raw, Mapping):
-        raise SpecError("The spec must be a mapping.")
-    raw = jsonable(raw)
+    _mapping(document, "The spec must be a mapping.")
+    raw: dict[str, Any] = jsonable(document)
     if raw.get("schema_version") != SPEC_FORMAT_VERSION:
         raise SpecError(f"schema_version must be {SPEC_FORMAT_VERSION}.")
     country = _identifier(_require(raw, "country", "spec"), "spec.country")
@@ -335,10 +361,10 @@ def parse_spec(raw: Mapping[str, Any], *, expected_country: str | None = None) -
             "schedule: weekly top-ups are switched on per country by the repository variable "
             "RELEASE_HISTORY_WEEKLY, not by the spec; remove the key."
         )
-    engine = _require(raw, "engine", "spec")
+    engine = _mapping(_require(raw, "engine", "spec"), "engine: must be a mapping.")
     periods, period_label = _periods(raw)
-    variables = raw.get("variables") or {}
-    budget = variables.get("budget") or {}
+    variables = _section(raw, "variables", "variables")
+    budget = _section(variables, "budget", "variables.budget")
     groups = _groups(variables)
     outputs = _output_levels(raw)
     baseline = tuple(
@@ -358,19 +384,21 @@ def parse_spec(raw: Mapping[str, Any], *, expected_country: str | None = None) -
         series_since=since,
         engine_module=_identifier(_require(engine, "module", "engine"), "engine.module"),
         model_package=str(_require(engine, "model_package", "engine")),
-        simulation_options=dict(engine.get("simulation_options") or {}),
+        simulation_options=dict(
+            _section(engine, "simulation_options", "engine.simulation_options")
+        ),
         periods=periods,
         period_label=period_label,
         currency=str(_require(raw, "currency", "spec")),
         household_entity=str(raw.get("household_entity", "household")),
-        weights=dict(raw.get("weights") or {}),
+        weights=dict(_section(raw, "weights", "weights")),
         household_net_income=variables.get("household_net_income"),
         budget_plus=_names(budget.get("plus"), "variables.budget.plus"),
         budget_minus=_names(budget.get("minus"), "variables.budget.minus"),
         income_decile=variables.get("income_decile"),
-        poverty=dict(variables.get("poverty") or {}),
+        poverty=dict(_section(variables, "poverty", "variables.poverty")),
         groups=groups,
-        behaviour=dict(variables.get("behaviour") or {}),
+        behaviour=dict(_section(variables, "behaviour", "variables.behaviour")),
         baseline=baseline,
         reforms=reforms,
         outputs=outputs,
@@ -387,7 +415,7 @@ def parse_spec(raw: Mapping[str, Any], *, expected_country: str | None = None) -
 def _series_rule(raw: Mapping[str, Any]) -> tuple[tuple[str, ...], str | None]:
     """The series' release lines, named as releases.json names them, and the date from which
     their builds count, if one is set."""
-    series = raw.get("series") or {}
+    series = _section(raw, "series", "series")
     releases = _names(series.get("releases"), "series.releases")
     if not releases:
         raise SpecError("series.releases must name at least one release line.")
@@ -408,25 +436,28 @@ def _series_rule(raw: Mapping[str, Any]) -> tuple[tuple[str, ...], str | None]:
 
 def _periods(raw: Mapping[str, Any]) -> tuple[tuple[int, ...], str]:
     """The years measured, and how the page labels them."""
-    periods = raw.get("periods")
-    if (
-        not isinstance(periods, list)
-        or not periods
-        or not all(isinstance(period, int) and not isinstance(period, bool) for period in periods)
-    ):
+    periods: object = raw.get("periods")
+    if not isinstance(periods, list) or not periods:
         raise SpecError("periods must be a non-empty list of years.")
+    years: list[int] = []
+    for period in cast(list[object], periods):
+        if not isinstance(period, int) or isinstance(period, bool):
+            raise SpecError("periods must be a non-empty list of years.")
+        years.append(period)
     period_label = raw.get("period_label", "calendar_year")
     if period_label not in PERIOD_LABELS:
         raise SpecError(f"period_label '{period_label}' must be one of {PERIOD_LABELS}.")
-    return tuple(periods), period_label
+    return tuple(years), period_label
 
 
 def _groups(variables: Mapping[str, Any]) -> dict[str, str | None]:
     """The poverty groups by name: `all` (no variable) and any group a person flag defines."""
-    groups = variables.get("groups") or {"all": None}
+    groups: dict[str, str | None] = dict(_section(variables, "groups", "variables.groups")) or {
+        "all": None
+    }
     if "all" not in groups or groups["all"] is not None:
         raise SpecError("variables.groups must include 'all: null'.")
-    return dict(groups)
+    return groups
 
 
 def _output_levels(raw: Mapping[str, Any]) -> tuple[str, ...]:
@@ -451,7 +482,9 @@ def _check_items(
         if len(ids) != len(set(ids)):
             raise SpecError(f"Duplicate {kind} ids.")
     used_levels = {level for reform in reforms for level in reform.outputs}
-    if "budget" in used_levels and not (variables.get("budget") or {}).get("plus"):
+    if "budget" in used_levels and not _section(variables, "budget", "variables.budget").get(
+        "plus"
+    ):
         raise SpecError("The 'budget' output level needs variables.budget.plus.")
     if "distribution" in used_levels and not (
         variables.get("household_net_income") and variables.get("income_decile")
@@ -466,10 +499,10 @@ def _check_items(
         raise SpecError("A baseline item 'by: income_decile' needs variables.income_decile.")
 
 
-def _disclosure(raw: Mapping[str, Any]) -> tuple[str, int, tuple[str, ...]]:
+def _disclosure(raw: Mapping[str, Any]) -> tuple[DisclosurePolicy, int, tuple[str, ...]]:
     """The disclosure policy, its floor of source households (raised, never lowered), and
     the columns that hold each household's source id."""
-    disclosure = raw.get("disclosure") or {"policy": "none"}
+    disclosure = _section(raw, "disclosure", "disclosure") or {"policy": "none"}
     policy = disclosure.get("policy", "none")
     if policy not in DISCLOSURE_POLICIES:
         raise SpecError(f"disclosure.policy '{policy}' must be one of {DISCLOSURE_POLICIES}.")
@@ -487,7 +520,7 @@ def _disclosure(raw: Mapping[str, Any]) -> tuple[str, int, tuple[str, ...]]:
 
 def _runner_limits(raw: Mapping[str, Any]) -> dict[str, int | None]:
     """The runner block's limits: each a positive whole number, or absent."""
-    runner = raw.get("runner") or {}
+    runner = _section(raw, "runner", "runner")
     limits = {
         key: runner.get(key) for key in ("max_dataset_bytes", "max_seconds", "max_memory_bytes")
     }

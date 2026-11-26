@@ -17,15 +17,36 @@ these documents to finalize a run and build each panel's timeline.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Final, Literal, TypedDict
+
+import numpy as np
 
 from release_history import POINT_FORMAT_VERSION, PRODUCER_VERSION
 from release_history.canonical import json_sha256
 from release_history.disclosure import apply_policy
+from release_history.documents import (
+    EngineBundle,
+    Environment,
+    LimitName,
+    NearLimit,
+    PointDocument,
+    Provenance,
+    Runtime,
+    SimulationRecord,
+)
 from release_history.measure import Measurement
 from release_history.spec import Spec
 
-KIND = "release_history.measurement"
+KIND: Final = "release_history.measurement"
+
+
+class RunFacts(TypedDict):
+    """When and where a `measure` run ran, as the command records it."""
+
+    started_at: str
+    finished_at: str
+    seconds: float
+    runner: str
 
 
 def measurement_id(panel_id: str, h5_sha256: str) -> str:
@@ -37,20 +58,21 @@ def _point(
     *,
     spec: Spec,
     panel_id: str,
-    h5_sha256: str,
-    status: str,
+    status: Literal["ok", "partial", "refused"],
     reason: str | None,
-    provenance: dict[str, Any],
-    env: dict[str, Any],
+    provenance: Provenance,
+    env: Environment,
     producer_commit: str | None,
-    runtime: dict[str, Any],
-) -> dict[str, Any]:
+    runtime: RunFacts,
+    simulations: list[SimulationRecord],
+) -> PointDocument:
+    """A point with nothing measured in it yet: all a stored refusal holds."""
     return {
         "format_version": POINT_FORMAT_VERSION,
         "kind": KIND,
         "country": spec.country,
         "panel_id": panel_id,
-        "measurement_id": measurement_id(panel_id, h5_sha256),
+        "measurement_id": measurement_id(panel_id, provenance["file"]["sha256"]),
         "status": status,
         "reason": reason,
         "fetched_from": provenance["fetched_from"],
@@ -70,85 +92,68 @@ def _point(
         "engine_bundle": None,
         "environment": env,
         "producer": {"version": PRODUCER_VERSION, "commit": producer_commit},
-        "runtime": _runtime(spec, runtime, provenance["file"]["bytes"]),
+        "runtime": _runtime(spec, runtime, simulations, provenance["file"]["bytes"]),
     }
 
 
-def _runtime(spec: Spec, runtime: dict[str, Any], file_bytes: int | None) -> dict[str, Any]:
+def _runtime(
+    spec: Spec, run: RunFacts, simulations: list[SimulationRecord], file_bytes: int | None
+) -> Runtime:
     """The run's facts, the limits it ran under, and the limits it came near."""
-    facts = {
-        "started_at": runtime.get("started_at"),
-        "finished_at": runtime.get("finished_at"),
-        "seconds": runtime.get("seconds"),
-        "runner": runtime.get("runner"),
-        "simulations": runtime.get("simulations") or [],
-        # The limits it ran under, so a reader can tell how close it came to them.
-        "limits": spec.runner_limits(),
+    # The limits it ran under, so a reader can tell how close it came to them.
+    limits = spec.runner_limits()
+    peak = max((simulation["peak_rss_bytes"] for simulation in simulations), default=0)
+    used: list[tuple[LimitName, float | None, int | None]] = [
+        ("dataset", file_bytes, limits["dataset_bytes"]),
+        ("memory", peak or None, limits["memory_bytes"]),
+        ("seconds", run["seconds"], limits["seconds"]),
+    ]
+    return {
+        "started_at": run["started_at"],
+        "finished_at": run["finished_at"],
+        "seconds": run["seconds"],
+        "runner": run["runner"],
+        "simulations": simulations,
+        "limits": limits,
+        "near_limits": near_limits(used, limits["warn_at"]),
     }
-    facts["near_limits"] = near_limits(facts, file_bytes)
-    return facts
 
 
-def runner_usage(runtime: dict[str, Any], file_bytes: int | None) -> dict[str, float]:
-    """The share of each runner limit a run used: its seconds, peak memory and file size."""
-    limits = runtime["limits"]
-    peak = max((simulation["peak_rss_bytes"] for simulation in runtime["simulations"]), default=0)
-    used = {
-        "seconds": (runtime["seconds"], limits["seconds"]),
-        "memory": (peak or None, limits["memory_bytes"]),
-        "dataset": (file_bytes, limits["dataset_bytes"]),
-    }
-    return {name: value / limit for name, (value, limit) in used.items() if value and limit}
-
-
-def near_limits(runtime: dict[str, Any], file_bytes: int | None) -> list[dict[str, Any]]:
-    """The limits a run came within 20% of (its `warn_at`), with the share it used.
+def near_limits(
+    used: list[tuple[LimitName, float | None, int | None]], warn_at: float
+) -> list[NearLimit]:
+    """The limits a run came within 20% of (a share of at least `warn_at`), by name, with the
+    share it used: its seconds, its largest simulation's peak memory, its file's size.
 
     Computed here once and stored in the point as `runtime.near_limits`; the
     TypeScript finalize reads it from there for the manifest and the run summary.
     """
-    warn_at = runtime["limits"]["warn_at"]
     return [
-        {"limit": name, "share": round(share, 3)}
-        for name, share in sorted(runner_usage(runtime, file_bytes).items())
-        if share >= warn_at
+        {"limit": name, "share": round(value / limit, 3)}
+        for name, value, limit in sorted(used, key=lambda entry: entry[0])
+        if value and limit and value / limit >= warn_at
     ]
 
 
-def _error(record: dict[str, Any] | None) -> dict[str, Any] | None:
-    if record is None:
-        return None
-    return {key: record.get(key) for key in ("stage", "class", "name", "where")}
-
-
-def _reform(record: dict[str, Any]) -> dict[str, Any]:
-    """A reform's status, with every key present: `applied` is null for a reform whose
-    definition failed, `error` is null for one that ran."""
+def _bundle(bundle: dict[str, Any]) -> EngineBundle:
     return {
-        "status": record["status"],
-        "definition_sha256": record.get("definition_sha256"),
-        "applied": record.get("applied"),
-        "error": _error(record.get("error")),
+        "bundle_id": bundle.get("bundle_id"),
+        "capital_gains_responses": bundle.get("capital_gains_responses"),
     }
-
-
-def _bundle(bundle: dict[str, Any] | None) -> dict[str, Any]:
-    bundle = bundle or {}
-    return {key: bundle.get(key) for key in ("bundle_id", "capital_gains_responses")}
 
 
 def measured_point(
     *,
     spec: Spec,
     panel_id: str,
-    provenance: dict[str, Any],
+    provenance: Provenance,
     result: Measurement,
-    source_ids: Any,
+    source_ids: np.ndarray | None,
     columns: list[str],
-    env: dict[str, Any],
+    env: Environment,
     producer_commit: str | None,
-    runtime: dict[str, Any],
-) -> tuple[dict[str, Any], int]:
+    runtime: RunFacts,
+) -> tuple[PointDocument, int]:
     """The spec's disclosure policy, then the stored document, with the number of cells
     withheld: what `release-history measure` writes for a measured file, and what the
     fixtures are made with."""
@@ -177,67 +182,65 @@ def measurement_document(
     *,
     spec: Spec,
     panel_id: str,
-    provenance: dict[str, Any],
+    provenance: Provenance,
     result: Measurement,
     columns: list[str],
     withheld: int,
-    env: dict[str, Any],
+    env: Environment,
     producer_commit: str | None,
-    runtime: dict[str, Any],
-) -> dict[str, Any]:
+    runtime: RunFacts,
+) -> PointDocument:
     """A measured file: `ok`, or `partial` when a reform failed on the last attempt."""
     known = set(result.model_variables)
-    document = _point(
+    point = _point(
         spec=spec,
         panel_id=panel_id,
-        h5_sha256=provenance["file"]["sha256"],
         status=result.status,
         reason=None,
         provenance=provenance,
         env=env,
         producer_commit=producer_commit,
-        runtime={**runtime, "simulations": result.simulations},
+        runtime=runtime,
+        simulations=result.simulations,
     )
-    document.update(
-        {
-            "data": {
-                "columns_sha256": json_sha256(columns),
-                "column_count": len(columns),
-                "unknown_columns": sorted(
-                    column for column in columns if known and column not in known
-                ),
-                "warnings": sorted(result.warnings),
-            },
-            "baseline": {"status": result.baseline_status["status"]},
-            "reforms": {reform_id: _reform(record) for reform_id, record in result.reforms.items()},
-            # Every key always present: a cell with no reason holds a null one.
-            "cells": [{"reason": None, **cell.to_json()} for cell in result.cells],
-            "engine_bundle": _bundle(result.engine_bundle),
-        }
-    )
-    document["disclosure"]["withheld_cells"] = withheld
-    return document
+    return {
+        **point,
+        "data": {
+            "columns_sha256": json_sha256(columns),
+            "column_count": len(columns),
+            "unknown_columns": sorted(
+                column for column in columns if known and column not in known
+            ),
+            "warnings": sorted(result.warnings),
+        },
+        # A failed baseline raises before any point is written, so a measured point's ran.
+        "baseline": {"status": "ok"},
+        "reforms": dict(result.reforms),
+        "cells": [cell.document() for cell in result.cells],
+        "disclosure": {**point["disclosure"], "withheld_cells": withheld},
+        "engine_bundle": _bundle(result.engine_bundle),
+    }
 
 
 def refused_document(
     *,
     spec: Spec,
     panel_id: str,
-    provenance: dict[str, Any],
+    provenance: Provenance,
     reason: str,
-    env: dict[str, Any],
+    env: Environment,
     producer_commit: str | None,
-    runtime: dict[str, Any],
-) -> dict[str, Any]:
+    runtime: RunFacts,
+) -> PointDocument:
     """A refusal the file itself causes (its source ids): stored, so it shows as a gap."""
     return _point(
         spec=spec,
         panel_id=panel_id,
-        h5_sha256=provenance["file"]["sha256"],
         status="refused",
         reason=reason,
         provenance=provenance,
         env=env,
         producer_commit=producer_commit,
         runtime=runtime,
+        simulations=[],
     )
