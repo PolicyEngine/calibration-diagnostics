@@ -131,7 +131,7 @@
       "values": [
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-1",
-          "value": 29723626.374524675,
+          "value": 37269506.55259678,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -141,7 +141,7 @@
         },
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-2",
-          "value": 29723626.374524675,
+          "value": 37269506.55259678,
           "status": "ok",
           "comparedWith": "microcosm-us-2024-national/synthetic-build-1",
           "change": 0,
@@ -151,11 +151,11 @@
         },
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-3",
-          "value": 39550396.17676331,
+          "value": 34048247.36564674,
           "status": "ok",
           "comparedWith": "microcosm-us-2024-national/synthetic-build-2",
-          "change": 9826769.802238636,
-          "relativeChange": 0.33060467381802705,
+          "change": -3221259.1869500354,
+          "relativeChange": -0.08643149547483323,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -195,7 +195,7 @@
       "values": [
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-1",
-          "value": 6097.11198624267,
+          "value": 6097.111986242669,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -205,7 +205,7 @@
         },
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-2",
-          "value": 6097.11198624267,
+          "value": 6097.111986242669,
           "status": "ok",
           "comparedWith": "microcosm-us-2024-national/synthetic-build-1",
           "change": 0,
@@ -215,7 +215,7 @@
         },
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-3",
-          "value": 6097.11198624267,
+          "value": 6097.111986242669,
           "status": "ok",
           "comparedWith": "microcosm-us-2024-national/synthetic-build-2",
           "change": 0,
@@ -259,7 +259,7 @@
       "values": [
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-1",
-          "value": 27116833.525199946,
+          "value": 42607723.67896426,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -269,7 +269,7 @@
         },
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-2",
-          "value": 27116833.525199946,
+          "value": 42607723.67896426,
           "status": "ok",
           "comparedWith": "microcosm-us-2024-national/synthetic-build-1",
           "change": 0,
@@ -279,11 +279,11 @@
         },
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-3",
-          "value": 31384548.967782933,
+          "value": 24300583.384143002,
           "status": "ok",
           "comparedWith": "microcosm-us-2024-national/synthetic-build-2",
-          "change": 4267715.442582987,
-          "relativeChange": 0.1573825143933917,
+          "change": -18307140.294821255,
+          "relativeChange": -0.42966717566889456,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -323,7 +323,7 @@
       "values": [
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-1",
-          "value": 44480977.81545046,
+          "value": 39689064.44294793,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -333,7 +333,7 @@
         },
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-2",
-          "value": 44480977.81545046,
+          "value": 39689064.44294793,
           "status": "ok",
           "comparedWith": "microcosm-us-2024-national/synthetic-build-1",
           "change": 0,
@@ -343,11 +343,11 @@
         },
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-3",
-          "value": 31503833.90658127,
+          "value": 33720913.783309735,
           "status": "ok",
           "comparedWith": "microcosm-us-2024-national/synthetic-build-2",
-          "change": -12977143.908869188,
-          "relativeChange": -0.29174592255392323,
+          "change": -5968150.659638196,
+          "relativeChange": -0.1503726717523732,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -387,7 +387,7 @@
       "values": [
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-1",
-          "value": 37485880.90618627,
+          "value": 32569123.83707137,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -397,7 +397,7 @@
         },
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-2",
-          "value": 37485880.90618627,
+          "value": 32569123.83707137,
           "status": "ok",
           "comparedWith": "microcosm-us-2024-national/synthetic-build-1",
           "change": 0,
@@ -407,11 +407,11 @@
         },
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-3",
-          "value": 38387765.66401107,
+          "value": 34578318.69363124,
           "status": "ok",
           "comparedWith": "microcosm-us-2024-national/synthetic-build-2",
-          "change": 901884.7578248009,
-          "relativeChange": 0.02405931876276018,
+          "change": 2009194.856559869,
+          "relativeChange": 0.0616901721584825,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -451,7 +451,7 @@
       "values": [
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-1",
-          "value": 33477128.073918976,
+          "value": 41085031.91138121,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -461,7 +461,7 @@
         },
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-2",
-          "value": 33477128.073918976,
+          "value": 41085031.91138121,
           "status": "ok",
           "comparedWith": "microcosm-us-2024-national/synthetic-build-1",
           "change": 0,
@@ -471,11 +471,11 @@
         },
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-3",
-          "value": 40270647.52357505,
+          "value": 36467785.31629569,
           "status": "ok",
           "comparedWith": "microcosm-us-2024-national/synthetic-build-2",
-          "change": 6793519.449656077,
-          "relativeChange": 0.20293017473469308,
+          "change": -4617246.595085517,
+          "relativeChange": -0.11238269462817348,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -527,7 +527,7 @@
       "values": [
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-1",
-          "value": 250754.15829877506,
+          "value": 530934.0591212822,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -537,7 +537,7 @@
         },
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-2",
-          "value": 250754.15829877506,
+          "value": 530934.0591212822,
           "status": "ok",
           "comparedWith": "microcosm-us-2024-national/synthetic-build-1",
           "change": 0,
@@ -547,11 +547,11 @@
         },
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-3",
-          "value": 273682.9829933081,
+          "value": 344486.18130757817,
           "status": "ok",
           "comparedWith": "microcosm-us-2024-national/synthetic-build-2",
-          "change": 22928.824694533047,
-          "relativeChange": 0.0914394594693549,
+          "change": -186447.87781370402,
+          "relativeChange": -0.3511695560128182,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -604,7 +604,7 @@
       "values": [
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-1",
-          "value": 108073.12828897694,
+          "value": 669112.6171205435,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -614,7 +614,7 @@
         },
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-2",
-          "value": 108073.12828897694,
+          "value": 669112.6171205435,
           "status": "ok",
           "comparedWith": "microcosm-us-2024-national/synthetic-build-1",
           "change": 0,
@@ -624,11 +624,11 @@
         },
         {
           "buildId": "microcosm-us-2024-national/synthetic-build-3",
-          "value": 221242.1203655357,
+          "value": 99493.08218755535,
           "status": "ok",
           "comparedWith": "microcosm-us-2024-national/synthetic-build-2",
-          "change": 113168.99207655876,
-          "relativeChange": 1.0471519966920546,
+          "change": -569619.5349329881,
+          "relativeChange": -0.8513059242318378,
           "changePoints": null,
           "changeStatus": "ok"
         },

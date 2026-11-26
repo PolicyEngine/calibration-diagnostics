@@ -9,7 +9,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 31384548.967782933
+      "value": 24300583.384143002
     },
     {
       "output": "baseline/eitc",
@@ -17,7 +17,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 39550396.17676331
+      "value": 34048247.36564674
     },
     {
       "output": "baseline/refundable_ctc",
@@ -25,7 +25,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 31503833.90658127
+      "value": 33720913.783309735
     },
     {
       "output": "baseline/snap",
@@ -33,7 +33,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 38387765.66401107
+      "value": 34578318.69363124
     },
     {
       "output": "baseline/ssi",
@@ -41,7 +41,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 40270647.52357505
+      "value": 36467785.31629569
     },
     {
       "output": "baseline/households",
@@ -49,7 +49,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 6097.11198624267
+      "value": 6097.111986242669
     },
     {
       "output": "reform/cbo_rates_plus_1pt/target/income_tax",
@@ -57,7 +57,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 221242.1203655357
+      "value": 99493.08218755535
     },
     {
       "output": "reform/arpa_ctc_2021/target/income_tax",
@@ -65,7 +65,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 273682.9829933081
+      "value": 344486.18130757817
     }
   ],
   "country": "us",

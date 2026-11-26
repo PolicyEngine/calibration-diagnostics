@@ -9,7 +9,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 36491435.21366916
+      "value": 26475876.1589521
     },
     {
       "output": "baseline/national_insurance",
@@ -17,7 +17,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 78546558.23496205
+      "value": 74148282.0618168
     },
     {
       "output": "baseline/vat",
@@ -25,7 +25,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 33167800.978567593
+      "value": 36486505.434602275
     },
     {
       "output": "baseline/council_tax",
@@ -33,7 +33,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 35273071.66588001
+      "value": 39930566.56026611
     },
     {
       "output": "baseline/capital_gains_tax",
@@ -41,7 +41,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 24267143.83459712
+      "value": 20818907.471257117
     },
     {
       "output": "baseline/universal_credit",
@@ -49,7 +49,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 30221661.94863717
+      "value": 28811867.748785123
     },
     {
       "output": "baseline/child_benefit",
@@ -57,7 +57,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 38332739.61189297
+      "value": 45135152.97511012
     },
     {
       "output": "baseline/state_pension",
@@ -65,7 +65,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 36520493.14350986
+      "value": 32778834.23087431
     },
     {
       "output": "baseline/pension_credit",
@@ -73,7 +73,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 34705077.73091336
+      "value": 35872299.95218776
     },
     {
       "output": "baseline/housing_benefit",
@@ -81,7 +81,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 32846756.418648433
+      "value": 37181981.92760993
     },
     {
       "output": "baseline/universal_credit_caseload",
@@ -89,7 +89,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 5655.318154755404
+      "value": 5674.2924464311345
     },
     {
       "output": "baseline/state_pension_caseload",
@@ -97,7 +97,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 11996.993317959823
+      "value": 10767.242652211016
     },
     {
       "output": "baseline/pension_credit_caseload",
@@ -105,7 +105,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 5868.382394194807
+      "value": 5191.467755554906
     },
     {
       "output": "baseline/housing_benefit_caseload",
@@ -113,7 +113,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 6419.982486540805
+      "value": 5233.143327803732
     },
     {
       "output": "baseline/households",
@@ -145,7 +145,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 35308861.1242687
+      "value": 35046974.34664936
     },
     {
       "output": "baseline/self_employment_income",
@@ -153,7 +153,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 27003064.62595065
+      "value": 46691888.715238936
     },
     {
       "output": "baseline/private_pension_income",
@@ -161,7 +161,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 36082978.811912365
+      "value": 26744847.928615592
     },
     {
       "output": "baseline/property_income",
@@ -169,7 +169,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 32112963.662608374
+      "value": 24041743.703796897
     },
     {
       "output": "baseline/savings_interest_income",
@@ -177,7 +177,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 31891533.505597994
+      "value": 37077966.502869815
     },
     {
       "output": "baseline/dividend_income",
@@ -185,7 +185,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 35681161.29117528
+      "value": 41164140.87787842
     },
     {
       "output": "baseline/household_net_income_total",
@@ -193,7 +193,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 36142831.8559088
+      "value": 34047618.80039948
     },
     {
       "output": "baseline/absolute_poverty_bhc_all",
@@ -257,7 +257,7 @@
       "reason": null,
       "status": "ok",
       "unit": "rate",
-      "value": 0.22938949284634805
+      "value": 0.22938949284634796
     },
     {
       "output": "baseline/household_net_income_mean/decile_1",
@@ -273,7 +273,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 10649.85949290196
+      "value": 3561.727209825302
     },
     {
       "output": "baseline/household_net_income_mean/decile_3",
@@ -281,7 +281,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 8067.927207955134
+      "value": 8011.404962634296
     },
     {
       "output": "baseline/household_net_income_mean/decile_4",
@@ -289,7 +289,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 6141.385601473665
+      "value": 8533.193676923613
     },
     {
       "output": "baseline/household_net_income_mean/decile_5",
@@ -297,7 +297,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 9486.28043081682
+      "value": 11816.101030602373
     },
     {
       "output": "baseline/household_net_income_mean/decile_6",
@@ -305,7 +305,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 2069.9040102653153
+      "value": 1902.2070107686877
     },
     {
       "output": "baseline/household_net_income_mean/decile_7",
@@ -313,7 +313,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 5494.178838736175
+      "value": 6218.89293023084
     },
     {
       "output": "baseline/household_net_income_mean/decile_8",
@@ -321,7 +321,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 5125.966077915549
+      "value": 8280.262253813014
     },
     {
       "output": "baseline/household_net_income_mean/decile_9",
@@ -329,7 +329,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 9263.636476087006
+      "value": 3305.836437856361
     },
     {
       "output": "baseline/household_net_income_mean/decile_10",
@@ -345,7 +345,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 403457.7443915147
+      "value": 230196.23696760467
     },
     {
       "output": "reform/basic_rate_plus_1p/budgetary_impact",
@@ -353,7 +353,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 322361.8540706495
+      "value": 362018.9498693066
     },
     {
       "output": "reform/basic_rate_plus_1p/programme/income_tax",
@@ -361,7 +361,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 403457.7443915147
+      "value": 230196.23696760467
     },
     {
       "output": "reform/basic_rate_plus_1p/programme/national_insurance",
@@ -369,7 +369,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 938227.1436571181
+      "value": 721671.3942994693
     },
     {
       "output": "reform/basic_rate_plus_1p/programme/vat",
@@ -377,7 +377,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 311626.47441020474
+      "value": 311120.05512358266
     },
     {
       "output": "reform/basic_rate_plus_1p/programme/council_tax",
@@ -385,7 +385,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 405007.178725508
+      "value": 537295.2091635218
     },
     {
       "output": "reform/basic_rate_plus_1p/programme/capital_gains_tax",
@@ -393,7 +393,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 172535.22394230895
+      "value": 381375.10822002566
     },
     {
       "output": "reform/basic_rate_plus_1p/programme/universal_credit",
@@ -401,7 +401,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 440285.0088106061
+      "value": 315829.36633605463
     },
     {
       "output": "reform/basic_rate_plus_1p/programme/child_benefit",
@@ -409,7 +409,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 489759.52069474553
+      "value": 456726.756092557
     },
     {
       "output": "reform/basic_rate_plus_1p/programme/state_pension",
@@ -417,7 +417,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 500459.0049472889
+      "value": 435478.64617131
     },
     {
       "output": "reform/basic_rate_plus_1p/programme/pension_credit",
@@ -425,7 +425,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 366769.4418548804
+      "value": 245233.30702543622
     },
     {
       "output": "reform/basic_rate_plus_1p/programme/housing_benefit",
@@ -433,7 +433,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 330414.93270931963
+      "value": 674308.3730504237
     },
     {
       "output": "reform/basic_rate_plus_1p/households_gaining",
@@ -449,7 +449,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 3747.448526244008
+      "value": 3747.4485262440076
     },
     {
       "output": "reform/basic_rate_plus_1p/households_losing",
@@ -473,7 +473,7 @@
       "reason": null,
       "status": "ok",
       "unit": "ratio",
-      "value": 1.2073595538604527
+      "value": 1.173551073784641
     },
     {
       "output": "reform/basic_rate_plus_1p/decile_relative_change/decile_1",
@@ -505,7 +505,7 @@
       "reason": null,
       "status": "ok",
       "unit": "ratio",
-      "value": 1.4900158493741278
+      "value": 3.7094900706415457
     },
     {
       "output": "reform/basic_rate_plus_1p/decile_relative_change/decile_5",
@@ -593,7 +593,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 1341.953037263614
+      "value": 1341.9530372636139
     },
     {
       "output": "reform/basic_rate_plus_1p/poverty/relative_bhc/children",
@@ -625,7 +625,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 434970.53344854753
+      "value": 270885.32470210415
     },
     {
       "output": "reform/higher_rate_plus_1p/budgetary_impact",
@@ -633,7 +633,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 370875.69610600284
+      "value": 346942.72802454047
     },
     {
       "output": "reform/higher_rate_plus_1p/programme/income_tax",
@@ -641,7 +641,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 434970.53344854753
+      "value": 270885.32470210415
     },
     {
       "output": "reform/higher_rate_plus_1p/programme/national_insurance",
@@ -649,7 +649,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 873868.1124574707
+      "value": 658510.7870676436
     },
     {
       "output": "reform/higher_rate_plus_1p/programme/vat",
@@ -657,7 +657,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 342720.2788485912
+      "value": 270413.680086585
     },
     {
       "output": "reform/higher_rate_plus_1p/programme/council_tax",
@@ -665,7 +665,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 318848.1198307793
+      "value": 583163.8741700926
     },
     {
       "output": "reform/higher_rate_plus_1p/programme/capital_gains_tax",
@@ -673,7 +673,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 316525.8147043972
+      "value": 206996.1846320869
     },
     {
       "output": "reform/higher_rate_plus_1p/programme/universal_credit",
@@ -681,7 +681,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 405751.6518291259
+      "value": 223314.4535596386
     },
     {
       "output": "reform/higher_rate_plus_1p/programme/child_benefit",
@@ -689,7 +689,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 469826.38571017724
+      "value": 410083.41977208486
     },
     {
       "output": "reform/higher_rate_plus_1p/programme/state_pension",
@@ -697,7 +697,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 565495.237486192
+      "value": 327786.7085293456
     },
     {
       "output": "reform/higher_rate_plus_1p/programme/pension_credit",
@@ -705,7 +705,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 365467.93304879934
+      "value": 362946.80069019244
     },
     {
       "output": "reform/higher_rate_plus_1p/programme/housing_benefit",
@@ -713,7 +713,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 419971.9924413647
+      "value": 675332.2599800649
     },
     {
       "output": "reform/higher_rate_plus_1p/households_gaining",
@@ -753,7 +753,7 @@
       "reason": null,
       "status": "ok",
       "unit": "ratio",
-      "value": 0.9003342708743991
+      "value": 1.3007703776110964
     },
     {
       "output": "reform/higher_rate_plus_1p/decile_relative_change/decile_1",
@@ -841,7 +841,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 980.4834627001392
+      "value": 980.4834627001394
     },
     {
       "output": "reform/higher_rate_plus_1p/poverty/absolute_bhc/children",
@@ -857,7 +857,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 356.5650715614793
+      "value": 356.56507156147933
     },
     {
       "output": "reform/higher_rate_plus_1p/poverty/absolute_ahc/children",
@@ -873,7 +873,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 1213.810904438006
+      "value": 1213.8109044380058
     },
     {
       "output": "reform/higher_rate_plus_1p/poverty/relative_bhc/children",
@@ -889,7 +889,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 617.8242857585417
+      "value": 617.8242857585416
     },
     {
       "output": "reform/higher_rate_plus_1p/poverty/relative_ahc/children",
@@ -905,7 +905,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 716306.8043894818
+      "value": 232622.7134370265
     },
     {
       "output": "reform/additional_rate_plus_1p/budgetary_impact",
@@ -913,7 +913,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 657434.9514183722
+      "value": 589534.3668941243
     },
     {
       "output": "reform/additional_rate_plus_1p/programme/income_tax",
@@ -921,7 +921,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 716306.8043894818
+      "value": 232622.7134370265
     },
     {
       "output": "reform/additional_rate_plus_1p/programme/national_insurance",
@@ -929,7 +929,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 868272.6396975175
+      "value": 1188453.248268721
     },
     {
       "output": "reform/additional_rate_plus_1p/programme/vat",
@@ -937,7 +937,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 555374.3883104719
+      "value": 309320.3249926525
     },
     {
       "output": "reform/additional_rate_plus_1p/programme/council_tax",
@@ -945,7 +945,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 340529.0520778334
+      "value": 578396.7721687694
     },
     {
       "output": "reform/additional_rate_plus_1p/programme/capital_gains_tax",
@@ -953,7 +953,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 422455.86103222216
+      "value": 123698.1310300345
     },
     {
       "output": "reform/additional_rate_plus_1p/programme/universal_credit",
@@ -961,7 +961,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 440679.32419086655
+      "value": 255671.01685999535
     },
     {
       "output": "reform/additional_rate_plus_1p/programme/child_benefit",
@@ -969,7 +969,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 556890.2410849964
+      "value": 575703.5530174406
     },
     {
       "output": "reform/additional_rate_plus_1p/programme/state_pension",
@@ -977,7 +977,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 408026.86890470365
+      "value": 377914.0954959739
     },
     {
       "output": "reform/additional_rate_plus_1p/programme/pension_credit",
@@ -985,7 +985,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 469208.24320129654
+      "value": 687793.6069200315
     },
     {
       "output": "reform/additional_rate_plus_1p/programme/housing_benefit",
@@ -993,7 +993,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 495282.14919575484
+      "value": 526250.4447100994
     },
     {
       "output": "reform/additional_rate_plus_1p/households_gaining",
@@ -1033,7 +1033,7 @@
       "reason": null,
       "status": "ok",
       "unit": "ratio",
-      "value": 1.3250007426318744
+      "value": 1.735676878644393
     },
     {
       "output": "reform/additional_rate_plus_1p/decile_relative_change/decile_1",
@@ -1041,7 +1041,7 @@
       "reason": null,
       "status": "ok",
       "unit": "ratio",
-      "value": 2.170746450023184
+      "value": 4.890767876837241
     },
     {
       "output": "reform/additional_rate_plus_1p/decile_relative_change/decile_2",
@@ -1049,7 +1049,7 @@
       "reason": null,
       "status": "ok",
       "unit": "ratio",
-      "value": 3.6717016474103548
+      "value": 2.5068631879339525
     },
     {
       "output": "reform/additional_rate_plus_1p/decile_relative_change/decile_3",
@@ -1065,7 +1065,7 @@
       "reason": null,
       "status": "ok",
       "unit": "ratio",
-      "value": 2.2340111126540614
+      "value": 3.783597304919061
     },
     {
       "output": "reform/additional_rate_plus_1p/decile_relative_change/decile_5",
@@ -1121,7 +1121,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 257.82515211164855
+      "value": 257.82515211164844
     },
     {
       "output": "reform/additional_rate_plus_1p/poverty/absolute_bhc/children",
@@ -1137,7 +1137,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 1611.941521726048
+      "value": 1611.9415217260482
     },
     {
       "output": "reform/additional_rate_plus_1p/poverty/absolute_ahc/children",
@@ -1145,7 +1145,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 533.0764760476069
+      "value": 533.076476047607
     },
     {
       "output": "reform/additional_rate_plus_1p/poverty/relative_bhc/all",
@@ -1177,7 +1177,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 420.2729505243333
+      "value": 420.27295052433317
     },
     {
       "output": "reform/personal_allowance_plus_100/target/income_tax",
@@ -1185,7 +1185,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 238262.27840797062
+      "value": 211705.25877719262
     },
     {
       "output": "reform/personal_allowance_plus_100/budgetary_impact",
@@ -1193,7 +1193,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 181643.22293449365
+      "value": 257259.70328895675
     },
     {
       "output": "reform/personal_allowance_plus_100/programme/income_tax",
@@ -1201,7 +1201,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 238262.27840797062
+      "value": 211705.25877719262
     },
     {
       "output": "reform/personal_allowance_plus_100/programme/national_insurance",
@@ -1209,7 +1209,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 471660.54117915186
+      "value": 491881.44054020045
     },
     {
       "output": "reform/personal_allowance_plus_100/programme/vat",
@@ -1217,7 +1217,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 244517.70928985107
+      "value": 202409.27903383682
     },
     {
       "output": "reform/personal_allowance_plus_100/programme/council_tax",
@@ -1225,7 +1225,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 152648.36040668268
+      "value": 282733.5519923459
     },
     {
       "output": "reform/personal_allowance_plus_100/programme/capital_gains_tax",
@@ -1233,7 +1233,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 75469.91856043888
+      "value": 86946.14788501812
     },
     {
       "output": "reform/personal_allowance_plus_100/programme/universal_credit",
@@ -1241,7 +1241,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 307066.6215644864
+      "value": 135731.4905356668
     },
     {
       "output": "reform/personal_allowance_plus_100/programme/child_benefit",
@@ -1249,7 +1249,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 346849.5769726156
+      "value": 365147.45847073256
     },
     {
       "output": "reform/personal_allowance_plus_100/programme/state_pension",
@@ -1257,7 +1257,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 192281.23265462698
+      "value": 158144.2776882337
     },
     {
       "output": "reform/personal_allowance_plus_100/programme/pension_credit",
@@ -1265,7 +1265,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 268331.70115091925
+      "value": 89873.10564551316
     },
     {
       "output": "reform/personal_allowance_plus_100/programme/housing_benefit",
@@ -1273,7 +1273,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 241551.66253149702
+      "value": 364351.3921127628
     },
     {
       "output": "reform/personal_allowance_plus_100/households_gaining",
@@ -1313,7 +1313,7 @@
       "reason": null,
       "status": "ok",
       "unit": "ratio",
-      "value": 0.4265306287070281
+      "value": 0.45226560771719915
     },
     {
       "output": "reform/personal_allowance_plus_100/decile_relative_change/decile_1",
@@ -1465,7 +1465,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 344216.2639288542
+      "value": 465280.7861236562
     },
     {
       "output": "reform/employee_nics_main_rate_plus_1pp/budgetary_impact",
@@ -1473,7 +1473,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 268359.0277736008
+      "value": 111862.07696518087
     },
     {
       "output": "reform/employee_nics_main_rate_plus_1pp/programme/income_tax",
@@ -1481,7 +1481,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 319691.44191255834
+      "value": 232229.91556749723
     },
     {
       "output": "reform/employee_nics_main_rate_plus_1pp/programme/national_insurance",
@@ -1489,7 +1489,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 544958.4095283947
+      "value": 547214.1589385429
     },
     {
       "output": "reform/employee_nics_main_rate_plus_1pp/programme/vat",
@@ -1497,7 +1497,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 176369.47982754704
+      "value": 286931.2306052426
     },
     {
       "output": "reform/employee_nics_main_rate_plus_1pp/programme/council_tax",
@@ -1505,7 +1505,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 305129.77083561296
+      "value": 248100.69092300563
     },
     {
       "output": "reform/employee_nics_main_rate_plus_1pp/programme/capital_gains_tax",
@@ -1513,7 +1513,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 243111.6692990882
+      "value": 152703.625805146
     },
     {
       "output": "reform/employee_nics_main_rate_plus_1pp/programme/universal_credit",
@@ -1521,7 +1521,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 215784.3686731781
+      "value": 308257.66560563433
     },
     {
       "output": "reform/employee_nics_main_rate_plus_1pp/programme/child_benefit",
@@ -1529,7 +1529,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 368100.3219882882
+      "value": 210365.2662020354
     },
     {
       "output": "reform/employee_nics_main_rate_plus_1pp/programme/state_pension",
@@ -1537,7 +1537,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 304162.2716409098
+      "value": 292439.0708980954
     },
     {
       "output": "reform/employee_nics_main_rate_plus_1pp/programme/pension_credit",
@@ -1545,7 +1545,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 225263.65504131638
+      "value": 333529.39207801933
     },
     {
       "output": "reform/employee_nics_main_rate_plus_1pp/programme/housing_benefit",
@@ -1553,7 +1553,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 329796.71962211066
+      "value": 279105.515824109
     },
     {
       "output": "reform/employee_nics_main_rate_plus_1pp/households_gaining",
@@ -1593,7 +1593,7 @@
       "reason": null,
       "status": "ok",
       "unit": "ratio",
-      "value": 0.7311188615288882
+      "value": 0.6849598287368461
     },
     {
       "output": "reform/employee_nics_main_rate_plus_1pp/decile_relative_change/decile_1",
@@ -1625,7 +1625,7 @@
       "reason": null,
       "status": "ok",
       "unit": "ratio",
-      "value": 3.2244834043530974
+      "value": 2.6410067487791165
     },
     {
       "output": "reform/employee_nics_main_rate_plus_1pp/decile_relative_change/decile_5",
@@ -1745,7 +1745,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 248779.08786388888
+      "value": 232704.9644930681
     },
     {
       "output": "reform/child_benefit_subsequent_child_plus_1/budgetary_impact",
@@ -1753,7 +1753,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 225834.69004926877
+      "value": 121555.71097561758
     },
     {
       "output": "reform/child_benefit_subsequent_child_plus_1/programme/income_tax",
@@ -1761,7 +1761,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 258910.07695696864
+      "value": 124536.1006146612
     },
     {
       "output": "reform/child_benefit_subsequent_child_plus_1/programme/national_insurance",
@@ -1769,7 +1769,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 531993.6805335889
+      "value": 431989.137974462
     },
     {
       "output": "reform/child_benefit_subsequent_child_plus_1/programme/vat",
@@ -1777,7 +1777,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 192136.14629228457
+      "value": 187762.23212647985
     },
     {
       "output": "reform/child_benefit_subsequent_child_plus_1/programme/council_tax",
@@ -1785,7 +1785,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 177208.8566937845
+      "value": 286891.51358340174
     },
     {
       "output": "reform/child_benefit_subsequent_child_plus_1/programme/capital_gains_tax",
@@ -1793,7 +1793,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 163962.36511233606
+      "value": 65658.31094294119
     },
     {
       "output": "reform/child_benefit_subsequent_child_plus_1/programme/universal_credit",
@@ -1801,7 +1801,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 231601.28063304658
+      "value": 122876.72020898396
     },
     {
       "output": "reform/child_benefit_subsequent_child_plus_1/programme/child_benefit",
@@ -1809,7 +1809,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 248779.08786388888
+      "value": 232704.9644930681
     },
     {
       "output": "reform/child_benefit_subsequent_child_plus_1/programme/state_pension",
@@ -1817,7 +1817,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 245984.36511647553
+      "value": 212296.0937404138
     },
     {
       "output": "reform/child_benefit_subsequent_child_plus_1/programme/pension_credit",
@@ -1825,7 +1825,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 172418.6509731266
+      "value": 191205.3083926124
     },
     {
       "output": "reform/child_benefit_subsequent_child_plus_1/programme/housing_benefit",
@@ -1833,7 +1833,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 311056.933168921
+      "value": 110134.69551376574
     },
     {
       "output": "reform/child_benefit_subsequent_child_plus_1/households_gaining",
@@ -1873,7 +1873,7 @@
       "reason": null,
       "status": "ok",
       "unit": "ratio",
-      "value": 0.5785108583718195
+      "value": 1.1157601623387299
     },
     {
       "output": "reform/child_benefit_subsequent_child_plus_1/decile_relative_change/decile_1",
@@ -2025,7 +2025,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 279602.65155778534
+      "value": 465111.9824721455
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/budgetary_impact",
@@ -2033,7 +2033,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 367640.0852993518
+      "value": 507279.39524087997
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/programme/income_tax",
@@ -2041,7 +2041,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 291214.0052668068
+      "value": 382178.51612899464
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/programme/national_insurance",
@@ -2049,7 +2049,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 1186595.6522605848
+      "value": 873357.2003896299
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/programme/vat",
@@ -2057,7 +2057,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 279602.65155778534
+      "value": 465111.9824721455
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/programme/council_tax",
@@ -2065,7 +2065,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 554534.6678864037
+      "value": 384554.1797762791
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/programme/capital_gains_tax",
@@ -2073,7 +2073,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 433933.93056321086
+      "value": 251536.93737111223
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/programme/universal_credit",
@@ -2081,7 +2081,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 399011.8022049526
+      "value": 431607.564672993
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/programme/child_benefit",
@@ -2089,7 +2089,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 488642.99502682476
+      "value": 561962.13519031
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/programme/state_pension",
@@ -2097,7 +2097,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 694680.0079911104
+      "value": 280351.6109590851
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/programme/pension_credit",
@@ -2105,7 +2105,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 434959.1125071103
+      "value": 510662.0835603176
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/programme/housing_benefit",
@@ -2113,7 +2113,7 @@
       "reason": null,
       "status": "ok",
       "unit": "currency",
-      "value": 306879.0944688738
+      "value": 609435.1196449345
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/households_gaining",
@@ -2153,7 +2153,7 @@
       "reason": null,
       "status": "ok",
       "unit": "ratio",
-      "value": 1.1270425085004336
+      "value": 1.703528676156796
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/decile_relative_change/decile_1",
@@ -2169,7 +2169,7 @@
       "reason": null,
       "status": "ok",
       "unit": "ratio",
-      "value": 1.4221963050148891
+      "value": 2.773899470486783
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/decile_relative_change/decile_3",
@@ -2177,7 +2177,7 @@
       "reason": null,
       "status": "ok",
       "unit": "ratio",
-      "value": 0.9076025275988041
+      "value": 4.569085061245984
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/decile_relative_change/decile_4",
@@ -2217,7 +2217,7 @@
       "reason": null,
       "status": "ok",
       "unit": "ratio",
-      "value": 4.268845401541211
+      "value": 2.3254224256781675
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/decile_relative_change/decile_9",
@@ -2265,7 +2265,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 359.4449402650238
+      "value": 359.4449402650237
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/poverty/relative_bhc/all",
@@ -2273,7 +2273,7 @@
       "reason": null,
       "status": "ok",
       "unit": "count",
-      "value": 1134.4583498257819
+      "value": 1134.4583498257816
     },
     {
       "output": "reform/vat_standard_rate_plus_1pp/poverty/relative_bhc/children",

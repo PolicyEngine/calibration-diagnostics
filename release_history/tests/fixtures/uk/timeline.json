@@ -447,7 +447,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 24267143.83459712,
+          "value": 20818907.471257117,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -457,7 +457,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 24267143.83459712,
+          "value": 20818907.471257117,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -467,11 +467,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 37353529.40539377,
+          "value": 45624905.87085652,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 13086385.570796654,
-          "relativeChange": 0.5392635268489936,
+          "change": 24805998.399599407,
+          "relativeChange": 1.1915129760698022,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -526,7 +526,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 38332739.61189297,
+          "value": 45135152.97511012,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -536,7 +536,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 38332739.61189297,
+          "value": 45135152.97511012,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -546,11 +546,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 26351951.911865413,
+          "value": 23161577.241477724,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -11980787.700027555,
-          "relativeChange": -0.31254712867719064,
+          "change": -21973575.733632397,
+          "relativeChange": -0.48683950945618315,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -669,7 +669,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 35273071.66588001,
+          "value": 39930566.56026611,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -679,7 +679,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 35273071.66588001,
+          "value": 39930566.56026611,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -689,11 +689,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 40113384.72593377,
+          "value": 40984005.89648581,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 4840313.060053758,
-          "relativeChange": 0.13722403044177864,
+          "change": 1053439.3362197056,
+          "relativeChange": 0.02638177784504456,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -733,7 +733,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 35681161.29117528,
+          "value": 41164140.87787842,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -743,7 +743,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 35681161.29117528,
+          "value": 41164140.87787842,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -753,11 +753,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 35425328.93391565,
+          "value": 29713556.58870456,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -255832.35725963116,
-          "relativeChange": -0.007169956021664126,
+          "change": -11450584.28917386,
+          "relativeChange": -0.2781689121885062,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -797,7 +797,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 35308861.1242687,
+          "value": 35046974.34664936,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -807,7 +807,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 35308861.1242687,
+          "value": 35046974.34664936,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -817,11 +817,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 32544953.36960149,
+          "value": 33284800.0675415,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -2763907.7546672113,
-          "relativeChange": -0.07827802049292112,
+          "change": -1762174.279107865,
+          "relativeChange": -0.05028035406646555,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -875,7 +875,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 5912.4749742199965,
+          "value": 4882.786398639625,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
           "change": null,
@@ -971,7 +971,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 10649.85949290196,
+          "value": 3561.727209825302,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -981,7 +981,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 10649.85949290196,
+          "value": 3561.727209825302,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -991,11 +991,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 8315.412912556383,
+          "value": 3641.2167968334898,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -2334.446580345577,
-          "relativeChange": -0.21919975394055344,
+          "change": 79.48958700818775,
+          "relativeChange": 0.022317707765184693,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -1029,7 +1029,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 8067.927207955134,
+          "value": 8011.404962634296,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -1039,7 +1039,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 8067.927207955134,
+          "value": 8011.404962634296,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -1049,11 +1049,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 5575.694708446092,
+          "value": 8439.684284985215,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -2492.232499509042,
-          "relativeChange": -0.30890617072643545,
+          "change": 428.27932235091885,
+          "relativeChange": 0.05345870347940729,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -1087,7 +1087,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 6141.385601473665,
+          "value": 8533.193676923613,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -1097,7 +1097,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 6141.385601473665,
+          "value": 8533.193676923613,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -1107,11 +1107,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 2330.8823040931566,
+          "value": 5744.897032299325,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -3810.5032973805082,
-          "relativeChange": -0.6204631242282123,
+          "change": -2788.296644624288,
+          "relativeChange": -0.3267588607726908,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -1145,7 +1145,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 9486.28043081682,
+          "value": 11816.101030602373,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -1155,7 +1155,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 9486.28043081682,
+          "value": 11816.101030602373,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -1165,11 +1165,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 7227.075065992223,
+          "value": 6808.948066129,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -2259.2053648245965,
-          "relativeChange": -0.2381550262298188,
+          "change": -5007.152964473373,
+          "relativeChange": -0.42375678335056627,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -1203,7 +1203,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 2069.9040102653153,
+          "value": 1902.2070107686877,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -1213,7 +1213,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 2069.9040102653153,
+          "value": 1902.2070107686877,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -1223,11 +1223,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 2844.752516484698,
+          "value": 5219.371099421138,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 774.8485062193827,
-          "relativeChange": 0.3743403087180185,
+          "change": 3317.16408865245,
+          "relativeChange": 1.7438502065618893,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -1261,7 +1261,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 5494.178838736175,
+          "value": 6218.89293023084,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -1271,7 +1271,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 5494.178838736175,
+          "value": 6218.89293023084,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -1281,11 +1281,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 16209.12793046184,
+          "value": 3936.9971784996387,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 10714.949091725666,
-          "relativeChange": 1.9502366788974828,
+          "change": -2281.895751731201,
+          "relativeChange": -0.36692957690887584,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -1319,7 +1319,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 5125.966077915549,
+          "value": 8280.262253813014,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -1329,7 +1329,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 5125.966077915549,
+          "value": 8280.262253813014,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -1339,11 +1339,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 3416.688084462921,
+          "value": 8279.910143579484,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -1709.2779934526284,
-          "relativeChange": -0.3334548000262418,
+          "change": -0.352110233530766,
+          "relativeChange": -0.00004252404365195332,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -1377,7 +1377,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 9263.636476087006,
+          "value": 3305.836437856361,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -1387,7 +1387,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 9263.636476087006,
+          "value": 3305.836437856361,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -1397,11 +1397,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 7462.602975223918,
+          "value": 6314.2964519610105,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -1801.0335008630873,
-          "relativeChange": -0.19441970823361265,
+          "change": 3008.4600141046494,
+          "relativeChange": 0.9100450281367995,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -1441,7 +1441,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 36142831.8559088,
+          "value": 34047618.80039948,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -1451,7 +1451,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 36142831.8559088,
+          "value": 34047618.80039948,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -1461,11 +1461,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 39821568.78656785,
+          "value": 32963420.577264756,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 3678736.9306590483,
-          "relativeChange": 0.10178330644718507,
+          "change": -1084198.2231347263,
+          "relativeChange": -0.03184358440720105,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -1584,7 +1584,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 32846756.418648433,
+          "value": 37181981.92760993,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -1594,7 +1594,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 32846756.418648433,
+          "value": 37181981.92760993,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -1604,11 +1604,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 35305523.28999154,
+          "value": 44333774.09531865,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 2458766.8713431098,
-          "relativeChange": 0.07485569777438263,
+          "change": 7151792.167708725,
+          "relativeChange": 0.1923456415430635,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -1648,7 +1648,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 6419.982486540805,
+          "value": 5233.143327803732,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -1658,7 +1658,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 6419.982486540805,
+          "value": 5233.143327803732,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -1668,11 +1668,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 5595.88582696061,
+          "value": 5733.006164311892,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -824.0966595801956,
-          "relativeChange": -0.1283643158385363,
+          "change": 499.8628365081595,
+          "relativeChange": 0.09551865966528841,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -1727,7 +1727,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 36491435.21366916,
+          "value": 26475876.1589521,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -1737,7 +1737,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 36491435.21366916,
+          "value": 26475876.1589521,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -1747,11 +1747,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 33743420.37270321,
+          "value": 31841909.105521254,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -2748014.840965949,
-          "relativeChange": -0.07530574845509455,
+          "change": 5366032.946569156,
+          "relativeChange": 0.20267631236652306,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -1806,7 +1806,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 78546558.23496205,
+          "value": 74148282.0618168,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -1816,7 +1816,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 78546558.23496205,
+          "value": 74148282.0618168,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -1826,11 +1826,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 83195127.94977206,
+          "value": 64449263.23669086,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 4648569.714810014,
-          "relativeChange": 0.05918234763265385,
+          "change": -9699018.82512594,
+          "relativeChange": -0.13080571195216567,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -1885,7 +1885,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 34705077.73091336,
+          "value": 35872299.95218776,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -1895,7 +1895,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 34705077.73091336,
+          "value": 35872299.95218776,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -1905,11 +1905,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 27657180.18016379,
+          "value": 33188414.911991816,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -7047897.550749574,
-          "relativeChange": -0.2030797223794055,
+          "change": -2683885.0401959457,
+          "relativeChange": -0.0748177575391918,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -1964,7 +1964,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 5868.382394194807,
+          "value": 5191.467755554906,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -1974,7 +1974,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 5868.382394194807,
+          "value": 5191.467755554906,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -1984,11 +1984,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 5739.169158449023,
+          "value": 5754.6544613458345,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -129.213235745784,
-          "relativeChange": -0.022018543964279817,
+          "change": 563.1867057909285,
+          "relativeChange": 0.10848313662129845,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -2092,7 +2092,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 36082978.811912365,
+          "value": 26744847.928615592,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -2102,7 +2102,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 36082978.811912365,
+          "value": 26744847.928615592,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -2112,11 +2112,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 36361710.02355213,
+          "value": 44207942.30215528,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 278731.2116397619,
-          "relativeChange": 0.007724728412603844,
+          "change": 17463094.373539686,
+          "relativeChange": 0.652951716911992,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -2156,7 +2156,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 32112963.662608374,
+          "value": 24041743.703796897,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -2166,7 +2166,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 32112963.662608374,
+          "value": 24041743.703796897,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -2176,11 +2176,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 30764116.280394383,
+          "value": 29236616.804145202,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -1348847.3822139911,
-          "relativeChange": -0.042003204574498965,
+          "change": 5194873.100348305,
+          "relativeChange": 0.21607721820642659,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -2284,7 +2284,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 0.22938949284634805,
+          "value": 0.22938949284634796,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -2294,7 +2294,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 0.22938949284634805,
+          "value": 0.22938949284634796,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -2304,7 +2304,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 0.22938949284634805,
+          "value": 0.22938949284634796,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
           "change": 0,
@@ -2476,7 +2476,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 31891533.505597994,
+          "value": 37077966.502869815,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -2486,7 +2486,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 31891533.505597994,
+          "value": 37077966.502869815,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -2496,11 +2496,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 29009586.950128023,
+          "value": 41761432.789099045,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -2881946.555469971,
-          "relativeChange": -0.09036713631108696,
+          "change": 4683466.28622923,
+          "relativeChange": 0.12631400068465817,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -2540,7 +2540,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 27003064.62595065,
+          "value": 46691888.715238936,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -2550,7 +2550,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 27003064.62595065,
+          "value": 46691888.715238936,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -2560,11 +2560,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 33238730.538686708,
+          "value": 24291920.79764645,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 6235665.912736058,
-          "relativeChange": 0.23092437836642515,
+          "change": -22399967.917592485,
+          "relativeChange": -0.4797400262431825,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -2619,7 +2619,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 36520493.14350986,
+          "value": 32778834.23087431,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -2629,7 +2629,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 36520493.14350986,
+          "value": 32778834.23087431,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -2639,11 +2639,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 29563266.10853432,
+          "value": 31571516.49392683,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -6957227.034975536,
-          "relativeChange": -0.19050200137321863,
+          "change": -1207317.7369474806,
+          "relativeChange": -0.036832235351747525,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -2698,7 +2698,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 11996.993317959823,
+          "value": 10767.242652211016,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -2708,7 +2708,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 11996.993317959823,
+          "value": 10767.242652211016,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -2718,11 +2718,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 11137.130249861764,
+          "value": 11824.704223426113,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -859.8630680980586,
-          "relativeChange": -0.07167321388858494,
+          "change": 1057.4615712150971,
+          "relativeChange": 0.09821099100037009,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -2788,7 +2788,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 30221661.94863717,
+          "value": 28811867.748785123,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -2798,7 +2798,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 30221661.94863717,
+          "value": 28811867.748785123,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -2808,11 +2808,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 31844108.988817815,
+          "value": 34074226.8700467,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 1622447.0401806459,
-          "relativeChange": 0.05368490465342556,
+          "change": 5262359.121261574,
+          "relativeChange": 0.18264553923212654,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -2867,7 +2867,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 5655.318154755404,
+          "value": 5674.2924464311345,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -2877,7 +2877,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 5655.318154755404,
+          "value": 5674.2924464311345,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -2887,11 +2887,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 5463.910915237654,
+          "value": 5903.822117026346,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -191.40723951774999,
-          "relativeChange": -0.03384552986763456,
+          "change": 229.52967059521143,
+          "relativeChange": 0.04045080030014577,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -2946,7 +2946,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 33167800.978567593,
+          "value": 36486505.434602275,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -2956,7 +2956,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 33167800.978567593,
+          "value": 36486505.434602275,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -2966,11 +2966,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 32443171.802879047,
+          "value": 43218459.07504673,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -724629.1756885462,
-          "relativeChange": -0.02184736866205836,
+          "change": 6731953.6404444575,
+          "relativeChange": 0.18450530025438266,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -3022,7 +3022,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 657434.9514183722,
+          "value": 589534.3668941243,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -3032,7 +3032,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 657434.9514183722,
+          "value": 589534.3668941243,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -3042,11 +3042,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 548056.277823296,
+          "value": 378178.01077352866,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -109378.6735950762,
-          "relativeChange": -0.16637185680362593,
+          "change": -211356.35612059565,
+          "relativeChange": -0.3585140544631787,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -3080,7 +3080,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 2.170746450023184,
+          "value": 4.890767876837241,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -3090,7 +3090,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 2.170746450023184,
+          "value": 4.890767876837241,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -3100,12 +3100,12 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 1.0634360555879072,
+          "value": 4.122142489687285,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -1.1073103944352767,
+          "change": -0.7686253871499567,
           "relativeChange": null,
-          "changePoints": -1.1073103944352767,
+          "changePoints": -0.7686253871499567,
           "changeStatus": "ok"
         },
         {
@@ -3196,7 +3196,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 3.6717016474103548,
+          "value": 2.5068631879339525,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -3206,7 +3206,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 3.6717016474103548,
+          "value": 2.5068631879339525,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -3216,12 +3216,12 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 3.1888127498986276,
+          "value": 4.070648264643146,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -0.48288889751172714,
+          "change": 1.5637850767091934,
           "relativeChange": null,
-          "changePoints": -0.48288889751172714,
+          "changePoints": 1.5637850767091934,
           "changeStatus": "ok"
         },
         {
@@ -3312,7 +3312,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 2.2340111126540614,
+          "value": 3.783597304919061,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -3322,7 +3322,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 2.2340111126540614,
+          "value": 3.783597304919061,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -3332,12 +3332,12 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 0.9798281400230695,
+          "value": 3.443437574524473,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -1.2541829726309919,
+          "change": -0.3401597303945878,
           "relativeChange": null,
-          "changePoints": -1.2541829726309919,
+          "changePoints": -0.3401597303945878,
           "changeStatus": "ok"
         },
         {
@@ -3776,7 +3776,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 1.3250007426318744,
+          "value": 1.735676878644393,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -3786,7 +3786,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 1.3250007426318744,
+          "value": 1.735676878644393,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -3796,12 +3796,12 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 1.6856417875206267,
+          "value": 1.8641401955950712,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 0.36064104488875226,
+          "change": 0.12846331695067814,
           "relativeChange": null,
-          "changePoints": 0.36064104488875226,
+          "changePoints": 0.12846331695067814,
           "changeStatus": "ok"
         },
         {
@@ -3950,7 +3950,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 1611.941521726048,
+          "value": 1611.9415217260482,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -3960,7 +3960,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 1611.941521726048,
+          "value": 1611.9415217260482,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -3970,7 +3970,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 1611.941521726048,
+          "value": 1611.9415217260482,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
           "change": 0,
@@ -4008,7 +4008,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 533.0764760476069,
+          "value": 533.076476047607,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -4018,7 +4018,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 533.0764760476069,
+          "value": 533.076476047607,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -4028,7 +4028,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 533.0764760476069,
+          "value": 533.076476047607,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
           "change": 0,
@@ -4066,7 +4066,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 257.82515211164855,
+          "value": 257.82515211164844,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -4076,7 +4076,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 257.82515211164855,
+          "value": 257.82515211164844,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -4086,7 +4086,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 257.82515211164855,
+          "value": 257.82515211164844,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
           "change": 0,
@@ -4240,7 +4240,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 420.2729505243333,
+          "value": 420.27295052433317,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -4250,7 +4250,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 420.2729505243333,
+          "value": 420.27295052433317,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -4260,7 +4260,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 420.2729505243333,
+          "value": 420.27295052433317,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
           "change": 0,
@@ -4414,7 +4414,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 422455.86103222216,
+          "value": 123698.1310300345,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -4424,7 +4424,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 422455.86103222216,
+          "value": 123698.1310300345,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -4434,11 +4434,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 613766.7975845805,
+          "value": 568448.3841379028,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 191310.93655235833,
-          "relativeChange": 0.4528542605253768,
+          "change": 444750.25310786825,
+          "relativeChange": 3.595448446992952,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -4472,7 +4472,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 556890.2410849964,
+          "value": 575703.5530174406,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -4482,7 +4482,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 556890.2410849964,
+          "value": 575703.5530174406,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -4492,11 +4492,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 387522.30284936447,
+          "value": 301737.2480257352,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -169367.9382356319,
-          "relativeChange": -0.30413163266364696,
+          "change": -273966.3049917054,
+          "relativeChange": -0.4758808653442612,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -4530,7 +4530,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 340529.0520778334,
+          "value": 578396.7721687694,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -4540,7 +4540,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 340529.0520778334,
+          "value": 578396.7721687694,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -4550,11 +4550,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 629009.156214817,
+          "value": 419237.40604992845,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 288480.1041369836,
-          "relativeChange": 0.8471526948339397,
+          "change": -159159.36611884093,
+          "relativeChange": -0.27517333044936165,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -4588,7 +4588,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 495282.14919575484,
+          "value": 526250.4447100994,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -4598,7 +4598,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 495282.14919575484,
+          "value": 526250.4447100994,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -4608,11 +4608,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 499062.15484096145,
+          "value": 652374.4119114224,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 3780.0056452066055,
-          "relativeChange": 0.007632024799085984,
+          "change": 126123.96720132302,
+          "relativeChange": 0.23966529333918593,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -4646,7 +4646,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 716306.8043894818,
+          "value": 232622.7134370265,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -4656,7 +4656,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 716306.8043894818,
+          "value": 232622.7134370265,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -4666,11 +4666,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 470436.50837817875,
+          "value": 553105.1295229598,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -245870.29601130303,
-          "relativeChange": -0.3432471875244319,
+          "change": 320482.41608593334,
+          "relativeChange": 1.37769184853349,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -4704,7 +4704,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 868272.6396975175,
+          "value": 1188453.248268721,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -4714,7 +4714,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 868272.6396975175,
+          "value": 1188453.248268721,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -4724,11 +4724,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 1291376.6228542766,
+          "value": 895714.4484287644,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 423103.98315675906,
-          "relativeChange": 0.48729392567771906,
+          "change": -292738.79983995657,
+          "relativeChange": -0.24631915497425227,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -4762,7 +4762,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 469208.24320129654,
+          "value": 687793.6069200315,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -4772,7 +4772,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 469208.24320129654,
+          "value": 687793.6069200315,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -4782,11 +4782,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 328834.43577030173,
+          "value": 561984.4069924894,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -140373.8074309948,
-          "relativeChange": -0.2991716566470734,
+          "change": -125809.19992754213,
+          "relativeChange": -0.18291708248193958,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -4820,7 +4820,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 408026.86890470365,
+          "value": 377914.0954959739,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -4830,7 +4830,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 408026.86890470365,
+          "value": 377914.0954959739,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -4840,11 +4840,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 305482.34470636235,
+          "value": 350638.1386604736,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -102544.5241983413,
-          "relativeChange": -0.2513180675419956,
+          "change": -27275.956835500314,
+          "relativeChange": -0.07217501850441273,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -4878,7 +4878,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 440679.32419086655,
+          "value": 255671.01685999535,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -4888,7 +4888,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 440679.32419086655,
+          "value": 255671.01685999535,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -4898,11 +4898,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 475502.0926312473,
+          "value": 650180.207146742,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 34822.76844038075,
-          "relativeChange": 0.07902065408745691,
+          "change": 394509.1902867467,
+          "relativeChange": 1.5430344633188466,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -4936,7 +4936,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 555374.3883104719,
+          "value": 309320.3249926525,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -4946,7 +4946,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 555374.3883104719,
+          "value": 309320.3249926525,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -4956,11 +4956,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 538597.9948738563,
+          "value": 564557.553372315,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -16776.393436615588,
-          "relativeChange": -0.03020735883707524,
+          "change": 255237.2283796625,
+          "relativeChange": 0.8251550504666167,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -4994,7 +4994,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 716306.8043894818,
+          "value": 232622.7134370265,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -5004,7 +5004,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 716306.8043894818,
+          "value": 232622.7134370265,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -5014,11 +5014,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 470436.50837817875,
+          "value": 553105.1295229598,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -245870.29601130303,
-          "relativeChange": -0.3432471875244319,
+          "change": 320482.41608593334,
+          "relativeChange": 1.37769184853349,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -5070,7 +5070,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 322361.8540706495,
+          "value": 362018.9498693066,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -5080,7 +5080,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 322361.8540706495,
+          "value": 362018.9498693066,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -5090,11 +5090,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 386215.5369495705,
+          "value": 391751.2270507795,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 63853.68287892104,
-          "relativeChange": 0.19808076567560234,
+          "change": 29732.27718147292,
+          "relativeChange": 0.08212906311176983,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -5360,7 +5360,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 1.4900158493741278,
+          "value": 3.7094900706415457,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -5370,7 +5370,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 1.4900158493741278,
+          "value": 3.7094900706415457,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -5380,12 +5380,12 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 0.9333438761174863,
+          "value": 1.9736030854137208,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -0.5566719732566415,
+          "change": -1.735886985227825,
           "relativeChange": null,
-          "changePoints": -0.5566719732566415,
+          "changePoints": -1.735886985227825,
           "changeStatus": "ok"
         },
         {
@@ -5824,7 +5824,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 1.2073595538604527,
+          "value": 1.173551073784641,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -5834,7 +5834,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 1.2073595538604527,
+          "value": 1.173551073784641,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -5844,12 +5844,12 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 0.4119644116123694,
+          "value": 1.2099472065285266,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -0.7953951422480833,
+          "change": 0.036396132743885534,
           "relativeChange": null,
-          "changePoints": -0.7953951422480833,
+          "changePoints": 0.036396132743885534,
           "changeStatus": "ok"
         },
         {
@@ -5882,7 +5882,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 3747.448526244008,
+          "value": 3747.4485262440076,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -5892,7 +5892,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 3747.448526244008,
+          "value": 3747.4485262440076,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -5902,7 +5902,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 3747.448526244008,
+          "value": 3747.4485262440076,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
           "change": 0,
@@ -6346,7 +6346,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 1341.953037263614,
+          "value": 1341.9530372636139,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -6356,7 +6356,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 1341.953037263614,
+          "value": 1341.9530372636139,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -6366,7 +6366,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 1341.953037263614,
+          "value": 1341.9530372636139,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
           "change": 0,
@@ -6462,7 +6462,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 172535.22394230895,
+          "value": 381375.10822002566,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -6472,7 +6472,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 172535.22394230895,
+          "value": 381375.10822002566,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -6482,11 +6482,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 302389.72104613454,
+          "value": 701893.6490515012,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 129854.49710382559,
-          "relativeChange": 0.7526260095575926,
+          "change": 320518.5408314755,
+          "relativeChange": 0.8404285804792474,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -6520,7 +6520,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 489759.52069474553,
+          "value": 456726.756092557,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -6530,7 +6530,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 489759.52069474553,
+          "value": 456726.756092557,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -6540,11 +6540,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 291027.542929005,
+          "value": 139259.7051929206,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -198731.97776574054,
-          "relativeChange": -0.40577460849322633,
+          "change": -317467.05089963635,
+          "relativeChange": -0.6950918610848819,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -6578,7 +6578,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 405007.178725508,
+          "value": 537295.2091635218,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -6588,7 +6588,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 405007.178725508,
+          "value": 537295.2091635218,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -6598,11 +6598,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 605247.7327965684,
+          "value": 438905.2173994908,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 200240.55407106044,
-          "relativeChange": 0.4944123575813768,
+          "change": -98389.99176403094,
+          "relativeChange": -0.1831209176743035,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -6636,7 +6636,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 330414.93270931963,
+          "value": 674308.3730504237,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -6646,7 +6646,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 330414.93270931963,
+          "value": 674308.3730504237,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -6656,11 +6656,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 366306.4470301074,
+          "value": 677528.2232397865,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 35891.51432078774,
-          "relativeChange": 0.10862558186001559,
+          "change": 3219.850189362769,
+          "relativeChange": 0.004775041091061751,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -6694,7 +6694,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 403457.7443915147,
+          "value": 230196.23696760467,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -6704,7 +6704,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 403457.7443915147,
+          "value": 230196.23696760467,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -6714,11 +6714,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 217558.47639551354,
+          "value": 285009.1714834906,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -185899.26799600114,
-          "relativeChange": -0.4607651497094695,
+          "change": 54812.93451588595,
+          "relativeChange": 0.23811394676968473,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -6752,7 +6752,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 938227.1436571181,
+          "value": 721671.3942994693,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -6762,7 +6762,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 938227.1436571181,
+          "value": 721671.3942994693,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -6772,11 +6772,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 803212.1336743792,
+          "value": 863661.7138487728,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -135015.00998273888,
-          "relativeChange": -0.14390439553524695,
+          "change": 141990.3195493035,
+          "relativeChange": 0.19675204070840904,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -6810,7 +6810,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 366769.4418548804,
+          "value": 245233.30702543622,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -6820,7 +6820,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 366769.4418548804,
+          "value": 245233.30702543622,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -6830,11 +6830,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 289893.1886154272,
+          "value": 330677.72270102793,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -76876.25323945325,
-          "relativeChange": -0.20960375774672868,
+          "change": 85444.4156755917,
+          "relativeChange": 0.3484209250039971,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -6868,7 +6868,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 500459.0049472889,
+          "value": 435478.64617131,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -6878,7 +6878,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 500459.0049472889,
+          "value": 435478.64617131,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -6888,11 +6888,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 315596.469507407,
+          "value": 183264.9912236374,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -184862.5354398819,
-          "relativeChange": -0.3693859709035561,
+          "change": -252213.6549476726,
+          "relativeChange": -0.5791642303591987,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -6926,7 +6926,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 440285.0088106061,
+          "value": 315829.36633605463,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -6936,7 +6936,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 440285.0088106061,
+          "value": 315829.36633605463,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -6946,11 +6946,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 311432.45178479276,
+          "value": 358912.57727399515,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -128852.55702581332,
-          "relativeChange": -0.2926571526336951,
+          "change": 43083.210937940516,
+          "relativeChange": 0.13641293536997542,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -6984,7 +6984,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 311626.47441020474,
+          "value": 311120.05512358266,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -6994,7 +6994,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 311626.47441020474,
+          "value": 311120.05512358266,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -7004,11 +7004,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 359064.6992310539,
+          "value": 577413.8878036498,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 47438.22482084914,
-          "relativeChange": 0.15222783914823795,
+          "change": 266293.8326800671,
+          "relativeChange": 0.8559198556785105,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -7042,7 +7042,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 403457.7443915147,
+          "value": 230196.23696760467,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -7052,7 +7052,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 403457.7443915147,
+          "value": 230196.23696760467,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -7062,11 +7062,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 217558.47639551354,
+          "value": 285009.1714834906,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -185899.26799600114,
-          "relativeChange": -0.4607651497094695,
+          "change": 54812.93451588595,
+          "relativeChange": 0.23811394676968473,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -7118,7 +7118,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 225834.69004926877,
+          "value": 121555.71097561758,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -7128,7 +7128,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 225834.69004926877,
+          "value": 121555.71097561758,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -7138,11 +7138,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 195850.81355361175,
+          "value": 139543.28588183702,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -29983.876495657023,
-          "relativeChange": -0.13276913519847483,
+          "change": 17987.574906219437,
+          "relativeChange": 0.14797803214550323,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -7872,7 +7872,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 0.5785108583718195,
+          "value": 1.1157601623387299,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -7882,7 +7882,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 0.5785108583718195,
+          "value": 1.1157601623387299,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -7892,12 +7892,12 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 0.7155338088672638,
+          "value": 0.5442278912472346,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 0.13702295049544433,
+          "change": -0.5715322710914953,
           "relativeChange": null,
-          "changePoints": 0.13702295049544433,
+          "changePoints": -0.5715322710914953,
           "changeStatus": "ok"
         },
         {
@@ -8510,7 +8510,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 163962.36511233606,
+          "value": 65658.31094294119,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -8520,7 +8520,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 163962.36511233606,
+          "value": 65658.31094294119,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -8530,11 +8530,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 200737.69464431706,
+          "value": 335743.6088061804,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 36775.329531981,
-          "relativeChange": 0.22429128481273736,
+          "change": 270085.29786323925,
+          "relativeChange": 4.113497499165803,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -8568,7 +8568,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 248779.08786388888,
+          "value": 232704.9644930681,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -8578,7 +8578,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 248779.08786388888,
+          "value": 232704.9644930681,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -8588,11 +8588,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 157973.71089415724,
+          "value": 69126.26675971763,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -90805.37696973165,
-          "relativeChange": -0.3650040594224413,
+          "change": -163578.69773335048,
+          "relativeChange": -0.7029445980651745,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -8626,7 +8626,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 177208.8566937845,
+          "value": 286891.51358340174,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -8636,7 +8636,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 177208.8566937845,
+          "value": 286891.51358340174,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -8646,11 +8646,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 348788.2394643008,
+          "value": 211067.41694103804,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 171579.3827705163,
-          "relativeChange": 0.9682325475808701,
+          "change": -75824.0966423637,
+          "relativeChange": -0.2642953627149414,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -8684,7 +8684,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 311056.933168921,
+          "value": 110134.69551376574,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -8694,7 +8694,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 311056.933168921,
+          "value": 110134.69551376574,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -8704,11 +8704,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 290888.88748341316,
+          "value": 366759.0653136554,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -20168.045685507823,
-          "relativeChange": -0.06483715209316832,
+          "change": 256624.36979988968,
+          "relativeChange": 2.330095603413315,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -8742,7 +8742,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 258910.07695696864,
+          "value": 124536.1006146612,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -8752,7 +8752,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 258910.07695696864,
+          "value": 124536.1006146612,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -8762,11 +8762,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 187176.49494201847,
+          "value": 218011.59499182928,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -71733.58201495017,
-          "relativeChange": -0.27705983041700005,
+          "change": 93475.49437716807,
+          "relativeChange": 0.7505895392244482,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -8800,7 +8800,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 531993.6805335889,
+          "value": 431989.137974462,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -8810,7 +8810,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 531993.6805335889,
+          "value": 431989.137974462,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -8820,11 +8820,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 522990.94834808586,
+          "value": 516205.08583755116,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -9002.732185503002,
-          "relativeChange": -0.016922629938899415,
+          "change": 84215.94786308915,
+          "relativeChange": 0.19494922547813637,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -8858,7 +8858,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 172418.6509731266,
+          "value": 191205.3083926124,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -8868,7 +8868,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 172418.6509731266,
+          "value": 191205.3083926124,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -8878,11 +8878,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 149847.48418251387,
+          "value": 158234.00344476738,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -22571.16679061274,
-          "relativeChange": -0.13090907893793177,
+          "change": -32971.30494784503,
+          "relativeChange": -0.1724392760066223,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -8916,7 +8916,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 245984.36511647553,
+          "value": 212296.0937404138,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -8926,7 +8926,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 245984.36511647553,
+          "value": 212296.0937404138,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -8936,11 +8936,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 180430.2653086475,
+          "value": 137595.79357464498,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -65554.09980782802,
-          "relativeChange": -0.26649701812059334,
+          "change": -74700.30016576883,
+          "relativeChange": -0.3518684628135882,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -8974,7 +8974,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 231601.28063304658,
+          "value": 122876.72020898396,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -8984,7 +8984,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 231601.28063304658,
+          "value": 122876.72020898396,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -8994,11 +8994,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 121583.07270772882,
+          "value": 301289.78411935735,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -110018.20792531777,
-          "relativeChange": -0.47503281339636755,
+          "change": 178413.0639103734,
+          "relativeChange": 1.4519679855300125,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -9032,7 +9032,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 192136.14629228457,
+          "value": 187762.23212647985,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -9042,7 +9042,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 192136.14629228457,
+          "value": 187762.23212647985,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -9052,11 +9052,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 192844.78171838677,
+          "value": 347478.7716028413,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 708.6354261022061,
-          "relativeChange": 0.003688194229857217,
+          "change": 159716.53947636147,
+          "relativeChange": 0.8506318745123017,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -9090,7 +9090,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 248779.08786388888,
+          "value": 232704.9644930681,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -9100,7 +9100,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 248779.08786388888,
+          "value": 232704.9644930681,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -9110,11 +9110,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 157973.71089415724,
+          "value": 69126.26675971763,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -90805.37696973165,
-          "relativeChange": -0.3650040594224413,
+          "change": -163578.69773335048,
+          "relativeChange": -0.7029445980651745,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -9166,7 +9166,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 268359.0277736008,
+          "value": 111862.07696518087,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -9176,7 +9176,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 268359.0277736008,
+          "value": 111862.07696518087,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -9186,11 +9186,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 250346.07234677236,
+          "value": 322189.6589732249,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -18012.95542682847,
-          "relativeChange": -0.06712259906540194,
+          "change": 210327.58200804406,
+          "relativeChange": 1.880240271897619,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -9456,7 +9456,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 3.2244834043530974,
+          "value": 2.6410067487791165,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -9466,7 +9466,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 3.2244834043530974,
+          "value": 2.6410067487791165,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -9476,12 +9476,12 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 1.8040870220165555,
+          "value": 0.19195782832659486,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -1.420396382336542,
+          "change": -2.4490489204525216,
           "relativeChange": null,
-          "changePoints": -1.420396382336542,
+          "changePoints": -2.4490489204525216,
           "changeStatus": "ok"
         },
         {
@@ -9920,7 +9920,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 0.7311188615288882,
+          "value": 0.6849598287368461,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -9930,7 +9930,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 0.7311188615288882,
+          "value": 0.6849598287368461,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -9940,12 +9940,12 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 0.6197801973506415,
+          "value": 0.5639514324019398,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -0.11133866417824667,
+          "change": -0.12100839633490634,
           "relativeChange": null,
-          "changePoints": -0.11133866417824667,
+          "changePoints": -0.12100839633490634,
           "changeStatus": "ok"
         },
         {
@@ -10558,7 +10558,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 243111.6692990882,
+          "value": 152703.625805146,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -10568,7 +10568,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 243111.6692990882,
+          "value": 152703.625805146,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -10578,11 +10578,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 355712.1655913441,
+          "value": 468254.6475387953,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 112600.49629225594,
-          "relativeChange": 0.46316368365571603,
+          "change": 315551.0217336493,
+          "relativeChange": 2.0664278275638392,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -10616,7 +10616,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 368100.3219882882,
+          "value": 210365.2662020354,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -10626,7 +10626,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 368100.3219882882,
+          "value": 210365.2662020354,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -10636,11 +10636,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 157230.14424988342,
+          "value": 147019.8339224488,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -210870.17773840477,
-          "relativeChange": -0.5728606174517663,
+          "change": -63345.43227958659,
+          "relativeChange": -0.30112115665876826,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -10674,7 +10674,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 305129.77083561296,
+          "value": 248100.69092300563,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -10684,7 +10684,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 305129.77083561296,
+          "value": 248100.69092300563,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -10694,11 +10694,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 301698.7384871703,
+          "value": 382925.9350863439,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -3431.032348442648,
-          "relativeChange": -0.01124450209839111,
+          "change": 134825.24416333827,
+          "relativeChange": 0.5434295392799986,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -10732,7 +10732,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 329796.71962211066,
+          "value": 279105.515824109,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -10742,7 +10742,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 329796.71962211066,
+          "value": 279105.515824109,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -10752,11 +10752,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 135670.48699507827,
+          "value": 375196.56796475244,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -194126.23262703238,
-          "relativeChange": -0.5886239039899096,
+          "change": 96091.05214064341,
+          "relativeChange": 0.3442821681861692,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -10790,7 +10790,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 319691.44191255834,
+          "value": 232229.91556749723,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -10800,7 +10800,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 319691.44191255834,
+          "value": 232229.91556749723,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -10810,11 +10810,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 218066.24528489652,
+          "value": 272520.3664857365,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -101625.19662766182,
-          "relativeChange": -0.3178852584219575,
+          "change": 40290.45091823928,
+          "relativeChange": 0.17349380169123357,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -10848,7 +10848,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 544958.4095283947,
+          "value": 547214.1589385429,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -10858,7 +10858,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 544958.4095283947,
+          "value": 547214.1589385429,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -10868,11 +10868,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 602090.4911645524,
+          "value": 587136.1614964895,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 57132.0816361577,
-          "relativeChange": 0.10483750803221778,
+          "change": 39922.0025579466,
+          "relativeChange": 0.07295498829084611,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -10906,7 +10906,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 225263.65504131638,
+          "value": 333529.39207801933,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -10916,7 +10916,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 225263.65504131638,
+          "value": 333529.39207801933,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -10926,11 +10926,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 225545.26354749693,
+          "value": 361772.1358540639,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 281.60850618054974,
-          "relativeChange": 0.0012501284600434054,
+          "change": 28242.743776044575,
+          "relativeChange": 0.08467842549072263,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -10964,7 +10964,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 304162.2716409098,
+          "value": 292439.0708980954,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -10974,7 +10974,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 304162.2716409098,
+          "value": 292439.0708980954,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -10984,11 +10984,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 182586.78956922685,
+          "value": 260075.51031603958,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -121575.48207168293,
-          "relativeChange": -0.3997059905418297,
+          "change": -32363.560582055798,
+          "relativeChange": -0.11066770415685442,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -11022,7 +11022,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 215784.3686731781,
+          "value": 308257.66560563433,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -11032,7 +11032,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 215784.3686731781,
+          "value": 308257.66560563433,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -11042,11 +11042,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 207857.17072192178,
+          "value": 252784.16970257688,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -7927.197951256327,
-          "relativeChange": -0.036736664476668714,
+          "change": -55473.495903057454,
+          "relativeChange": -0.17995820410197613,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -11080,7 +11080,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 176369.47982754704,
+          "value": 286931.2306052426,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -11090,7 +11090,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 176369.47982754704,
+          "value": 286931.2306052426,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -11100,11 +11100,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 229207.85318581207,
+          "value": 439442.98080269666,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 52838.37335826503,
-          "relativeChange": 0.2995890978979473,
+          "change": 152511.75019745406,
+          "relativeChange": 0.5315271881549847,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -11138,7 +11138,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 344216.2639288542,
+          "value": 465280.7861236562,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -11148,7 +11148,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 344216.2639288542,
+          "value": 465280.7861236562,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -11158,11 +11158,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 145767.4371712845,
+          "value": 284932.6502494639,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -198448.8267575697,
-          "relativeChange": -0.5765236787259621,
+          "change": -180348.1358741923,
+          "relativeChange": -0.3876113977899395,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -11214,7 +11214,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 370875.69610600284,
+          "value": 346942.72802454047,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -11224,7 +11224,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 370875.69610600284,
+          "value": 346942.72802454047,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -11234,11 +11234,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 429265.6630984216,
+          "value": 284009.09236833244,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 58389.96699241875,
-          "relativeChange": 0.15743810555795995,
+          "change": -62933.63565620803,
+          "relativeChange": -0.1813948832838961,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -11968,7 +11968,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 0.9003342708743991,
+          "value": 1.3007703776110964,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -11978,7 +11978,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 0.9003342708743991,
+          "value": 1.3007703776110964,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -11988,12 +11988,12 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 1.0283535272754565,
+          "value": 0.771364910381949,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 0.12801925640105738,
+          "change": -0.5294054672291474,
           "relativeChange": null,
-          "changePoints": 0.12801925640105738,
+          "changePoints": -0.5294054672291474,
           "changeStatus": "ok"
         },
         {
@@ -12142,7 +12142,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 356.5650715614793,
+          "value": 356.56507156147933,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -12152,7 +12152,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 356.5650715614793,
+          "value": 356.56507156147933,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -12162,7 +12162,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 356.5650715614793,
+          "value": 356.56507156147933,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
           "change": 0,
@@ -12258,7 +12258,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 980.4834627001392,
+          "value": 980.4834627001394,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -12268,7 +12268,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 980.4834627001392,
+          "value": 980.4834627001394,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -12278,7 +12278,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 980.4834627001392,
+          "value": 980.4834627001394,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
           "change": 0,
@@ -12374,7 +12374,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 617.8242857585417,
+          "value": 617.8242857585416,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -12384,7 +12384,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 617.8242857585417,
+          "value": 617.8242857585416,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -12394,7 +12394,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 617.8242857585417,
+          "value": 617.8242857585416,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
           "change": 0,
@@ -12490,7 +12490,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 1213.810904438006,
+          "value": 1213.8109044380058,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -12500,7 +12500,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 1213.810904438006,
+          "value": 1213.8109044380058,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -12510,7 +12510,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 1213.810904438006,
+          "value": 1213.8109044380058,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
           "change": 0,
@@ -12606,7 +12606,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 316525.8147043972,
+          "value": 206996.1846320869,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -12616,7 +12616,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 316525.8147043972,
+          "value": 206996.1846320869,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -12626,11 +12626,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 481805.06083617784,
+          "value": 755724.9363355793,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 165279.24613178062,
-          "relativeChange": 0.5221667189645639,
+          "change": 548728.7517034924,
+          "relativeChange": 2.65091239569849,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -12664,7 +12664,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 469826.38571017724,
+          "value": 410083.41977208486,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -12674,7 +12674,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 469826.38571017724,
+          "value": 410083.41977208486,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -12684,11 +12684,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 314486.7814477108,
+          "value": 74562.43598000205,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -155339.60426246643,
-          "relativeChange": -0.3306319291277333,
+          "change": -335520.9837920828,
+          "relativeChange": -0.8181773941959366,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -12722,7 +12722,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 318848.1198307793,
+          "value": 583163.8741700926,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -12732,7 +12732,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 318848.1198307793,
+          "value": 583163.8741700926,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -12742,11 +12742,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 398449.729208511,
+          "value": 531503.2221467906,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 79601.60937773169,
-          "relativeChange": 0.2496536890980516,
+          "change": -51660.65202330204,
+          "relativeChange": -0.08858685236087527,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -12780,7 +12780,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 419971.9924413647,
+          "value": 675332.2599800649,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -12790,7 +12790,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 419971.9924413647,
+          "value": 675332.2599800649,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -12800,11 +12800,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 448311.3584336067,
+          "value": 531859.8396470046,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 28339.365992242005,
-          "relativeChange": 0.06747918076036623,
+          "change": -143472.42033306032,
+          "relativeChange": -0.21244715947272452,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -12838,7 +12838,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 434970.53344854753,
+          "value": 270885.32470210415,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -12848,7 +12848,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 434970.53344854753,
+          "value": 270885.32470210415,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -12858,11 +12858,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 277654.5371830492,
+          "value": 400346.0624990105,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -157315.99626549834,
-          "relativeChange": -0.361670467694123,
+          "change": 129460.73779690638,
+          "relativeChange": 0.4779171331605945,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -12896,7 +12896,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 873868.1124574707,
+          "value": 658510.7870676436,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -12906,7 +12906,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 873868.1124574707,
+          "value": 658510.7870676436,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -12916,11 +12916,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 847140.2833907458,
+          "value": 839587.5798086333,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -26727.829066724982,
-          "relativeChange": -0.030585655530514358,
+          "change": 181076.7927409897,
+          "relativeChange": 0.27497923541590996,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -12954,7 +12954,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 365467.93304879934,
+          "value": 362946.80069019244,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -12964,7 +12964,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 365467.93304879934,
+          "value": 362946.80069019244,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -12974,11 +12974,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 310355.1406111608,
+          "value": 443668.26965758746,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -55112.79243763856,
-          "relativeChange": -0.15080062422406726,
+          "change": 80721.46896739502,
+          "relativeChange": 0.22240578733272268,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -13012,7 +13012,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 565495.237486192,
+          "value": 327786.7085293456,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -13022,7 +13022,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 565495.237486192,
+          "value": 327786.7085293456,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -13032,11 +13032,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 278321.7829775999,
+          "value": 190862.33793509076,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -287173.45450859214,
-          "relativeChange": -0.5078264775229061,
+          "change": -136924.3705942548,
+          "relativeChange": -0.41772398645626124,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -13070,7 +13070,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 405751.6518291259,
+          "value": 223314.4535596386,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -13080,7 +13080,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 405751.6518291259,
+          "value": 223314.4535596386,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -13090,11 +13090,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 209807.51868604153,
+          "value": 598012.8912360197,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -195944.13314308436,
-          "relativeChange": -0.4829164151514096,
+          "change": 374698.4376763811,
+          "relativeChange": 1.6778960416743187,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -13128,7 +13128,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 342720.2788485912,
+          "value": 270413.680086585,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -13138,7 +13138,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 342720.2788485912,
+          "value": 270413.680086585,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -13148,11 +13148,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 312536.69427807187,
+          "value": 673550.8080049818,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -30183.584570519335,
-          "relativeChange": -0.08807061161342601,
+          "change": 403137.12791839684,
+          "relativeChange": 1.4908163218270412,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -13186,7 +13186,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 434970.53344854753,
+          "value": 270885.32470210415,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -13196,7 +13196,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 434970.53344854753,
+          "value": 270885.32470210415,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -13206,11 +13206,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 277654.5371830492,
+          "value": 400346.0624990105,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -157315.99626549834,
-          "relativeChange": -0.361670467694123,
+          "change": 129460.73779690638,
+          "relativeChange": 0.4779171331605945,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -13262,7 +13262,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 181643.22293449365,
+          "value": 257259.70328895675,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -13272,7 +13272,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 181643.22293449365,
+          "value": 257259.70328895675,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -13282,11 +13282,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 224766.58528953476,
+          "value": 191241.73102830036,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 43123.362355041114,
-          "relativeChange": 0.2374069434486569,
+          "change": -66017.97226065639,
+          "relativeChange": -0.2566199502551098,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -14016,7 +14016,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 0.4265306287070281,
+          "value": 0.45226560771719915,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -14026,7 +14026,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 0.4265306287070281,
+          "value": 0.45226560771719915,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -14036,12 +14036,12 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 0.8988241726461934,
+          "value": 0.4220075845195243,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 0.4722935439391653,
+          "change": -0.030258023197674844,
           "relativeChange": null,
-          "changePoints": 0.4722935439391653,
+          "changePoints": -0.030258023197674844,
           "changeStatus": "ok"
         },
         {
@@ -14654,7 +14654,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 75469.91856043888,
+          "value": 86946.14788501812,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -14664,7 +14664,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 75469.91856043888,
+          "value": 86946.14788501812,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -14674,11 +14674,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 291242.19103573624,
+          "value": 357236.2614979565,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 215772.27247529736,
-          "relativeChange": 2.859050024050305,
+          "change": 270290.11361293844,
+          "relativeChange": 3.108707173207759,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -14712,7 +14712,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 346849.5769726156,
+          "value": 365147.45847073256,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -14722,7 +14722,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 346849.5769726156,
+          "value": 365147.45847073256,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -14732,11 +14732,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 189494.43759809714,
+          "value": 157545.94396241615,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -157355.13937451848,
-          "relativeChange": -0.4536696880185094,
+          "change": -207601.5145083164,
+          "relativeChange": -0.5685415842075652,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -14770,7 +14770,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 152648.36040668268,
+          "value": 282733.5519923459,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -14780,7 +14780,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 152648.36040668268,
+          "value": 282733.5519923459,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -14790,11 +14790,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 313550.62511119293,
+          "value": 347711.45534913527,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 160902.26470451025,
-          "relativeChange": 1.0540713590099342,
+          "change": 64977.90335678938,
+          "relativeChange": 0.22982027742695513,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -14828,7 +14828,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 241551.66253149702,
+          "value": 364351.3921127628,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -14838,7 +14838,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 241551.66253149702,
+          "value": 364351.3921127628,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -14848,11 +14848,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 243652.17166822066,
+          "value": 292248.8882029476,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 2100.5091367236455,
-          "relativeChange": 0.008695900142892829,
+          "change": -72102.50390981516,
+          "relativeChange": -0.19789276360854474,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -14886,7 +14886,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 238262.27840797062,
+          "value": 211705.25877719262,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -14896,7 +14896,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 238262.27840797062,
+          "value": 211705.25877719262,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -14906,11 +14906,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 124952.62958282366,
+          "value": 97118.86263035046,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -113309.64882514696,
-          "relativeChange": -0.47556688193474606,
+          "change": -114586.39614684216,
+          "relativeChange": -0.541254368496522,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -14944,7 +14944,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 471660.54117915186,
+          "value": 491881.44054020045,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -14954,7 +14954,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 471660.54117915186,
+          "value": 491881.44054020045,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -14964,11 +14964,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 650662.7201642002,
+          "value": 472357.4703024834,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 179002.17898504832,
-          "relativeChange": 0.3795148488307771,
+          "change": -19523.970237717032,
+          "relativeChange": -0.03969243120105358,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -15002,7 +15002,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 268331.70115091925,
+          "value": 89873.10564551316,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -15012,7 +15012,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 268331.70115091925,
+          "value": 89873.10564551316,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -15022,11 +15022,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 237147.72734963906,
+          "value": 300064.9595114554,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -31183.973801280197,
-          "relativeChange": -0.11621427385406552,
+          "change": 210191.85386594222,
+          "relativeChange": 2.3387625514467336,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -15060,7 +15060,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 192281.23265462698,
+          "value": 158144.2776882337,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -15070,7 +15070,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 192281.23265462698,
+          "value": 158144.2776882337,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -15080,11 +15080,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 159703.9966045481,
+          "value": 236884.50188033853,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -32577.236050078878,
-          "relativeChange": -0.16942493867091898,
+          "change": 78740.22419210483,
+          "relativeChange": 0.4979011908817443,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -15118,7 +15118,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 307066.6215644864,
+          "value": 135731.4905356668,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -15128,7 +15128,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 307066.6215644864,
+          "value": 135731.4905356668,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -15138,11 +15138,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 259149.05393809886,
+          "value": 246463.220858499,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -47917.56762638755,
-          "relativeChange": -0.15604941814336692,
+          "change": 110731.73032283221,
+          "relativeChange": 0.8158145901575783,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -15176,7 +15176,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 244517.70928985107,
+          "value": 202409.27903383682,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -15186,7 +15186,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 244517.70928985107,
+          "value": 202409.27903383682,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -15196,11 +15196,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 259383.35007739862,
+          "value": 299247.396056928,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 14865.640787547542,
-          "relativeChange": 0.060795763344592045,
+          "change": 96838.11702309115,
+          "relativeChange": 0.4784272612665287,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -15234,7 +15234,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 238262.27840797062,
+          "value": 211705.25877719262,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -15244,7 +15244,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 238262.27840797062,
+          "value": 211705.25877719262,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -15254,11 +15254,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 124952.62958282366,
+          "value": 97118.86263035046,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -113309.64882514696,
-          "relativeChange": -0.47556688193474606,
+          "change": -114586.39614684216,
+          "relativeChange": -0.541254368496522,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -15310,7 +15310,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 367640.0852993518,
+          "value": 507279.39524087997,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -15320,7 +15320,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 367640.0852993518,
+          "value": 507279.39524087997,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -15330,11 +15330,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 466317.944813151,
+          "value": 357583.60833138647,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 98677.85951379925,
-          "relativeChange": 0.2684088690531409,
+          "change": -149695.7869094935,
+          "relativeChange": -0.2950953425545915,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -15484,7 +15484,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 1.4221963050148891,
+          "value": 2.773899470486783,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -15494,7 +15494,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 1.4221963050148891,
+          "value": 2.773899470486783,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -15504,12 +15504,12 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 1.9314458602889744,
+          "value": 1.2039852042757253,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 0.5092495552740852,
+          "change": -1.5699142662110577,
           "relativeChange": null,
-          "changePoints": 0.5092495552740852,
+          "changePoints": -1.5699142662110577,
           "changeStatus": "ok"
         },
         {
@@ -15542,7 +15542,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 0.9076025275988041,
+          "value": 4.569085061245984,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -15552,7 +15552,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 0.9076025275988041,
+          "value": 4.569085061245984,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -15562,12 +15562,12 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 3.671943967622484,
+          "value": 1.0724154641882788,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 2.76434144002368,
+          "change": -3.496669597057705,
           "relativeChange": null,
-          "changePoints": 2.76434144002368,
+          "changePoints": -3.496669597057705,
           "changeStatus": "ok"
         },
         {
@@ -15832,7 +15832,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 4.268845401541211,
+          "value": 2.3254224256781675,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -15842,7 +15842,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 4.268845401541211,
+          "value": 2.3254224256781675,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -15852,12 +15852,12 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 2.0764745583364057,
+          "value": 3.1701312297326476,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -2.192370843204805,
+          "change": 0.8447088040544801,
           "relativeChange": null,
-          "changePoints": -2.192370843204805,
+          "changePoints": 0.8447088040544801,
           "changeStatus": "ok"
         },
         {
@@ -16064,7 +16064,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 1.1270425085004336,
+          "value": 1.703528676156796,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -16074,7 +16074,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 1.1270425085004336,
+          "value": 1.703528676156796,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -16084,12 +16084,12 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 0.9399084125901328,
+          "value": 1.426841320805934,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -0.18713409591030084,
+          "change": -0.276687355350862,
           "relativeChange": null,
-          "changePoints": -0.18713409591030084,
+          "changePoints": -0.276687355350862,
           "changeStatus": "ok"
         },
         {
@@ -16296,7 +16296,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 359.4449402650238,
+          "value": 359.4449402650237,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -16306,7 +16306,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 359.4449402650238,
+          "value": 359.4449402650237,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -16316,7 +16316,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 359.4449402650238,
+          "value": 359.4449402650237,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
           "change": 0,
@@ -16586,7 +16586,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 1134.4583498257819,
+          "value": 1134.4583498257816,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -16596,7 +16596,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 1134.4583498257819,
+          "value": 1134.4583498257816,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -16606,7 +16606,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 1134.4583498257819,
+          "value": 1134.4583498257816,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
           "change": 0,
@@ -16702,7 +16702,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 433933.93056321086,
+          "value": 251536.93737111223,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -16712,7 +16712,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 433933.93056321086,
+          "value": 251536.93737111223,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -16722,11 +16722,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 502701.246723705,
+          "value": 888325.8182904538,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 68767.31616049411,
-          "relativeChange": 0.1584741623482629,
+          "change": 636788.8809193415,
+          "relativeChange": 2.5315919306906274,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -16760,7 +16760,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 488642.99502682476,
+          "value": 561962.13519031,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -16770,7 +16770,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 488642.99502682476,
+          "value": 561962.13519031,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -16780,11 +16780,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 351554.5413991044,
+          "value": 196095.69664225826,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -137088.45362772036,
-          "relativeChange": -0.28054930700519853,
+          "change": -365866.4385480517,
+          "relativeChange": -0.6510517624539776,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -16818,7 +16818,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 554534.6678864037,
+          "value": 384554.1797762791,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -16828,7 +16828,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 554534.6678864037,
+          "value": 384554.1797762791,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -16838,11 +16838,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 642939.3457249232,
+          "value": 396198.04454745195,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 88404.67783851945,
-          "relativeChange": 0.1594213724733782,
+          "change": 11643.86477117287,
+          "relativeChange": 0.03027886675928704,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -16876,7 +16876,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 306879.0944688738,
+          "value": 609435.1196449345,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -16886,7 +16886,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 306879.0944688738,
+          "value": 609435.1196449345,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -16896,11 +16896,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 485092.2022689266,
+          "value": 720402.2383724209,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 178213.1078000528,
-          "relativeChange": 0.5807274298319094,
+          "change": 110967.11872748635,
+          "relativeChange": 0.18208192332620632,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -16934,7 +16934,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 291214.0052668068,
+          "value": 382178.51612899464,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -16944,7 +16944,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 291214.0052668068,
+          "value": 382178.51612899464,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -16954,11 +16954,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 401037.9070490178,
+          "value": 336099.9545698146,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 109823.90178221097,
-          "relativeChange": 0.37712438205570376,
+          "change": -46078.56155918003,
+          "relativeChange": -0.12056816282061074,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -16992,7 +16992,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 1186595.6522605848,
+          "value": 873357.2003896299,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -17002,7 +17002,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 1186595.6522605848,
+          "value": 873357.2003896299,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -17012,11 +17012,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 1090067.591596918,
+          "value": 779687.9283066817,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -96528.06066366681,
-          "relativeChange": -0.08134873954726793,
+          "change": -93669.27208294824,
+          "relativeChange": -0.10725196064240344,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -17050,7 +17050,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 434959.1125071103,
+          "value": 510662.0835603176,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -17060,7 +17060,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 434959.1125071103,
+          "value": 510662.0835603176,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -17070,11 +17070,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 279630.8372596761,
+          "value": 576766.6569943007,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -155328.2752474342,
-          "relativeChange": -0.3571100611092383,
+          "change": 66104.57343398308,
+          "relativeChange": 0.12944875987875268,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -17108,7 +17108,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 694680.0079911104,
+          "value": 280351.6109590851,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -17118,7 +17118,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 694680.0079911104,
+          "value": 280351.6109590851,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -17128,11 +17128,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 367209.54491445934,
+          "value": 540208.8541361784,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -327470.4630766511,
-          "relativeChange": -0.47139756335242283,
+          "change": 259857.24317709327,
+          "relativeChange": 0.9268976279041863,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -17166,7 +17166,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 399011.8022049526,
+          "value": 431607.564672993,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -17176,7 +17176,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 399011.8022049526,
+          "value": 431607.564672993,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -17186,11 +17186,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 305145.319426434,
+          "value": 354427.6694109351,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": -93866.48277851858,
-          "relativeChange": -0.23524738431246708,
+          "change": -77179.8952620579,
+          "relativeChange": -0.1788196073915738,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -17224,7 +17224,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 279602.65155778534,
+          "value": 465111.9824721455,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -17234,7 +17234,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 279602.65155778534,
+          "value": 465111.9824721455,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -17244,11 +17244,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 459035.511994786,
+          "value": 717105.7155082689,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 179432.86043700064,
-          "relativeChange": 0.641742341988904,
+          "change": 251993.7330361234,
+          "relativeChange": 0.5417915309271025,
           "changePoints": null,
           "changeStatus": "ok"
         },
@@ -17282,7 +17282,7 @@
       "values": [
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-1",
-          "value": 279602.65155778534,
+          "value": 465111.9824721455,
           "status": "ok",
           "comparedWith": null,
           "change": null,
@@ -17292,7 +17292,7 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "value": 279602.65155778534,
+          "value": 465111.9824721455,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-1",
           "change": 0,
@@ -17302,11 +17302,11 @@
         },
         {
           "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
-          "value": 459035.511994786,
+          "value": 717105.7155082689,
           "status": "ok",
           "comparedWith": "microcosm-uk-2024-25-national/synthetic-build-2",
-          "change": 179432.86043700064,
-          "relativeChange": 0.641742341988904,
+          "change": 251993.7330361234,
+          "relativeChange": 0.5417915309271025,
           "changePoints": null,
           "changeStatus": "ok"
         },

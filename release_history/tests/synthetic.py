@@ -16,6 +16,8 @@ role the spec gives it, never from a country code.
   outputs; the same reform on the same build gives the same world.
 - A build's `seed` (a file's synthetic digest) moves every amount, so two
   files give two different points and the timeline has steps.
+- Every draw is numpy's `random` or `integers` (`_Draws`), so the world, and
+  every fixture made from it, is the same to the last digit on every platform.
 """
 
 from __future__ import annotations
@@ -33,6 +35,27 @@ from release_history.spec import Spec
 def _seed(*parts: object) -> int:
     text = "\x1f".join(str(part) for part in parts)
     return int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:12], 16)
+
+
+class _Draws:
+    """numpy's `random` and `integers` only, from a seed made of `parts`.
+
+    Those two draw the same numbers on every platform. numpy's other samplers
+    (`uniform`, `gamma`, `normal`, ...) compute `a + b * x` inside one C
+    expression, which arm64 builds round once (a fused multiply-add) and x86_64
+    builds round twice, so a fixture written on a Mac would differ in its last
+    digits from the one CI writes on Linux. Arithmetic on the draws happens in
+    separate numpy operations, each rounded once everywhere.
+    """
+
+    def __init__(self, *parts: object) -> None:
+        self._generator = np.random.default_rng(_seed(*parts))
+
+    def random(self, size: int | None = None) -> Any:
+        return self._generator.random(size)
+
+    def integers(self, low: int, high: int, size: int) -> np.ndarray:
+        return self._generator.integers(low, high, size=size)
 
 
 class SyntheticParameter:
@@ -75,7 +98,7 @@ class SyntheticWorld:
 
     def __post_init__(self) -> None:
         spec = self.spec
-        rng = np.random.default_rng(_seed("structure", spec.country))
+        rng = _Draws("structure", spec.country)
         household = spec.household_entity
         self.group_entities = sorted(
             {item.entity for item in spec.baseline if item.entity} - {household, "person"}
@@ -111,7 +134,7 @@ class SyntheticWorld:
         self.source_ids = source
         self.ids = {entity: 10 * (np.arange(count) + 1) for entity, count in self.counts.items()}
         self.weights = {
-            entity: rng.uniform(50, 150, size=count) for entity, count in self.counts.items()
+            entity: 50.0 + 100.0 * rng.random(count) for entity, count in self.counts.items()
         }
         self.native = self._native_entities()
 
@@ -169,7 +192,7 @@ class SyntheticSim:
         key = sorted(
             (path, sorted(map(str, values.items()))) for path, values in self.reform.items()
         )
-        rng = np.random.default_rng(_seed("reform", key))
+        rng = _Draws("reform", key)
         households = rng.random(world.households) < 0.2
         household = world.spec.household_entity
         if entity == household:
@@ -194,12 +217,14 @@ class SyntheticSim:
         elif variable == spec.income_decile:
             values = world.decile
         elif variable in flags:
-            rng = np.random.default_rng(_seed("flag", variable, period))
+            rng = _Draws("flag", variable, period)
             values = rng.random(size) < 0.3
             values = values ^ (self._moved(entity) & (rng.random(size) < 0.5))
         else:
-            rng = np.random.default_rng(_seed("amount", variable, period, self.seed))
-            amounts = rng.gamma(2.0, 4000.0, size=size) * (rng.random(size) > 0.25)
+            rng = _Draws("amount", variable, period, self.seed)
+            # Skewed like incomes, a mean of 8,000, and a quarter of them zero.
+            draws = rng.random(size)
+            amounts = 24_000.0 * draws * draws * (rng.random(size) > 0.25)
             values = np.where(self._moved(entity), amounts * 1.05 + 10.0, amounts)
         return world.map_values(np.asarray(values), entity, map_to or entity)
 
