@@ -7,8 +7,15 @@ import {
   directoryStore,
   RELEASE_HISTORY_LOCAL_DIR_ENV,
   releaseHistoryLocalDirectory,
+  releaseHistoryReadStore,
 } from "./release-history-source";
-import { readJson, RELEASE_HISTORY_MANIFEST_PATH } from "./release-history-store";
+import {
+  encodeDocument,
+  memoryStore,
+  readJson,
+  RELEASE_HISTORY_MANIFEST_PATH,
+  type ReleaseHistoryStore,
+} from "./release-history-store";
 
 async function folder(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "release-history-source-"));
@@ -49,4 +56,35 @@ test("the folder is read only when the environment names it", () => {
   expect(releaseHistoryLocalDirectory({})).toBeNull();
   expect(releaseHistoryLocalDirectory({ [RELEASE_HISTORY_LOCAL_DIR_ENV]: "  " })).toBeNull();
   expect(releaseHistoryLocalDirectory({ [RELEASE_HISTORY_LOCAL_DIR_ENV]: "/tmp/store" })).toBe("/tmp/store");
+});
+
+test("Blob is read with the deployment's own credentials: no token is passed, whatever the environment holds", async () => {
+  const blob = memoryStore();
+  await blob.write(RELEASE_HISTORY_MANIFEST_PATH, encodeDocument({ formatVersion: 1 }), "create", false);
+  const calls: unknown[][] = [];
+  const blobStore = (...credentials: unknown[]): ReleaseHistoryStore => {
+    calls.push(credentials);
+    return blob;
+  };
+  // A token in the environment is the Blob client's to pick, after OIDC with BLOB_STORE_ID.
+  for (const environment of [{}, { BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_secret", BLOB_STORE_ID: "store_1" }]) {
+    const store = releaseHistoryReadStore(environment, blobStore);
+    expect(await readJson<{ formatVersion: number }>(store, RELEASE_HISTORY_MANIFEST_PATH)).toEqual({ formatVersion: 1 });
+    expect(await store.list("release-history/")).toEqual([RELEASE_HISTORY_MANIFEST_PATH]);
+    // The page only reads: nothing is written through the store it is given.
+    await expect(store.write(RELEASE_HISTORY_MANIFEST_PATH, new Uint8Array(), "replace", false)).rejects.toThrow("never writes");
+  }
+  expect(calls).toEqual([[], []]);
+  expect(await readJson<{ formatVersion: number }>(blob, RELEASE_HISTORY_MANIFEST_PATH)).toEqual({ formatVersion: 1 });
+});
+
+test("a named local folder is read in place of Blob, which is then never opened", async () => {
+  const root = await folder();
+  let opened = 0;
+  const store = releaseHistoryReadStore({ [RELEASE_HISTORY_LOCAL_DIR_ENV]: root, BLOB_READ_WRITE_TOKEN: "unused" }, () => {
+    opened += 1;
+    return memoryStore();
+  });
+  expect(await readJson<{ formatVersion: number }>(store, RELEASE_HISTORY_MANIFEST_PATH)).toEqual({ formatVersion: 1 });
+  expect(opened).toBe(0);
 });

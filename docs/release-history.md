@@ -295,7 +295,11 @@ on a country code. A country the dashboard does not serve gets the
 not-configured state, and one with no measured file an empty state.
 
 Three routes read the store on the server, so the browser never receives a
-Blob URL or a token. Each requires `?country=`.
+Blob URL or a token. Each requires `?country=`. They read Blob as the
+dashboard's other Blob reads do ([hosted runtime](../frontend/HOSTED_RUNTIME.md)):
+with no credential passed, so `@vercel/blob` uses the deployment's Vercel OIDC
+token with `BLOB_STORE_ID` when both are present, and `BLOB_READ_WRITE_TOKEN`
+otherwise. The page has no setting of its own for Blob, and it never writes.
 
 - `GET /api/microcosm/release-history`: the country's panels from the
   manifest, one per reference engine that holds a measured file, with engine,

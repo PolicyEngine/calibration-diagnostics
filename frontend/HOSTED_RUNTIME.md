@@ -22,7 +22,9 @@ The dashboard server also reads:
   deployment's Vercel OIDC token with `BLOB_STORE_ID` when both are present, and
   `BLOB_READ_WRITE_TOKEN` otherwise. The comparison route
   (`frontend/app/api/microcosm/comparison-tree/route.ts`) writes a missing comparison
-  artifact with `BLOB_READ_WRITE_TOKEN`.
+  artifact with `BLOB_READ_WRITE_TOKEN`. The release history page's routes read the
+  same store the same way, with no credential passed, and never write
+  (see [release history](../docs/release-history.md#the-page)).
 
 The Modal runtime uses Python 3.12 and the hashed `backend/requirements.lock`.
 Regenerate that lock from the repository root with `uv pip compile
