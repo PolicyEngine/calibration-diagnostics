@@ -210,6 +210,83 @@
               }
             ],
             "description": "Columns of the file the reference model does not define; null where the panel holds no point or the point is a gap."
+          },
+          "declared": {
+            "description": "Added after the first timelines were written, so not required: what the build the panel's point was fetched through declares about its file, copied from the point (`fetched_from.declared`). Null where the panel holds no point.",
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "fetchedThrough",
+                  "builtAt",
+                  "builtWithModel",
+                  "builtWithCore",
+                  "compatibleModels",
+                  "codeRepository",
+                  "codeCommit",
+                  "targetSurfaceSha256",
+                  "nTargets",
+                  "targetRegistryVersion",
+                  "householdWeightYear"
+                ],
+                "properties": {
+                  "fetchedThrough": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+                    "description": "The build the point was fetched through: another build than this one where two builds publish the same file."
+                  },
+                  "builtAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "builtWithModel": {
+                    "description": "Copied as the upstream document holds it; its shape is that document's."
+                  },
+                  "builtWithCore": {
+                    "description": "Copied as the upstream document holds it; its shape is that document's."
+                  },
+                  "compatibleModels": {
+                    "description": "Copied as the upstream document holds it; its shape is that document's."
+                  },
+                  "codeRepository": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "codeCommit": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "targetSurfaceSha256": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "nTargets": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "targetRegistryVersion": {
+                    "description": "Copied as the upstream document holds it; its shape is that document's."
+                  },
+                  "householdWeightYear": {
+                    "description": "Copied as the upstream document holds it; its shape is that document's."
+                  }
+                }
+              }
+            ]
           }
         }
       }

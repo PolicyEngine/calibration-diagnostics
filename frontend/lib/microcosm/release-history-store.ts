@@ -745,9 +745,14 @@ export interface ReferencesLock {
  * `withdrawn`: listed, but never a neighbour, so no step starts or ends at it. `sameFileAs`: the
  * earliest earlier build that publishes the same file. `state`: the file's state on this panel,
  * `missing` when it was never run. `status`: the stored point's (ok, partial or refused).
- * `reason`: a gap's refusal reason, or the last error of a failed or retrying file.
+ * `reason`: a gap's refusal reason, or the last error of a failed or retrying file. `declared`:
+ * what the build the point was fetched through declares about its file (the model and core it
+ * was built with, its Microcosm commit, its target set), for the page's step card and marks.
  */
 export type TimelineBuild = Timeline["builds"][number];
+
+/** A build's declared facts on the timeline; a timeline written before they were carried has none. */
+export type TimelineDeclared = NonNullable<TimelineBuild["declared"]>;
 
 /** One output in one period, with a value per build in the order of the timeline's `builds`. */
 export type TimelineOutput = Timeline["outputs"][number];
@@ -789,6 +794,28 @@ function stateOfStored(document: MeasurementDocument): PointState {
 }
 
 /**
+ * What the build a point was fetched through declares about its file: a copy of the point's
+ * facts, so the page reads a step's two builds from the timeline alone.
+ */
+function declaredFacts(point: MeasurementDocument): TimelineDeclared {
+  const declared = point.fetched_from.declared;
+  const provenance = declared.build_provenance;
+  return {
+    fetchedThrough: point.fetched_from.build_id,
+    builtAt: declared.built_at,
+    builtWithModel: declared.built_with_model ?? null,
+    builtWithCore: declared.built_with_core ?? null,
+    compatibleModels: declared.compatible_models ?? null,
+    codeRepository: provenance?.code_repository ?? null,
+    codeCommit: provenance?.code_commit ?? null,
+    targetSurfaceSha256: provenance?.target_surface_sha256 ?? null,
+    nTargets: provenance?.n_targets ?? null,
+    targetRegistryVersion: provenance?.target_registry_version ?? null,
+    householdWeightYear: provenance?.household_weight_year ?? null,
+  };
+}
+
+/**
  * Each listed build with its file's state on the panel: the stored point's when there is one,
  * else the manifest's (retrying or failed), else missing.
  */
@@ -819,6 +846,7 @@ function timelineBuilds(
       reason: point ? point.reason : state?.lastError ?? null,
       referenceModelCompatibility: point?.fetched_from?.declared?.reference_model_compatibility ?? null,
       unknownColumns: point?.data?.unknown_columns ?? null,
+      declared: point ? declaredFacts(point) : null,
     };
   });
 }

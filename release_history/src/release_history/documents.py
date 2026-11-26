@@ -359,6 +359,23 @@ class TimelineLabel(TypedDict):
     source: JsonValue
 
 
+class TimelineDeclared(TypedDict):
+    """What the build a point was fetched through declares about its file, as the timeline
+    copies it from the point's `fetched_from.declared`."""
+
+    fetchedThrough: str  # noqa: N815
+    builtAt: str | None  # noqa: N815
+    builtWithModel: JsonValue  # noqa: N815
+    builtWithCore: JsonValue  # noqa: N815
+    compatibleModels: JsonValue  # noqa: N815
+    codeRepository: str | None  # noqa: N815
+    codeCommit: str | None  # noqa: N815
+    targetSurfaceSha256: str | None  # noqa: N815
+    nTargets: int | None  # noqa: N815
+    targetRegistryVersion: JsonValue  # noqa: N815
+    householdWeightYear: JsonValue  # noqa: N815
+
+
 class TimelineBuild(TypedDict):
     buildId: str  # noqa: N815
     release: str
@@ -374,6 +391,8 @@ class TimelineBuild(TypedDict):
     reason: str | None
     referenceModelCompatibility: Compatibility | None  # noqa: N815
     unknownColumns: list[str] | None  # noqa: N815
+    # Added after the first timelines were written, so a stored timeline may lack it.
+    declared: NotRequired[TimelineDeclared | None]
 
 
 class TimelineReference(TypedDict):

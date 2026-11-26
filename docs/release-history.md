@@ -263,8 +263,13 @@ served page.
 
 `timeline.json` holds, for each build of the series record in publish order,
 its file, state and point, whether the reference model is inside the range the
-build declares, and the file's columns the model does not define (it drops
-them); and for each output and period, one value per
+build declares, the file's columns the model does not define (it drops
+them), and what the build its point was fetched through declares (`declared`:
+its built-at time, the model and core it was built with, the range of models
+it declares, its Microcosm repository and commit, its target set's digest and
+size, the target registry version and the household weight year; null where
+the panel holds no point, and absent from a timeline written before the page
+needed it); and for each output and period, one value per
 build, the change from the previous build on the series when both hold the
 cell (relative for money and counts, in percentage points for rates), and the
 output's official reference. A withdrawn build is listed but is never a
