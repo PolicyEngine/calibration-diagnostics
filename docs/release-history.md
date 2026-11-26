@@ -286,7 +286,12 @@ other, and declare a later key without requiring it. Maps copied from
 upstream manifests, or keyed by reform ids, stay open. The tests check every
 document of each country's fixtures against its schema, and every attempt
 report and planned point the producer's tests write or read; the TypeScript
-tests build each country's timeline fixture from the producer's.
+tests build each country's timeline fixture from the producer's. Both languages
+type the documents from the same schemas: the producer's TypedDicts
+(`release_history/documents.py`) are compared with them key by key
+(`tests/test_documents.py`), and the TypeScript types are generated from them
+(`frontend/scripts/generate-release-history-types.ts`), with a test that fails
+while the generated file is stale. CI runs Pyright in strict mode on the producer.
 
 ## Regeneration
 

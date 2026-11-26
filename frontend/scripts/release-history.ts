@@ -49,6 +49,7 @@ import {
   type LabelsDocument,
   type ManifestPoint,
   type MeasurementDocument,
+  type PanelDocument,
   type Plan,
   type PlanMode,
   type ReferencesLock,
@@ -56,25 +57,6 @@ import {
   type ReleaseHistoryStore,
   type SeriesRecord,
 } from "../lib/microcosm/release-history-store";
-
-/** The producer's panel.json (`engine.panel_document`): the panel key and what it hashes. */
-export interface PanelDocument {
-  format_version: number;
-  kind: "release_history.panel";
-  panel_id: string;
-  panel_key: Record<string, unknown>;
-  country: string;
-  engine: {
-    policyengine: string;
-    bundle_sha256?: string;
-    model: { name: string; version: string };
-    core: { name: string; version: string };
-  };
-  producer_version: string;
-  point_format_version: number;
-  spec_sha256: string;
-  definition: Record<string, unknown>;
-}
 
 function now(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -197,7 +179,7 @@ export async function uploadDirectory(
   const counts: Record<string, number> = {};
   const failed: string[] = [];
   const files = (await walk(join(root, RELEASE_HISTORY_PREFIX)))
-    .filter((f) => f.endsWith(".json"))
+    .filter((file) => file.endsWith(".json"))
     .map((file) => ({ file, path: relative(root, file).split("\\").join("/") }))
     .map((entry) => ({ ...entry, kind: storedFileKind(entry.path) }))
     .sort((left, right) =>
@@ -230,7 +212,7 @@ export async function uploadDirectory(
 async function storedMeasurements(store: ReleaseHistoryStore, country: string, panelId: string) {
   const paths = await store.list(panelPrefix(country, panelId));
   const documents: MeasurementDocument[] = [];
-  for (const path of paths.filter((p) => storedFileKind(p) === "measurement").sort()) {
+  for (const path of paths.filter((candidate) => storedFileKind(candidate) === "measurement").sort()) {
     const document = await readJson<MeasurementDocument>(store, path);
     if (document) documents.push(document);
   }
@@ -267,7 +249,7 @@ export async function finalize(options: {
 }) {
   const { store, panel } = options;
   const country = panel.country;
-  const at = options.at ?? now();
+  const finalizedAt = options.at ?? now();
   const series = await readJson<SeriesRecord>(store, countryFilePath(country, "series"));
   const stored = await storedMeasurements(store, country, panel.panel_id);
   const reports: Record<string, AttemptReport> = {};
@@ -286,8 +268,8 @@ export async function finalize(options: {
       reports,
       cancelled: options.measureResult === "cancelled",
       pin: options.pin,
-      at,
-    }), at);
+      at: finalizedAt,
+    }), finalizedAt);
   const entry = manifest.countries[country]!;
   let timelines = 0;
   if (series && listedBuilds(series).length > 0) {
@@ -304,7 +286,7 @@ export async function finalize(options: {
         states: entry.panels[panelId].points,
         references,
         labels,
-        builtAt: at,
+        builtAt: finalizedAt,
       });
       await putReplace(store, `${panelPrefix(country, panelId)}timeline.json`, encodeDocument(timeline));
       timelines += 1;
@@ -398,8 +380,12 @@ function blobStore(): ReleaseHistoryStore {
   return vercelBlobStore(process.env.BLOB_READ_WRITE_TOKEN || undefined);
 }
 
-// A run is flagged once it comes within 20% of a limit: the runner's (per file) or a plan's cap.
-const WARN_AT = 0.8;
+/**
+ * A plan is flagged once it comes within 20% of its cap. The producer flags a file near a runner
+ * limit at the same share, and records it in each point (`runtime.limits.warn_at`); a test holds
+ * the two equal.
+ */
+export const WARN_AT = 0.8;
 
 /** A GitHub Actions warning, shown on the run's page; it carries ids and shares only. */
 function warning(title: string, message: string): void {
@@ -461,7 +447,7 @@ async function main(argv: string[]): Promise<void> {
         (result.reason ? ` (${result.reason})` : "") + "." +
         (nearCap ? `\n\n**Near the cap:** ${result.points.length} of at most ${MAX_PLANNED_POINTS} files in one run.` : ""),
     );
-    console.log(JSON.stringify({ ...result, points: result.points.map((p) => p.build_id) }));
+    console.log(JSON.stringify({ ...result, points: result.points.map((point) => point.build_id) }));
   } else if (command === "upload") {
     console.log(JSON.stringify(await uploadDirectory(blobStore(), values.root!, { countryFiles: values.pin === true })));
   } else if (command === "finalize") {
@@ -474,12 +460,12 @@ async function main(argv: string[]): Promise<void> {
       store, panel, plan: planned, pin: values.pin === true, measureResult: values["measure-result"],
     });
     const rows = summary.points
-      .map((p) => `| ${p.buildId ?? ""} | \`${p.digest.slice(0, 12)}\` | ${p.state} | ${p.measurementStatus ?? ""} | ${p.attempts} | ${[p.lastError, p.lastStage].filter(Boolean).join(" at ")} | ${p.nearLimits.join(", ")} |`)
+      .map((point) => `| ${point.buildId ?? ""} | \`${point.digest.slice(0, 12)}\` | ${point.state} | ${point.measurementStatus ?? ""} | ${point.attempts} | ${[point.lastError, point.lastStage].filter(Boolean).join(" at ")} | ${point.nearLimits.join(", ")} |`)
       .join("\n");
-    const near = summary.points.filter((p) => p.nearLimits.length > 0);
-    for (const p of near) {
+    const near = summary.points.filter((point) => point.nearLimits.length > 0);
+    for (const point of near) {
       warning("Release history near a runner limit",
-        `${summary.country} ${p.buildId ?? p.digest.slice(0, 12)}: within 20% of its ${p.nearLimits.join(", ")} limit`);
+        `${summary.country} ${point.buildId ?? point.digest.slice(0, 12)}: within 20% of its ${point.nearLimits.join(", ")} limit`);
     }
     const { coverage } = summary;
     await stepSummary(

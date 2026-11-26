@@ -25,6 +25,27 @@
  */
 import { BlobPreconditionFailedError, get, list, put } from "@vercel/blob";
 
+import type {
+  AttemptReport,
+  LabelsDocument,
+  MeasurementDocument,
+  PlannedPoint,
+  SeriesRecord,
+  Timeline,
+} from "./release-history-documents";
+
+// The documents the Python producer and this side hand each other, generated from the JSON
+// Schemas in release_history/schemas/ by scripts/generate-release-history-types.ts.
+export type {
+  AttemptReport,
+  LabelsDocument,
+  MeasurementDocument,
+  PanelDocument,
+  PlannedPoint,
+  SeriesRecord,
+  Timeline,
+} from "./release-history-documents";
+
 export const RELEASE_HISTORY_PREFIX = "release-history";
 export const RELEASE_HISTORY_MANIFEST_PATH = `${RELEASE_HISTORY_PREFIX}/manifest.json`;
 // Each document kind has its own format version; an added field never moves one.
@@ -265,41 +286,13 @@ function compareText(left: string, right: string): number {
 // ---------------------------------------------------------------------------
 // The series record (written by the Python `series` command, snake_case)
 
-export interface SeriesBuild {
-  /** `<release>/<build>`, as releases.json names it. */
-  build_id: string;
-  release: string;
-  build: string;
-  release_directory: string;
-  published_at: string;
-  withdrawn: boolean;
-  /** The line's current build. */
-  current: boolean;
-  in_default_release: boolean;
-  role: string | null;
-  /** The sha256 of the build's national data file: a point is one file on one panel. */
-  digest: string | null;
-  dataset_path: string | null;
-  release_manifest_sha256: string | null;
-  /** `refused` when the build has no file to measure; it is never planned. */
-  listing_status: "ok" | "refused";
-  listing_reason: string | null;
-}
-
-export interface SeriesRecord {
-  format_version: number;
-  kind: "release_history.series";
-  country: string;
-  release_repo: string;
-  rule: { releases: string[]; since: string | null };
-  revision: string;
-  /** The one commit of the release repository everything was read at. */
-  commit: string;
-  listed_at: string;
-  record: { present: boolean; sha256: string | null; default: string | null };
-  lines: Array<{ release: string; present: boolean; role: string | null }>;
-  builds: SeriesBuild[];
-}
+/**
+ * One build of the series record: `build_id` is `<release>/<build>` as releases.json names it,
+ * `current` marks its line's current build, `digest` is the sha256 of its national data file (a
+ * point is one file on one panel), and `listing_status` is `refused` when it has no file to
+ * measure, so it is never planned.
+ */
+export type SeriesBuild = SeriesRecord["builds"][number];
 
 function publishedTime(build: SeriesBuild): number {
   const time = Date.parse(build.published_at);
@@ -343,7 +336,10 @@ export interface ManifestPoint {
   lastError: string | null;
   /** Where the last failed attempt stopped (open, download, baseline, reform:<id>, ...). */
   lastStage: string | null;
-  /** The runner limits its stored point came within 20% of: seconds, memory, dataset. */
+  /**
+   * The runner limits (seconds, memory, dataset) its stored point came within 20% of, sorted: the
+   * names in the point's `runtime.near_limits`, which the producer computes once.
+   */
   nearLimits: string[];
   /** The build the file was last planned under, when a plan named it. */
   lastBuildId: string | null;
@@ -444,19 +440,6 @@ export async function updateManifestCountry(
 
 // ---------------------------------------------------------------------------
 // Planning
-
-/** The point JSON the Python producer reads (`releases.Point.from_json`). */
-export interface PlannedPoint {
-  build_id: string;
-  release_directory: string;
-  hf_repo: string;
-  hf_commit: string;
-  /** The file the series listed; the producer refuses a different one. */
-  digest: string;
-  attempt: number;
-  /** A partial result (a reform failed) is stored only on the last attempt. */
-  last_attempt: boolean;
-}
 
 export type PlanMode = "topup" | "backfill" | "release" | "retry";
 export const PLAN_MODES: readonly PlanMode[] = ["topup", "backfill", "release", "retry"];
@@ -602,88 +585,16 @@ export interface PanelSummary {
   producerVersion: string | null;
 }
 
-export interface MeasurementCell {
-  output: string;
-  period: number;
-  unit: string;
-  value: number | null;
-  status: string;
-  reason?: string | null;
-}
+/** One output of a stored point in one period: ok, or withheld with the reason the point keeps. */
+export type MeasurementCell = MeasurementDocument["cells"][number];
 
-/** A file's attempt report, as the Python producer writes it (`cli.AttemptReport`). */
-export interface AttemptReport {
-  format_version: number;
-  kind: "release_history.attempt";
-  country: string;
-  panel_id: string;
-  digest: string;
-  build_id: string;
-  attempt: number;
-  last_attempt: boolean;
-  /** `interrupted`: written before a stage and never replaced, so the run died there. */
-  status: "interrupted" | "failed";
-  stage: string;
-  reason: string;
-  error_class: string | null;
-  at: string;
-}
-
-/** The runner limits a point ran under, as the producer records them (`runtime.limits`). */
-export interface RunnerLimits {
-  seconds: number | null;
-  memory_bytes: number | null;
-  dataset_bytes: number | null;
-  /** The share of a limit at which a run is flagged: 0.8, 20% short of the limit. */
-  warn_at: number;
-}
-
-/** How much of each limit a stored point used: seconds, peak memory and the file's size. */
-export function runnerUsage(document: MeasurementDocument): Record<string, number> {
-  const runtime = document.runtime;
-  const limits = runtime?.limits;
-  if (!runtime || !limits) return {};
-  const peak = Math.max(0, ...(runtime.simulations ?? []).map((s) => s.peak_rss_bytes ?? 0));
-  const usage: Record<string, number> = {};
-  const share = (name: string, used: number | null | undefined, limit: number | null) => {
-    if (typeof used === "number" && typeof limit === "number" && limit > 0) usage[name] = used / limit;
-  };
-  share("seconds", runtime.seconds, limits.seconds);
-  share("memory", peak || null, limits.memory_bytes);
-  share("dataset", document.file.bytes, limits.dataset_bytes);
-  return usage;
-}
-
-/** The limits a stored point came within 20% (its `warn_at`) of, by name. */
-export function nearLimits(document: MeasurementDocument): string[] {
-  const warnAt = document.runtime?.limits?.warn_at ?? 0.8;
-  return Object.entries(runnerUsage(document)).filter(([, used]) => used >= warnAt).map(([name]) => name).sort();
+/** The runner limits a stored point came within 20% of, by name, as the producer recorded them. */
+function nearLimitNames(document: MeasurementDocument): string[] {
+  return document.runtime.near_limits.map((near) => near.limit).sort();
 }
 
 /** A failure no later attempt can fix: the file is over the runner's budget. */
 export const FAILS_AT_ONCE: ReadonlySet<string> = new Set(["exceeds_runner_budget"]);
-
-/** A stored point, as the Python producer writes it (snake_case; `document.py`). */
-export interface MeasurementDocument {
-  format_version: number;
-  kind: string;
-  country: string;
-  panel_id: string;
-  measurement_id: string;
-  /** ok, partial (a reform failed on the last attempt), or refused (the file's own fault). */
-  status: string;
-  reason: string | null;
-  /** The file alone; what the build it was fetched through declares is under `fetched_from`. */
-  file: { sha256: string; bytes: number | null };
-  fetched_from?: { declared?: { reference_model_compatibility?: string | null } };
-  data?: { unknown_columns?: string[] } | null;
-  runtime?: {
-    seconds: number | null;
-    simulations?: Array<{ peak_rss_bytes?: number | null }>;
-    limits?: RunnerLimits | null;
-  };
-  cells: MeasurementCell[];
-}
 
 function emptyCoverage(): PanelCoverage {
   return { builds: 0, files: 0, measured: 0, gap: 0, retrying: 0, failed: 0, missing: 0 };
@@ -767,7 +678,7 @@ export function finalizeCountry(options: {
       attempts: point?.attempt ?? Math.max(before?.attempts ?? 0, 1),
       lastError: refused ? document.reason : null,
       lastStage: null,
-      nearLimits: nearLimits(document),
+      nearLimits: nearLimitNames(document),
       lastBuildId: point?.build_id ?? before?.lastBuildId ?? null,
     };
   }
@@ -795,8 +706,8 @@ export function finalizeCountry(options: {
   // a missing record says nothing about the panels.
   const axis = seriesAxis(options.series);
   if (axis.length > 0) {
-    for (const [id, panel] of Object.entries(entry.panels)) {
-      entry.panels[id] = { ...panel, ...panelCoverage(panel.points, axis) };
+    for (const [countryPanelId, countryPanel] of Object.entries(entry.panels)) {
+      entry.panels[countryPanelId] = { ...countryPanel, ...panelCoverage(countryPanel.points, axis) };
     }
   }
   if (pinning) {
@@ -829,76 +740,29 @@ export interface ReferencesLock {
   chronicle?: Record<string, unknown>;
 }
 
-/** The country's labels.json: what the page shows for each reform. Replaceable, not hashed. */
-export interface LabelsDocument {
-  format_version: number;
-  kind: "release_history.labels";
-  country: string;
-  reforms: Record<string, { label: string | null; source: Record<string, unknown> | null }>;
-}
+/**
+ * One build on the timeline. `current`: the current build of the record's default release.
+ * `withdrawn`: listed, but never a neighbour, so no step starts or ends at it. `sameFileAs`: the
+ * earliest earlier build that publishes the same file. `state`: the file's state on this panel,
+ * `missing` when it was never run. `status`: the stored point's (ok, partial or refused).
+ * `reason`: a gap's refusal reason, or the last error of a failed or retrying file.
+ */
+export type TimelineBuild = Timeline["builds"][number];
 
-export interface TimelineBuild {
-  buildId: string;
-  release: string;
-  build: string;
-  publishedAt: string;
-  /** The current build of the record's default release. */
-  current: boolean;
-  /** Withdrawn builds are listed but never a neighbour: no step starts or ends at one. */
-  withdrawn: boolean;
-  digest: string;
-  /** The earliest earlier build that publishes the same file. */
-  sameFileAs: string | null;
-  /** The file's state on this panel; `missing` when it was never run. */
-  state: PointState | "missing";
-  measurementId: string | null;
-  /** The stored point's status: ok, partial or refused. */
-  status: string | null;
-  /** A gap's refusal reason, or the last error of a failed or retrying file. */
-  reason: string | null;
-  /** Whether the reference model is inside the range the build declares (inside, outside,
-   *  undeclared or unreadable); null where the panel holds no point for the file. */
-  referenceModelCompatibility: string | null;
-  /** Columns in the file the reference model does not define (it drops them); null where the panel
-   *  holds no point, or the point is a gap. */
-  unknownColumns: string[] | null;
-}
+/** One output in one period, with a value per build in the order of the timeline's `builds`. */
+export type TimelineOutput = Timeline["outputs"][number];
 
-export interface TimelineValue {
-  buildId: string;
-  value: number | null;
-  /** ok or withheld (the cell's own), missing (the point has no such cell), or unmeasured. */
-  status: string;
-  /** The neighbour the change is from: the previous build on the axis, when both have the cell. */
-  comparedWith: string | null;
-  change: number | null;
-  /** change / |previous|, for currency and counts. */
-  relativeChange: number | null;
-  /** The change in percentage points, for rates (shares) and percentages. */
-  changePoints: number | null;
-  changeStatus: "ok" | "withheld" | "none";
-}
+/**
+ * One build's value of an output. `status`: ok or withheld (the cell's own), missing (the point
+ * has no such cell), or unmeasured. `comparedWith`: the neighbour the change is from, the previous
+ * build on the axis when both have the cell. `relativeChange`: change / |previous|, for currency
+ * and counts. `changePoints`: the change in percentage points, for rates (shares) and percentages.
+ */
+export type TimelineValue = TimelineOutput["values"][number];
 
-export interface TimelineOutput {
-  output: string;
-  period: number;
-  unit: string;
-  reference: (ReferenceEntry & { modelSignValue?: number }) | null;
-  /** One value per build, in the order of `builds`. */
-  values: TimelineValue[];
-}
-
-export interface Timeline {
-  formatVersion: typeof TIMELINE_FORMAT_VERSION;
-  kind: "release_history.timeline";
-  country: string;
-  panelId: string;
-  builtAt: string;
-  listing: { commit: string; listedAt: string; rule: { releases: string[]; since: string | null } };
-  labels: LabelsDocument["reforms"];
-  builds: TimelineBuild[];
-  outputs: TimelineOutput[];
-  chronicle: Record<string, unknown> | null;
+/** An output and period, as a point's cells and the timeline's rows are keyed. */
+function cellKey(cell: Pick<MeasurementCell, "output" | "period">): string {
+  return `${cell.output}@${cell.period}`;
 }
 
 function referenceFor(output: string, references: ReferencesLock | null): ReferenceEntry | null {
@@ -925,30 +789,19 @@ function stateOfStored(document: MeasurementDocument): PointState {
 }
 
 /**
- * A panel's numbers on the country's series axis. Order, publish times, `current` and withdrawn
- * come from the series record, joined to the points by file digest, so a corrected publish time
- * re-orders the timeline with no re-run. A point whose file the series no longer lists never
- * plots. A step exists only between neighbours on the axis that both hold the cell; a withheld
- * cell carries its status and no reason (the point keeps the reason).
+ * Each listed build with its file's state on the panel: the stored point's when there is one,
+ * else the manifest's (retrying or failed), else missing.
  */
-export function buildTimeline(options: {
-  country: string;
-  panelId: string;
-  series: SeriesRecord;
-  points: MeasurementDocument[];
-  /** The panel's manifest points, for retrying and failed files; stored points suffice without. */
-  states?: Record<string, ManifestPoint>;
-  references: ReferencesLock | null;
-  labels: LabelsDocument | null;
-  builtAt: string;
-}): Timeline {
-  const listed = listedBuilds(options.series);
-  const byDigest = new Map(options.points.map((point) => [point.file.sha256, point]));
+function timelineBuilds(
+  listed: SeriesBuild[],
+  pointByDigest: ReadonlyMap<string, MeasurementDocument>,
+  states: Record<string, ManifestPoint> | undefined,
+): TimelineBuild[] {
   const firstWithFile = new Map<string, string>();
-  const builds: TimelineBuild[] = listed.map((build) => {
+  return listed.map((build) => {
     const digest = build.digest as string;
-    const point = byDigest.get(digest);
-    const state = own(options.states, digest);
+    const point = pointByDigest.get(digest);
+    const state = own(states, digest);
     const sameFileAs = firstWithFile.get(digest) ?? null;
     if (!sameFileAs) firstWithFile.set(digest, build.build_id);
     return {
@@ -968,63 +821,126 @@ export function buildTimeline(options: {
       unknownColumns: point?.data?.unknown_columns ?? null,
     };
   });
-  const pointOf = listed.map((build) => byDigest.get(build.digest as string));
-  const keys = new Map<string, { output: string; period: number; unit: string }>();
-  for (const point of pointOf) {
+}
+
+type TimelineRow = Pick<TimelineOutput, "output" | "period" | "unit">;
+
+/** Every output and period a listed build's point holds, by key, ordered by output then period. */
+function timelineRows(points: ReadonlyArray<MeasurementDocument | undefined>): Array<[string, TimelineRow]> {
+  const rows = new Map<string, TimelineRow>();
+  for (const point of points) {
     for (const cell of point?.cells ?? []) {
-      const key = `${cell.output}@${cell.period}`;
-      if (!keys.has(key)) keys.set(key, { output: cell.output, period: cell.period, unit: cell.unit });
+      const key = cellKey(cell);
+      if (!rows.has(key)) rows.set(key, { output: cell.output, period: cell.period, unit: cell.unit });
     }
   }
-  const cellsOf = pointOf.map((point) =>
-    new Map((point?.cells ?? []).map((cell) => [`${cell.output}@${cell.period}`, cell]))
-  );
-  const ordered = [...keys.entries()].sort(([, left], [, right]) =>
+  return [...rows.entries()].sort(([, left], [, right]) =>
     compareText(left.output, right.output) || left.period - right.period
   );
-  const outputs: TimelineOutput[] = ordered.map(([key, { output, period, unit }]) => {
-    let previous: { buildId: string; cell: MeasurementCell | undefined } | null = null;
-    const values = builds.map((build, index): TimelineValue => {
-      const cell = cellsOf[index].get(key);
-      const value: TimelineValue = {
-        buildId: build.buildId,
-        value: cell?.value ?? null,
-        status: cell?.status ?? (pointOf[index] && build.state === "measured" ? "missing" : "unmeasured"),
-        comparedWith: null,
-        change: null,
-        relativeChange: null,
-        changePoints: null,
-        changeStatus: "none",
-      };
-      if (build.withdrawn) return value;
-      const before = previous?.cell;
-      if (cell && before && previous) {
-        value.comparedWith = previous.buildId;
-        if (cell.status === "withheld" || before.status === "withheld") {
-          value.changeStatus = "withheld";
-        } else if (cell.value !== null && before.value !== null) {
-          const change = cell.value - before.value;
-          value.change = change;
-          value.changeStatus = "ok";
-          if (unit === "rate") value.changePoints = change * 100;
-          else if (unit === "ratio") value.changePoints = change;
-          else if (before.value !== 0) value.relativeChange = change / Math.abs(before.value);
-        }
-      }
-      previous = { buildId: build.buildId, cell };
-      return value;
-    });
-    const entry = referenceFor(output, options.references);
-    const reference = entry && referencePeriodMatches(entry, period)
-      ? {
-          ...entry,
-          ...(typeof entry.value === "number"
-            ? { modelSignValue: entry.value * (entry.sign ?? 1) }
-            : {}),
-        }
-      : null;
-    return { output, period, unit, reference, values };
+}
+
+/**
+ * The step from a neighbour's cell to this one: none across a withheld cell, relative for money
+ * and counts, and in percentage points for rates (shares) and ratios (percentages).
+ */
+function applyStep(
+  value: TimelineValue,
+  cell: MeasurementCell,
+  before: MeasurementCell,
+  unit: MeasurementCell["unit"],
+): void {
+  if (cell.status === "withheld" || before.status === "withheld") {
+    value.changeStatus = "withheld";
+  } else if (cell.value !== null && before.value !== null) {
+    const change = cell.value - before.value;
+    value.change = change;
+    value.changeStatus = "ok";
+    if (unit === "rate") value.changePoints = change * 100;
+    else if (unit === "ratio") value.changePoints = change;
+    else if (before.value !== 0) value.relativeChange = change / Math.abs(before.value);
+  }
+}
+
+/**
+ * One row's value on each build. A step runs only from the previous build on the axis, and only
+ * when both hold the cell; a withdrawn build is shown but never a neighbour.
+ */
+function timelineValues(
+  key: string,
+  unit: MeasurementCell["unit"],
+  builds: TimelineBuild[],
+  points: ReadonlyArray<MeasurementDocument | undefined>,
+  cellsByBuild: ReadonlyArray<ReadonlyMap<string, MeasurementCell>>,
+): TimelineValue[] {
+  let previous: { buildId: string; cell: MeasurementCell | undefined } | null = null;
+  return builds.map((build, index): TimelineValue => {
+    const cell = cellsByBuild[index].get(key);
+    const value: TimelineValue = {
+      buildId: build.buildId,
+      value: cell?.value ?? null,
+      status: cell?.status ?? (points[index] && build.state === "measured" ? "missing" : "unmeasured"),
+      comparedWith: null,
+      change: null,
+      relativeChange: null,
+      changePoints: null,
+      changeStatus: "none",
+    };
+    if (build.withdrawn) return value;
+    const before = previous?.cell;
+    if (cell && before && previous) {
+      value.comparedWith = previous.buildId;
+      applyStep(value, cell, before, unit);
+    }
+    previous = { buildId: build.buildId, cell };
+    return value;
   });
+}
+
+/** The output's official figure for its period, in the model's sign convention when it has a value. */
+function timelineReference(
+  output: string,
+  period: number,
+  references: ReferencesLock | null,
+): TimelineOutput["reference"] {
+  const entry = referenceFor(output, references);
+  if (!entry || !referencePeriodMatches(entry, period)) return null;
+  return {
+    ...entry,
+    ...(typeof entry.value === "number" ? { modelSignValue: entry.value * (entry.sign ?? 1) } : {}),
+  };
+}
+
+/**
+ * A panel's numbers on the country's series axis. Order, publish times, `current` and withdrawn
+ * come from the series record, joined to the points by file digest, so a corrected publish time
+ * re-orders the timeline with no re-run. A point whose file the series no longer lists never
+ * plots. A step exists only between neighbours on the axis that both hold the cell; a withheld
+ * cell carries its status and no reason (the point keeps the reason).
+ */
+export function buildTimeline(options: {
+  country: string;
+  panelId: string;
+  series: SeriesRecord;
+  points: MeasurementDocument[];
+  /** The panel's manifest points, for retrying and failed files; stored points suffice without. */
+  states?: Record<string, ManifestPoint>;
+  references: ReferencesLock | null;
+  labels: LabelsDocument | null;
+  builtAt: string;
+}): Timeline {
+  const listed = listedBuilds(options.series);
+  const pointByDigest = new Map(options.points.map((point) => [point.file.sha256, point]));
+  const builds = timelineBuilds(listed, pointByDigest, options.states);
+  // Each listed build's point, and its cells by key, in the order of `builds`.
+  const points = listed.map((build) => pointByDigest.get(build.digest as string));
+  const cellsByBuild = points.map((point) => new Map((point?.cells ?? []).map((cell) => [cellKey(cell), cell])));
+  const outputs = timelineRows(points).map(([key, { output, period, unit }]): TimelineOutput => ({
+    output,
+    period,
+    unit,
+    reference: timelineReference(output, period, options.references),
+    values: timelineValues(key, unit, builds, points, cellsByBuild),
+  }));
   return {
     formatVersion: TIMELINE_FORMAT_VERSION,
     kind: "release_history.timeline",
