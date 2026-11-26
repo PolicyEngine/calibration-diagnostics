@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 
 import diagnosticsFixture from "@/lib/microcosm/fixtures/zz-release/calibration_diagnostics.json";
-import { clearBuildRunCaches } from "@/lib/microcosm/build-runs";
+import { clearBuildRunCaches, loadBuildRuns } from "@/lib/microcosm/build-runs";
 import {
   FakeCollectorStore,
   type FakeStagingRun,
@@ -250,6 +250,34 @@ test("a version 2 run shows no reform validation other than the one its run mani
     });
     expect(store.huggingFaceRequests).toEqual([]);
   }
+});
+
+test("a version 2 run without a copied run manifest shows no reform validation", async () => {
+  const { "run_manifest.json": _manifest, ...files } = usV2RunFiles();
+  const store = serve(usV2Store(files));
+
+  const body = await runDetail();
+
+  expect(body.progress).toMatchObject({ schema_version: 3, run_id: US_V2_RUN });
+  expect(body.reform_validation).toBeNull();
+  expect(store.huggingFaceRequests).toEqual([]);
+});
+
+test("the calibration and Build progress readers don't read a version 2 run's reform validation", async () => {
+  const store = serve(usV2Store());
+  const copiedFiles = store.stagingIndex("us").runs[US_V2_RUN].files as Record<
+    string,
+    { path: string } | undefined
+  >;
+  const reformValidationCopy = copiedFiles["artifacts/reform_validation.json"]?.path;
+
+  const tree = await stagingTargetTree(request(`/staging/target-tree?country=us&run=${US_V2_RUN}`));
+  const builds = await loadBuildRuns("staging", "us");
+
+  expect(reformValidationCopy).toBeString();
+  expect(tree.status).toBe(200);
+  expect(builds.runs.map((run) => run.run_id)).toEqual([US_V2_RUN]);
+  expect(store.requests).not.toContain(reformValidationCopy);
 });
 
 test("a US version 1 run still shows its top-level reform validation", async () => {
