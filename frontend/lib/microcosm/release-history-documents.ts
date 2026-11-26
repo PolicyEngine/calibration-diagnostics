@@ -397,6 +397,40 @@ export interface Timeline {
      * Columns of the file the reference model does not define; null where the panel holds no point or the point is a gap.
      */
     unknownColumns: null | string[];
+    /**
+     * Added after the first timelines were written, so not required: what the build the panel's point was fetched through declares about its file, copied from the point (`fetched_from.declared`). Null where the panel holds no point.
+     */
+    declared?: null | {
+      /**
+       * The build the point was fetched through: another build than this one where two builds publish the same file.
+       */
+      fetchedThrough: string;
+      builtAt: string | null;
+      /**
+       * Copied as the upstream document holds it; its shape is that document's.
+       */
+      builtWithModel: unknown;
+      /**
+       * Copied as the upstream document holds it; its shape is that document's.
+       */
+      builtWithCore: unknown;
+      /**
+       * Copied as the upstream document holds it; its shape is that document's.
+       */
+      compatibleModels: unknown;
+      codeRepository: string | null;
+      codeCommit: string | null;
+      targetSurfaceSha256: string | null;
+      nTargets: number | null;
+      /**
+       * Copied as the upstream document holds it; its shape is that document's.
+       */
+      targetRegistryVersion: unknown;
+      /**
+       * Copied as the upstream document holds it; its shape is that document's.
+       */
+      householdWeightYear: unknown;
+    };
   }[];
   outputs: {
     output: string;

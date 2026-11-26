@@ -626,3 +626,69 @@ test("the timeline carries each point's model compatibility and the columns the 
     [null, null],
   ]);
 });
+
+test("the timeline carries what each build's point declares, for the page's step card and marks", () => {
+  // b1 and b2 publish one file: both carry the facts of the build its point was fetched through.
+  const listed = series([build("b1", file(1)), build("b2", file(1)), build("b3", file(3)), build("b4", file(4))]);
+  const withFacts: MeasurementDocument = {
+    ...point(file(1), [cell(1)]),
+    fetched_from: {
+      ...point(file(1)).fetched_from,
+      build_id: `${LINE}/b1`,
+      declared: {
+        ...point(file(1)).fetched_from.declared,
+        built_at: "2026-11-01T03:00:00+00:00",
+        built_with_model: { name: "policyengine-zz", version: "1.2.0" },
+        built_with_core: { name: "policyengine-core", version: "3.33.3" },
+        compatible_models: [{ name: "policyengine-zz", specifier: "==1.2.0" }],
+        build_provenance: {
+          code_repository: "PolicyEngine/microcosm",
+          code_commit: "e".repeat(40),
+          attempt_id: "b1",
+          target_surface_sha256: "7".repeat(64),
+          n_targets: 1214,
+          target_registry_version: "2026.11",
+          household_weight_year: 2024,
+          runtime: { seconds: 1 },
+        },
+      },
+    },
+  };
+  // A build with no build manifest declares no provenance: its facts are null, never absent.
+  const withoutProvenance = point(file(3), [cell(2)]);
+  const timeline = timelineOf(listed, [withFacts, withoutProvenance]);
+  const facts = {
+    fetchedThrough: `${LINE}/b1`,
+    builtAt: "2026-11-01T03:00:00+00:00",
+    builtWithModel: { name: "policyengine-zz", version: "1.2.0" },
+    builtWithCore: { name: "policyengine-core", version: "3.33.3" },
+    compatibleModels: [{ name: "policyengine-zz", specifier: "==1.2.0" }],
+    codeRepository: "PolicyEngine/microcosm",
+    codeCommit: "e".repeat(40),
+    targetSurfaceSha256: "7".repeat(64),
+    nTargets: 1214,
+    targetRegistryVersion: "2026.11",
+    householdWeightYear: 2024,
+  };
+  expect(timeline.builds.map((timelineBuild) => timelineBuild.declared)).toEqual([
+    facts,
+    facts,
+    {
+      fetchedThrough: "test-release/test-build",
+      builtAt: null,
+      builtWithModel: null,
+      builtWithCore: null,
+      compatibleModels: null,
+      codeRepository: null,
+      codeCommit: null,
+      targetSurfaceSha256: null,
+      nTargets: null,
+      targetRegistryVersion: null,
+      householdWeightYear: null,
+    },
+    // No point on this panel: nothing declared.
+    null,
+  ]);
+  // The build's own runtime record and attempt id stay in the point.
+  expect(JSON.stringify(timeline)).not.toContain("attempt_id");
+});

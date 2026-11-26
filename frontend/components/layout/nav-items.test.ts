@@ -84,6 +84,9 @@ test("every navigation item is gated by a capability, never by a country code", 
   const items = NAV_GROUPS.flatMap((group) => group.items);
   expect(items.every((item) => item.capability != null)).toBe(true);
   expect(items.find((item) => item.href === "/microcosm/staging")?.capability).toBe("staging");
+  expect(items.find((item) => item.href === "/microcosm/release-history")?.capability).toBe(
+    "calibration",
+  );
   expect(items.find((item) => item.href === "/microcosm/model-coverage")?.capability).toBe(
     "model_coverage",
   );
@@ -101,11 +104,13 @@ test("Belgium navigation keeps country-ready pages and hides pages it lacks capa
   expect(items.map((item) => item.href)).toEqual([
     "/microcosm",
     "/microcosm/datasets",
+    "/microcosm/release-history",
   ]);
   expect(items.every((item) => hasCapability("be", item.capability!))).toBe(true);
   expect(items.map((item) => navItemHref(item, "be"))).toEqual([
     "/microcosm?country=be",
     "/microcosm/datasets?country=be",
+    "/microcosm/release-history?country=be",
   ]);
 });
 
@@ -117,8 +122,32 @@ test("US navigation lists every page", () => {
 
 test("artifact-narrowed capabilities hide pages the release does not serve", () => {
   const groups = navGroupsForCountry("us", ["calibration", "targets"]);
-  expect(groups.map((group) => group.label)).toEqual(["Dataset accuracy"]);
+  expect(groups.map((group) => group.label)).toEqual(["Dataset accuracy", "Releases"]);
   expect(groups[0].items.map((item) => item.href)).toEqual(["/microcosm"]);
+  // Staging candidates goes with `staging`; the release history stays with `calibration`.
+  expect(groups[1].items.map((item) => item.href)).toEqual(["/microcosm/release-history"]);
+  expect(navGroupsForCountry("us", ["targets"])).toEqual([]);
+});
+
+test("lists the release history under Releases for every selectable country", () => {
+  for (const country of selectableCountries()) {
+    const releases = navGroupsForCountry(country).find((group) => group.label === "Releases");
+    const item = releases?.items.find((candidate) => candidate.label === "Release history");
+    expect(item).toEqual({
+      href: "/microcosm/release-history",
+      label: "Release history",
+      capability: "calibration",
+    });
+    expect(navItemHref(item!, country)).toBe(`/microcosm/release-history?country=${country}`);
+    expect(navLinkAttributes(item!)).toEqual({});
+  }
+});
+
+test("the release history path activates its own entry and no other", () => {
+  const items = NAV_GROUPS.flatMap((group) => group.items);
+  expect(
+    items.filter((item) => isActive("/microcosm/release-history", item)).map((item) => item.label),
+  ).toEqual(["Release history"]);
 });
 
 test("shows Cross-dataset navigation for every selectable country", () => {
@@ -136,6 +165,7 @@ test("names the page the reader is on for the phone-width nav bar", () => {
   expect(activeNavItem("/microcosm/staging", uk)?.label).toBe("Staging candidates");
   expect(activeNavItem("/microcosm", uk)?.label).toBe("Calibration fit");
   expect(activeNavItem("/microcosm/datasets", uk)?.label).toBe("Cross-dataset");
+  expect(activeNavItem("/microcosm/release-history", uk)?.label).toBe("Release history");
   // Drill-downs no item claims, and pages the country does not serve, have no label.
   expect(activeNavItem("/microcosm/targets", uk)).toBeUndefined();
   expect(activeNavItem("/microcosm/staging", navGroupsForCountry("be"))).toBeUndefined();

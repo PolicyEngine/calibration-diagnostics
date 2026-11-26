@@ -94,7 +94,25 @@
       "status": "ok",
       "reason": null,
       "referenceModelCompatibility": "inside",
-      "unknownColumns": []
+      "unknownColumns": [],
+      "declared": {
+        "fetchedThrough": "microcosm-uk-2024-25-national/synthetic-build-1",
+        "builtAt": "2026-11-01T00:00:00+00:00",
+        "builtWithModel": null,
+        "builtWithCore": null,
+        "compatibleModels": [
+          {
+            "name": "policyengine-uk",
+            "specifier": ">=1"
+          }
+        ],
+        "codeRepository": null,
+        "codeCommit": null,
+        "targetSurfaceSha256": null,
+        "nTargets": null,
+        "targetRegistryVersion": null,
+        "householdWeightYear": null
+      }
     },
     {
       "buildId": "microcosm-uk-2024-25-national/synthetic-build-2",
@@ -110,7 +128,25 @@
       "status": "ok",
       "reason": null,
       "referenceModelCompatibility": "inside",
-      "unknownColumns": []
+      "unknownColumns": [],
+      "declared": {
+        "fetchedThrough": "microcosm-uk-2024-25-national/synthetic-build-1",
+        "builtAt": "2026-11-01T00:00:00+00:00",
+        "builtWithModel": null,
+        "builtWithCore": null,
+        "compatibleModels": [
+          {
+            "name": "policyengine-uk",
+            "specifier": ">=1"
+          }
+        ],
+        "codeRepository": null,
+        "codeCommit": null,
+        "targetSurfaceSha256": null,
+        "nTargets": null,
+        "targetRegistryVersion": null,
+        "householdWeightYear": null
+      }
     },
     {
       "buildId": "microcosm-uk-2024-25-national/synthetic-build-3",
@@ -126,7 +162,25 @@
       "status": "ok",
       "reason": null,
       "referenceModelCompatibility": "inside",
-      "unknownColumns": []
+      "unknownColumns": [],
+      "declared": {
+        "fetchedThrough": "microcosm-uk-2024-25-national/synthetic-build-3",
+        "builtAt": "2026-11-01T00:00:00+00:00",
+        "builtWithModel": null,
+        "builtWithCore": null,
+        "compatibleModels": [
+          {
+            "name": "policyengine-uk",
+            "specifier": ">=1"
+          }
+        ],
+        "codeRepository": null,
+        "codeCommit": null,
+        "targetSurfaceSha256": null,
+        "nTargets": null,
+        "targetRegistryVersion": null,
+        "householdWeightYear": null
+      }
     },
     {
       "buildId": "microcosm-uk-2024-25-national/synthetic-build-4",
@@ -142,7 +196,8 @@
       "status": null,
       "reason": null,
       "referenceModelCompatibility": null,
-      "unknownColumns": null
+      "unknownColumns": null,
+      "declared": null
     },
     {
       "buildId": "microcosm-uk-2024-25-national/synthetic-build-5",
@@ -158,7 +213,25 @@
       "status": "refused",
       "reason": "disclosure_source_ids_missing",
       "referenceModelCompatibility": "inside",
-      "unknownColumns": null
+      "unknownColumns": null,
+      "declared": {
+        "fetchedThrough": "microcosm-uk-2024-25-national/synthetic-build-5",
+        "builtAt": "2026-11-01T00:00:00+00:00",
+        "builtWithModel": null,
+        "builtWithCore": null,
+        "compatibleModels": [
+          {
+            "name": "policyengine-uk",
+            "specifier": ">=1"
+          }
+        ],
+        "codeRepository": null,
+        "codeCommit": null,
+        "targetSurfaceSha256": null,
+        "nTargets": null,
+        "targetRegistryVersion": null,
+        "householdWeightYear": null
+      }
     }
   ],
   "outputs": [
