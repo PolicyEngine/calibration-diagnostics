@@ -21,7 +21,7 @@ from typing import Any
 
 import numpy as np
 
-from release_history.releases import ReleaseRefused
+from release_history.releases import ReleaseRefusedError
 
 HOUSEHOLD_IDS = np.array([10, 20, 30, 40])
 BENUNIT_IDS = np.array([1, 2, 3, 4, 5])
@@ -221,7 +221,7 @@ class FakeHub:
 
     def _get(self, commit: str, path: str) -> bytes:
         if commit != self.commit:
-            raise ReleaseRefused("error", "repository_or_revision_unreadable")
+            raise ReleaseRefusedError("error", "repository_or_revision_unreadable")
         if path not in self.files:
             raise FileNotFoundError(path)
         self.reads.append(path)

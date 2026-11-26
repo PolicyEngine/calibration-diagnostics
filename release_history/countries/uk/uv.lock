@@ -479,6 +479,15 @@ wheels = [
 ]
 
 [[package]]
+name = "microcosm-emitter-interface"
+version = "0.17.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/86/8b/064da04723f6417dcad479f889ee2063c20ec356eeec579b1bffb5761f1a/microcosm_emitter_interface-0.17.0.tar.gz", hash = "sha256:8a3d624ece2b686813a328166ccc8cbb5bfb205bee9bb6cf2d584edf1e46e8a3", size = 45453, upload-time = "2026-11-19T19:03:25.089Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e0/df/4256236e982afd218514fba80d1cc5c37bd588e9bc315c5fbf266fac36d0/microcosm_emitter_interface-0.17.0-py3-none-any.whl", hash = "sha256:528bc65a70393f836fa05246e3fee00e9e17a3aef9b78d2dfddc1151fbb20b59", size = 72270, upload-time = "2026-11-19T19:03:23.79Z" },
+]
+
+[[package]]
 name = "microdf-python"
 version = "1.3.10"
 source = { registry = "https://pypi.org/simple" }
@@ -909,6 +918,7 @@ version = "0.1.0"
 source = { editable = "../../" }
 dependencies = [
     { name = "huggingface-hub" },
+    { name = "microcosm-emitter-interface" },
     { name = "numpy" },
     { name = "packaging" },
     { name = "pandas" },
@@ -919,6 +929,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "huggingface-hub", specifier = ">=0.27,<2" },
+    { name = "microcosm-emitter-interface", specifier = ">=0.16,<1" },
     { name = "numpy", specifier = ">=1.26,<3" },
     { name = "packaging", specifier = ">=23" },
     { name = "pandas", specifier = ">=2,<4" },
@@ -928,6 +939,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "jsonschema", specifier = ">=4.21,<5" },
     { name = "pytest", specifier = ">=8.3,<9" },
     { name = "ruff", specifier = ">=0.6,<1" },
 ]

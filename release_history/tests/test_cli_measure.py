@@ -14,7 +14,7 @@ import pytest
 
 from release_history import cli
 from release_history.document import measurement_id
-from release_history.releases import ReleaseRefused, TransientError
+from release_history.releases import ReleaseRefusedError, TransientError
 from release_history.spec import parse_spec
 
 from .fakes import FAKE_COMMIT, FakeBackend, fake_spec_dict, release_repo
@@ -173,7 +173,7 @@ def test_a_refusal_no_file_causes_is_never_stored(world, capsys, monkeypatch):
     )
 
     def odd(spec, path, household_ids):
-        raise ReleaseRefused("error", "some_other_reason")
+        raise ReleaseRefusedError("error", "some_other_reason")
 
     monkeypatch.setattr(cli, "source_ids_for", odd)
     code, printed, stored = world["run"](capsys)
@@ -276,7 +276,7 @@ def test_a_refusal_the_file_causes_is_stored_as_a_gap(world, capsys, monkeypatch
     )
 
     def missing(spec, path, household_ids):
-        raise ReleaseRefused("error", "disclosure_source_ids_missing")
+        raise ReleaseRefusedError("error", "disclosure_source_ids_missing")
 
     monkeypatch.setattr(cli, "source_ids_for", missing)
     code, printed, stored = world["run"](capsys)

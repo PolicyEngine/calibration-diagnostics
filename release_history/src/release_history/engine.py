@@ -33,7 +33,7 @@ BUNDLE_MANIFEST = "policyengine/data/bundle/manifest.json"
 CORE_PACKAGE = "policyengine-core"
 
 
-class EngineMismatch(RuntimeError):
+class EngineMismatchError(RuntimeError):
     """The installed packages are not the ones the bundle pins."""
 
 
@@ -47,7 +47,7 @@ def _installed(package: str) -> str:
     try:
         return metadata.version(package)
     except metadata.PackageNotFoundError as error:
-        raise EngineMismatch(f"{package} is not installed") from error
+        raise EngineMismatchError(f"{package} is not installed") from error
 
 
 def engine_identity(spec: Spec, bundle: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -55,15 +55,15 @@ def engine_identity(spec: Spec, bundle: dict[str, Any] | None = None) -> dict[st
     bundle = bundle if bundle is not None else bundle_manifest()
     version = bundle["policyengine_version"]
     if _installed("policyengine") != version:
-        raise EngineMismatch("the installed policyengine differs from its own bundle manifest")
+        raise EngineMismatchError("the installed policyengine differs from its own bundle manifest")
     packages = bundle["packages"]
     model = packages.get(spec.model_package)
     if not model:
-        raise EngineMismatch(f"the bundle does not pin {spec.model_package}")
+        raise EngineMismatchError(f"the bundle does not pin {spec.model_package}")
     core = packages[CORE_PACKAGE]
     for name, pinned in ((spec.model_package, model["version"]), (CORE_PACKAGE, core["version"])):
         if _installed(name) != pinned:
-            raise EngineMismatch(f"{name} differs from the bundle's pin {pinned}")
+            raise EngineMismatchError(f"{name} differs from the bundle's pin {pinned}")
     return {
         "policyengine": version,
         "bundle_sha256": json_sha256(bundle),

@@ -3,7 +3,7 @@ import json
 import pytest
 
 from release_history.references import (
-    ReferenceError_,
+    ReferencesError,
     load_lock,
     load_references,
     lock_is_current,
@@ -95,7 +95,7 @@ def test_an_ambiguous_record_set_is_refused(facts_file):
     references = references_for(
         spec, benefit_caseload={"chronicle_records": ["pub.tables.caseload.fy2026"]}
     )
-    with pytest.raises(ReferenceError_, match="matches 2 facts"):
+    with pytest.raises(ReferencesError, match="matches 2 facts"):
         resolve(spec, references, facts_file, None, resolved_at="t", check_digests=False)
 
 

@@ -27,7 +27,7 @@ from typing import Any
 from release_history import ATTEMPT_FORMAT_VERSION, LABELS_FORMAT_VERSION, PRODUCER_VERSION
 from release_history.canonical import document_bytes, file_sha256, write_atomic
 from release_history.document import measured_point, measurement_id, refused_document
-from release_history.engine import EngineMismatch, engine_identity, environment, panel_document
+from release_history.engine import EngineMismatchError, engine_identity, environment, panel_document
 from release_history.export import export_csv
 from release_history.local_store import (
     country_dir,
@@ -38,7 +38,7 @@ from release_history.local_store import (
 )
 from release_history.measure import MeasurementError, error_record, measure
 from release_history.references import (
-    ReferenceError_,
+    ReferencesError,
     load_lock,
     load_references,
     lock_is_current,
@@ -50,7 +50,7 @@ from release_history.releases import (
     HubClient,
     LocalBuildFolder,
     Point,
-    ReleaseRefused,
+    ReleaseRefusedError,
     TransientError,
     download_verified,
     open_release,
@@ -257,7 +257,7 @@ def cmd_series(args: argparse.Namespace) -> int:
     spec = load_spec(args.country)
     try:
         record = build_series(spec, HubClient(), listed_at=_now(), revision=args.revision)
-    except (SeriesError, ReleaseRefused) as error:
+    except (SeriesError, ReleaseRefusedError) as error:
         _emit(
             {"command": "series", "country": spec.country, "status": "error", "detail": str(error)}
         )
@@ -354,14 +354,14 @@ def source_ids_for(spec: Spec, path: Path, household_ids: Any) -> Any:
     id_column = spec.household_id_variable
     with pd.HDFStore(path, "r") as store:
         if key not in store.keys():
-            raise ReleaseRefused("error", "disclosure_source_ids_missing")
+            raise ReleaseRefusedError("error", "disclosure_source_ids_missing")
         columns = set(store.select(key, start=0, stop=0).columns)
     chosen = next((c for c in spec.source_id_columns if c in columns), None)
     if chosen is None or id_column not in columns:
-        raise ReleaseRefused("error", "disclosure_source_ids_missing")
+        raise ReleaseRefusedError("error", "disclosure_source_ids_missing")
     table = pd.read_hdf(path, key, columns=[id_column, chosen])
     if not np.array_equal(table[id_column].to_numpy(), np.asarray(household_ids)):
-        raise ReleaseRefused("error", "disclosure_source_ids_misaligned")
+        raise ReleaseRefusedError("error", "disclosure_source_ids_misaligned")
     return table[chosen].to_numpy()
 
 
@@ -469,7 +469,7 @@ def cmd_measure(args: argparse.Namespace) -> int:
     spec = load_spec(args.country)
     try:
         engine = engine_identity(spec)
-    except EngineMismatch as error:
+    except EngineMismatchError as error:
         _emit({"command": "measure", "status": "engine_mismatch", "detail": str(error)})
         return 1
     root = Path(args.out)
@@ -502,7 +502,7 @@ def cmd_measure(args: argparse.Namespace) -> int:
         report.started("open")
         try:
             opened = open_release(hub, point, workdir)
-        except ReleaseRefused as refusal:
+        except ReleaseRefusedError as refusal:
             # Before the file is known there is no digest, so there is no point to store.
             # A plan never names such a build: the series record keeps the reason.
             return _run_failed(report, "open", refusal.reason, point)
@@ -528,7 +528,7 @@ def cmd_measure(args: argparse.Namespace) -> int:
         else:
             try:
                 h5_path = download_verified(hub, opened, workdir)
-            except ReleaseRefused as refusal:
+            except ReleaseRefusedError as refusal:
                 return _run_failed(report, "download", refusal.reason, point)
         columns = dataset_columns(h5_path)
         backend = PolicyEngineBackend(spec.engine_module, str(h5_path), spec.simulation_options)
@@ -538,7 +538,7 @@ def cmd_measure(args: argparse.Namespace) -> int:
                 source_ids = None
                 if spec.disclosure_policy != "none":
                     source_ids = source_ids_for(spec, h5_path, result.household_ids)
-        except ReleaseRefused as refusal:
+        except ReleaseRefusedError as refusal:
             if refusal.reason not in FILE_REFUSALS:
                 return _run_failed(report, "measure", refusal.reason, point)
             # The file's own source ids are missing or misaligned: the file causes it, so
@@ -609,7 +609,7 @@ def cmd_measure(args: argparse.Namespace) -> int:
         return _run_failed(
             report, failure.stage, f"{failure.stage}_failed", point, error_class=record["class"]
         )
-    except ReleaseRefused as refusal:
+    except ReleaseRefusedError as refusal:
         return _run_failed(report, "open", refusal.reason, point)
     except TransientError as error:
         report.write("failed", "transient", "transient", str(error))
@@ -700,7 +700,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return int(args.func(args) or 0)
-    except ReferenceError_ as error:
+    except ReferencesError as error:
         _emit({"command": args.command, "status": "references_error", "detail": str(error)})
         return 1
 

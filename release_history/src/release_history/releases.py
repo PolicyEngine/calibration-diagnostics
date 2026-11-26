@@ -48,7 +48,7 @@ class TransientError(RuntimeError):
     """A failure worth retrying on a later run (network, service)."""
 
 
-class ReleaseRefused(RuntimeError):
+class ReleaseRefusedError(RuntimeError):
     """A release that is not measured, with the reason stored on its point."""
 
     def __init__(self, status: str, reason: str) -> None:
@@ -124,17 +124,17 @@ class NationalArtifact:
 def national_artifact(manifest: Mapping[str, Any], release_directory: str) -> NationalArtifact:
     role = release_role(manifest)
     if not role["is_default"] or role["is_local_area"]:
-        raise ReleaseRefused("skipped", "not_default_national")
+        raise ReleaseRefusedError("skipped", "not_default_national")
     key = (manifest.get("default_datasets") or {}).get("national")
     artifacts = manifest.get("artifacts") or {}
     artifact = artifacts.get(key) if isinstance(key, str) else None
     if not isinstance(artifact, Mapping):
-        raise ReleaseRefused("error", "national_artifact_missing")
+        raise ReleaseRefusedError("error", "national_artifact_missing")
     if artifact.get("kind", "microdata") != "microdata":
-        raise ReleaseRefused("error", "national_artifact_not_microdata")
+        raise ReleaseRefusedError("error", "national_artifact_not_microdata")
     path, sha256 = artifact.get("path"), artifact.get("sha256")
     if not isinstance(path, str) or not re.fullmatch(r"[0-9a-f]{64}", str(sha256)):
-        raise ReleaseRefused("error", "national_artifact_unpinned")
+        raise ReleaseRefusedError("error", "national_artifact_unpinned")
     in_repo = path if artifact.get("revision") else f"releases/{release_directory}/{path}"
     return NationalArtifact(key=key, path=in_repo, sha256=str(sha256))
 
@@ -191,7 +191,9 @@ class HubClient:
                 if name in ("EntryNotFoundError", "RemoteEntryNotFoundError"):
                     raise FileNotFoundError(kwargs.get("filename") or args) from error
                 if name in ("RepositoryNotFoundError", "RevisionNotFoundError", "GatedRepoError"):
-                    raise ReleaseRefused("error", "repository_or_revision_unreadable") from error
+                    raise ReleaseRefusedError(
+                        "error", "repository_or_revision_unreadable"
+                    ) from error
                 if attempt + 1 == TRANSIENT_TRIES:
                     raise TransientError(name) from error
                 time.sleep(TRANSIENT_BACKOFF_SECONDS * (attempt + 1))
@@ -260,7 +262,7 @@ class LocalBuildFolder:
         relative = path[len(self.prefix) :] if path.startswith(self.prefix) else path
         local = (self.folder / relative).resolve()
         if self.folder.resolve() not in local.parents and local != self.folder.resolve():
-            raise ReleaseRefused("error", "repository_or_revision_unreadable")
+            raise ReleaseRefusedError("error", "repository_or_revision_unreadable")
         return local
 
     def resolve_revision(self, repo: str, revision: str) -> None:
@@ -314,7 +316,7 @@ def open_release(hub: HubClient, point: Point, workdir: Path) -> OpenedRelease:
             point.hf_repo, point.hf_commit, manifest_path, workdir
         )
     except FileNotFoundError as error:
-        raise ReleaseRefused("error", "release_manifest_missing") from error
+        raise ReleaseRefusedError("error", "release_manifest_missing") from error
     build_path = f"{folder}/build_manifest.json"
     try:
         build_manifest, build_sha = hub.read_json(
@@ -345,7 +347,7 @@ def download_verified(hub: HubClient, opened: OpenedRelease, workdir: Path) -> P
     digest = file_sha256(local)
     if digest != opened.artifact.sha256:
         local.unlink(missing_ok=True)
-        raise ReleaseRefused("error", "sha256_mismatch")
+        raise ReleaseRefusedError("error", "sha256_mismatch")
     return local
 
 

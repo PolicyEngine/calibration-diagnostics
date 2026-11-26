@@ -30,7 +30,7 @@ PREFIX = "release-history"
 _POINT_NAME = re.compile(r"^[0-9a-f]{64}\.json$")
 
 
-class ImmutableConflict(RuntimeError):
+class ImmutableConflictError(RuntimeError):
     """An immutable document already exists with different bytes."""
 
 
@@ -55,7 +55,7 @@ def write_immutable(path: Path, document: dict[str, Any]) -> bool:
     data = document_bytes(document)
     if path.exists():
         if path.read_bytes() != data:
-            raise ImmutableConflict(f"{path} already exists with different content")
+            raise ImmutableConflictError(f"{path} already exists with different content")
         return False
     write_atomic(path, data)
     return True

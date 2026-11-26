@@ -5,14 +5,14 @@ import pytest
 
 from release_history import engine
 from release_history.canonical import json_sha256
-from release_history.engine import EngineMismatch, engine_identity, panel_document, panel_id
+from release_history.engine import EngineMismatchError, engine_identity, panel_document, panel_id
 from release_history.export import POINT_COLUMNS, TIMELINE_COLUMNS, export_csv, timeline_rows
-from release_history.local_store import ImmutableConflict, write_immutable, write_once
+from release_history.local_store import ImmutableConflictError, write_immutable, write_once
 from release_history.releases import (
     NationalArtifact,
     OpenedRelease,
     Point,
-    ReleaseRefused,
+    ReleaseRefusedError,
     compatibility,
     national_artifact,
     point_provenance,
@@ -147,7 +147,7 @@ def test_each_country_s_panel_id_is_pinned(installed, country):
 
 def test_the_engine_must_be_the_bundle_s_own_pins(installed):
     installed["policyengine-core"] = "3.34.0"
-    with pytest.raises(EngineMismatch):
+    with pytest.raises(EngineMismatchError):
         engine_identity(load_spec("uk"), BUNDLE)
 
 
@@ -184,7 +184,7 @@ def test_national_artifact_resolves_both_layouts():
     }
     assert national_artifact(tagged, "line").path == "n.h5"
     assert national_artifact(folder, "line/build").path == "releases/line/build/n.h5"
-    with pytest.raises(ReleaseRefused) as refused:
+    with pytest.raises(ReleaseRefusedError) as refused:
         national_artifact({"default_datasets": {}, "dataset_role": "non_default_local_area"}, "x")
     assert refused.value.reason == "not_default_national"
 
@@ -296,7 +296,7 @@ def test_immutable_points_refuse_different_bytes(tmp_path):
     path = tmp_path / "point.json"
     assert write_immutable(path, {"a": 1})
     assert not write_immutable(path, {"a": 1})
-    with pytest.raises(ImmutableConflict):
+    with pytest.raises(ImmutableConflictError):
         write_immutable(path, {"a": 2})
     assert not write_once(path, {"b": 3})
     assert json.loads(path.read_text()) == {"a": 1}

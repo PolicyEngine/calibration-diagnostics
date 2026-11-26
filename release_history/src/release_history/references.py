@@ -33,14 +33,14 @@ from release_history.spec import Spec, countries_dir, jsonable
 BASES = ("outturn", "forecast", "post_behavioural", "partial", "approximation", "mechanical")
 
 
-class ReferenceError_(ValueError):
+class ReferencesError(ValueError):
     """A references file that does not cover or match its spec."""
 
 
 def load_references(country: str, root: Path | None = None) -> dict[str, Any]:
     path = (root or countries_dir()) / country / "references.yaml"
     if not path.is_file():
-        raise ReferenceError_(f"No references at {path}.")
+        raise ReferencesError(f"No references at {path}.")
     with path.open(encoding="utf-8") as stream:
         return jsonable(yaml.safe_load(stream))
 
@@ -52,9 +52,9 @@ def references_digest(references: Mapping[str, Any]) -> str:
 def _entry_kind(entry: Mapping[str, Any], where: str) -> str:
     kinds = [k for k in ("chronicle_records", "citation", "none") if k in entry]
     if len(kinds) != 1:
-        raise ReferenceError_(f"{where}: needs exactly one of chronicle_records, citation, none.")
+        raise ReferencesError(f"{where}: needs exactly one of chronicle_records, citation, none.")
     if entry.get("basis") is not None and entry["basis"] not in BASES:
-        raise ReferenceError_(f"{where}: basis '{entry['basis']}' must be one of {BASES}.")
+        raise ReferencesError(f"{where}: basis '{entry['basis']}' must be one of {BASES}.")
     return kinds[0]
 
 
@@ -77,7 +77,7 @@ def validate_references(spec: Spec, references: Mapping[str, Any]) -> list[str]:
         for key, entry in entries.items():
             try:
                 kind = _entry_kind(entry or {}, f"{section}.{key}")
-            except ReferenceError_ as error:
+            except ReferencesError as error:
                 problems.append(str(error))
                 continue
             if kind == "chronicle_records" and not references.get("chronicle"):
@@ -131,20 +131,20 @@ def resolve(
     """Build the references lock from a Chronicle consumer artifact."""
     problems = validate_references(spec, references)
     if problems:
-        raise ReferenceError_("; ".join(problems))
+        raise ReferencesError("; ".join(problems))
     pin = references.get("chronicle") or {}
     wanted = _wanted(references)
     if wanted and facts_path is None:
-        raise ReferenceError_("chronicle_records need --facts, a Chronicle consumer_facts.jsonl")
+        raise ReferencesError("chronicle_records need --facts, a Chronicle consumer_facts.jsonl")
     if check_digests and pin and facts_path is not None:
         if pin.get("facts_sha256") and file_sha256(facts_path) != pin["facts_sha256"]:
-            raise ReferenceError_("the facts file is not the pinned Chronicle artifact")
+            raise ReferencesError("the facts file is not the pinned Chronicle artifact")
         if (
             manifest_path
             and pin.get("manifest_sha256")
             and (file_sha256(manifest_path) != pin["manifest_sha256"])
         ):
-            raise ReferenceError_("the artifact manifest is not the pinned one")
+            raise ReferencesError("the artifact manifest is not the pinned one")
     found: dict[str, list[dict[str, Any]]] = {}
     if wanted:
         with facts_path.open("rb") as stream:
@@ -178,13 +178,13 @@ def resolve(
                 for record in records:
                     matches = found.get(record, [])
                     if len(matches) != 1:
-                        raise ReferenceError_(
+                        raise ReferencesError(
                             f"{section}.{key}: {record} matches {len(matches)} facts, not one"
                         )
                     facts.append(_fact_summary(matches[0]))
                 values = [fact["value"] for fact in facts]
                 if not all(isinstance(v, int | float) and not isinstance(v, bool) for v in values):
-                    raise ReferenceError_(f"{section}.{key}: a referenced fact is not numeric")
+                    raise ReferencesError(f"{section}.{key}: a referenced fact is not numeric")
                 out.update(
                     status="resolved", value=float(sum(values)), facts=facts, note=entry.get("note")
                 )

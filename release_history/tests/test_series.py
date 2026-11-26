@@ -4,10 +4,11 @@ import json
 from pathlib import Path
 
 import pytest
+from microcosm_emitter_interface.releases import MAX_RECORD_BYTES
 
 from release_history import cli
-from release_history.releases import ReleaseRefused
-from release_history.series import MAX_RECORD_BYTES, SeriesError, build_series, parse_record
+from release_history.releases import ReleaseRefusedError
+from release_history.series import SeriesError, build_series, parse_record
 from release_history.spec import parse_spec
 
 from .fakes import (
@@ -139,9 +140,13 @@ def valid_record() -> dict:
     }
 
 
+def encoded(record: dict) -> bytes:
+    return json.dumps(record).encode("utf-8")
+
+
 def test_a_record_the_release_writer_writes_is_read():
-    parsed = parse_record(valid_record())
-    assert parsed["releases"]["line"]["builds"]["b"]["withdrawn"] is False
+    parsed = parse_record(encoded(valid_record()))
+    assert parsed.releases["line"].builds["b"].withdrawn is False
 
 
 @pytest.mark.parametrize(
@@ -166,7 +171,7 @@ def test_a_record_the_release_writer_would_not_write_is_refused(change):
     record = valid_record()
     change(record)
     with pytest.raises(SeriesError):
-        parse_record(record)
+        parse_record(encoded(record))
 
 
 def test_an_unreadable_or_oversized_record_fails_the_listing(tmp_path):
@@ -187,7 +192,7 @@ def test_a_repository_fault_fails_the_listing_rather_than_refusing_every_build(t
     hub = fixture_repo()
     hub.commit = "d" * 40
     hub.resolve_revision = lambda repo, revision: "e" * 40
-    with pytest.raises(ReleaseRefused):
+    with pytest.raises(ReleaseRefusedError):
         build_series(spec, hub, listed_at=LISTED_AT, workdir=tmp_path)
 
 

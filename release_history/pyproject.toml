@@ -2,12 +2,14 @@
 name = "release-history"
 version = "0.1.0"
 description = "Measure each published Microcosm release on a fixed reference model (calibration-diagnostics#224)."
-requires-python = ">=3.11,<3.15"
+requires-python = ">=3.13,<3.15"
 # The shared producer pins no engine. Each country pins its own reference
 # engine in countries/<code>/pyproject.toml, so one country's bump never moves
 # another country's panel.
 dependencies = [
   "huggingface-hub>=0.27,<2",
+  # The release writer's own releases.json reader (PolicyEngine/microcosm-emitter).
+  "microcosm-emitter-interface>=0.16,<1",
   "numpy>=1.26,<3",
   "packaging>=23",
   "pandas>=2,<4",
@@ -37,7 +39,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py313"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP"]
+select = ["E", "W", "F", "I", "N", "B", "UP"]
