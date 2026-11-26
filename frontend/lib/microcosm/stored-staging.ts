@@ -52,6 +52,7 @@ import {
   readStagingRunFilesIndex,
   stagingJsonObjectOrNull,
   type StagingRunFileName,
+  type StagingRunFileRecord,
   type StagingRunFilesIndex,
   type StagingRunRecord,
 } from "@policyengine/calibration-tree/staging-run-files";
@@ -131,8 +132,19 @@ export interface CopiedRunDocuments {
   stagedDatasetReceipt: JsonObject | null;
 }
 
-async function readCopiedJson(record: StagingRunRecord, name: StagingRunFileName) {
-  const file = record.files[name];
+// Where a version 2 or 3 run's reform validation is copied: under its path in
+// the run folder, as its run manifest declares it. Version 1 runs write
+// `reform_validation.json` at the folder's top level.
+const DECLARED_REFORM_VALIDATION = "artifacts/reform_validation.json";
+
+type CopiedFileName = StagingRunFileName | typeof DECLARED_REFORM_VALIDATION;
+
+function copiedFile(record: StagingRunRecord, name: CopiedFileName) {
+  return (record.files as Partial<Record<CopiedFileName, StagingRunFileRecord>>)[name];
+}
+
+async function readCopiedJson(record: StagingRunRecord, name: CopiedFileName) {
+  const file = copiedFile(record, name);
   return file
     ? readStagingRunFile({ record: file, client: collectorStoreBlob })
     : null;
@@ -159,6 +171,8 @@ async function copiedRunRecords(country: MicrocosmCountry): Promise<Map<string, 
   );
 }
 
+// `reform_validation.json` stands for the run's reform validation, wherever
+// the run's version keeps it.
 const ALL_DOCUMENTS: readonly StagingRunFileName[] = [
   "progress.json",
   "run_manifest.json",
@@ -185,8 +199,16 @@ export async function copiedRunDocuments(
   names: readonly StagingRunFileName[] = ALL_DOCUMENTS,
 ): Promise<CopiedRunDocuments> {
   const wanted = new Set(names);
+  // A version 2 or 3 run's copied documents say so in the index's summary,
+  // so its reform validation is read from where version 2 writes it.
+  const structured = (record.summary.schema_version ?? 1) >= 2;
+  const reformValidationName: CopiedFileName = structured
+    ? DECLARED_REFORM_VALIDATION
+    : "reform_validation.json";
   const read = (name: StagingRunFileName) =>
-    wanted.has(name) ? readCopiedJson(record, name) : Promise.resolve(null);
+    wanted.has(name)
+      ? readCopiedJson(record, name === "reform_validation.json" ? reformValidationName : name)
+      : Promise.resolve(null);
   const [progressBytes, manifestBytes, calibrationBytes, eventBytes, reformBytes, receiptBytes] =
     await Promise.all(ALL_DOCUMENTS.map(read));
   const progressDocument = stagingJsonObjectOrNull(progressBytes);
@@ -209,9 +231,30 @@ export async function copiedRunDocuments(
     runManifest,
     calibrationProgress,
     events,
-    reformValidation: stagingJsonObjectOrNull(reformBytes),
+    reformValidation:
+      !structured || declaresCopy(runManifest, "reform_validation", copiedFile(record, reformValidationName))
+        ? stagingJsonObjectOrNull(reformBytes)
+        : null,
     stagedDatasetReceipt: stagingJsonObjectOrNull(receiptBytes),
   };
+}
+
+/**
+ * Whether a structured run manifest declares the artifact `logicalName` with
+ * the digest of the copy: a version 2 run shows only the result files its
+ * run manifest declares, as they were when it declared them.
+ */
+function declaresCopy(
+  runManifest: JsonObject | null,
+  logicalName: string,
+  copy: StagingRunFileRecord | undefined,
+): boolean {
+  if (!copy || !isStructuredStagingDocument(runManifest)) return false;
+  const artifact = objectOrNull(objectOrNull(runManifest?.artifacts)?.[logicalName]);
+  return (
+    stringValue(artifact?.path) === `artifacts/${logicalName}.json` &&
+    stringValue(artifact?.sha256) === copy.sha256
+  );
 }
 
 async function readRunDocuments(
