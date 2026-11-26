@@ -26,7 +26,7 @@ from typing import Any
 
 from release_history import ATTEMPT_FORMAT_VERSION, LABELS_FORMAT_VERSION, PRODUCER_VERSION
 from release_history.canonical import document_bytes, file_sha256, write_atomic
-from release_history.document import measured_point, measurement_id, near_limits, refused_document
+from release_history.document import measured_point, measurement_id, refused_document
 from release_history.engine import EngineMismatch, engine_identity, environment, panel_document
 from release_history.export import export_csv
 from release_history.local_store import (
@@ -579,12 +579,13 @@ def cmd_measure(args: argparse.Namespace) -> int:
         )
         write_immutable(target, document)
         report.clear()
-        near = near_limits(document)
-        for name, share in near.items():
+        near = document["runtime"]["near_limits"]
+        for near_limit in near:
             # A GitHub Actions warning on the run's page: ids and shares only.
             print(
                 f"::warning title=Release history near a runner limit::{spec.country} "
-                f"{point.build_id}: {name} at {round(100 * share)}% of its limit",
+                f"{point.build_id}: {near_limit['limit']} at "
+                f"{round(100 * near_limit['share'])}% of its limit",
                 flush=True,
             )
         _emit(

@@ -9,23 +9,15 @@ Regenerate in order with UPDATE_FIXTURES=1: pytest, then bun, then pytest.
 import copy
 import json
 import os
-from pathlib import Path
 
 import pytest
-from jsonschema import Draft202012Validator
 
 from release_history.canonical import document_bytes
 
 from .country_fixtures import FIXTURES, countries, fixture_files
+from .schema_check import errors
 
-SCHEMAS = Path(__file__).parents[1] / "schemas"
-KINDS = ("point", "panel", "series", "timeline")
-
-
-def schema(kind: str) -> Draft202012Validator:
-    document = json.loads((SCHEMAS / f"{kind}.schema.json").read_text(encoding="utf-8"))
-    Draft202012Validator.check_schema(document)
-    return Draft202012Validator(document)
+KINDS = ("point", "panel", "series", "labels", "timeline")
 
 
 def committed(country: str) -> dict[str, dict]:
@@ -39,11 +31,12 @@ def committed(country: str) -> dict[str, dict]:
 def kind_of(name: str) -> str | None:
     if name.startswith("points/"):
         return "point"
-    return {"panel.json": "panel", "series.json": "series", "timeline.json": "timeline"}.get(name)
-
-
-def errors(kind: str, document: dict) -> list[str]:
-    return [error.message for error in schema(kind).iter_errors(document)]
+    return {
+        "panel.json": "panel",
+        "series.json": "series",
+        "labels.json": "labels",
+        "timeline.json": "timeline",
+    }.get(name)
 
 
 @pytest.mark.parametrize("country", countries())

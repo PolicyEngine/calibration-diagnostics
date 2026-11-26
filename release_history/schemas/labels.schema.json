@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/PolicyEngine/calibration-diagnostics/release_history/schemas/labels.schema.json",
+  "title": "Release history labels",
+  "description": "A country's labels.json (`release_history/cli.py`, `labels_document`): what the page shows for each reform. Replaceable, so a corrected label needs no new panel; finalize copies it into every timeline. Version 1: every key listed here is required and no other key is allowed. A key added later is declared here with the version that added it, and is not required, so the documents already written stay valid and no format version moves.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "kind",
+    "country",
+    "reforms"
+  ],
+  "properties": {
+    "format_version": {
+      "const": 1
+    },
+    "kind": {
+      "const": "release_history.labels"
+    },
+    "country": {
+      "type": "string"
+    },
+    "reforms": {
+      "type": "object",
+      "description": "By reform id.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "source"
+        ],
+        "properties": {
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Where the reform is defined, as the spec gives it."
+          }
+        }
+      }
+    }
+  }
+}

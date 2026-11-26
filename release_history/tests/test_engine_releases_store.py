@@ -22,6 +22,7 @@ from release_history.releases import (
 from release_history.spec import load_spec, measurement_definition, parse_spec
 
 from .fakes import fake_spec_dict
+from .schema_check import errors
 
 BUNDLE = {
     "policyengine_version": "6.16.1",
@@ -364,3 +365,22 @@ def test_export_reads_the_timeline_the_typescript_side_writes(tmp_path, country)
     (folder / "timeline.json").write_text(json.dumps(timeline))
     header = export_csv(tmp_path, country).splitlines()[0]
     assert header == ",".join(TIMELINE_COLUMNS)
+
+
+def test_a_planned_point_matches_its_schema_and_names_a_commit():
+    point = Point(
+        build_id="line/build",
+        release_directory="line/build",
+        hf_repo="org/repo",
+        hf_commit="c" * 40,
+        digest="d" * 64,
+        attempt=2,
+        last_attempt=False,
+    )
+    planned = point.to_json()
+    assert errors("planned-point", planned) == []
+    assert Point.from_json(planned) == point
+    # A null commit was once read as the commit "None".
+    with pytest.raises(ValueError, match="commit"):
+        Point.from_json({**planned, "hf_commit": None})
+    assert errors("planned-point", {**planned, "hf_commit": None})

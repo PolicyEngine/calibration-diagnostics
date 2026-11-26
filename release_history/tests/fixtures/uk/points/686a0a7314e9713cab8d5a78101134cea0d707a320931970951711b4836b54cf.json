@@ -2456,6 +2456,7 @@
       "seconds": 6600,
       "warn_at": 0.8
     },
+    "near_limits": [],
     "runner": "synthetic",
     "seconds": 600.0,
     "simulations": [

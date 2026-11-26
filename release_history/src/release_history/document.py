@@ -68,37 +68,49 @@ def _point(
         "engine_bundle": None,
         "environment": env,
         "producer": {"version": PRODUCER_VERSION, "commit": producer_commit},
-        "runtime": {
-            "started_at": runtime.get("started_at"),
-            "finished_at": runtime.get("finished_at"),
-            "seconds": runtime.get("seconds"),
-            "runner": runtime.get("runner"),
-            "simulations": runtime.get("simulations") or [],
-            # The limits it ran under, so a reader can tell how close it came to them.
-            "limits": spec.runner_limits(),
-        },
+        "runtime": _runtime(spec, runtime, provenance["file"]["bytes"]),
     }
 
 
-def runner_usage(document: dict[str, Any]) -> dict[str, float]:
-    """The share of each runner limit a point used: its seconds, peak memory and file size."""
-    runtime = document["runtime"]
-    limits = runtime.get("limits") or {}
-    peak = max((s.get("peak_rss_bytes") or 0 for s in runtime.get("simulations") or []), default=0)
+def _runtime(spec: Spec, runtime: dict[str, Any], file_bytes: int | None) -> dict[str, Any]:
+    """The run's facts, the limits it ran under, and the limits it came near."""
+    facts = {
+        "started_at": runtime.get("started_at"),
+        "finished_at": runtime.get("finished_at"),
+        "seconds": runtime.get("seconds"),
+        "runner": runtime.get("runner"),
+        "simulations": runtime.get("simulations") or [],
+        # The limits it ran under, so a reader can tell how close it came to them.
+        "limits": spec.runner_limits(),
+    }
+    facts["near_limits"] = near_limits(facts, file_bytes)
+    return facts
+
+
+def runner_usage(runtime: dict[str, Any], file_bytes: int | None) -> dict[str, float]:
+    """The share of each runner limit a run used: its seconds, peak memory and file size."""
+    limits = runtime["limits"]
+    peak = max((simulation["peak_rss_bytes"] for simulation in runtime["simulations"]), default=0)
     used = {
-        "seconds": (runtime.get("seconds"), limits.get("seconds")),
-        "memory": (peak or None, limits.get("memory_bytes")),
-        "dataset": ((document.get("file") or {}).get("bytes"), limits.get("dataset_bytes")),
+        "seconds": (runtime["seconds"], limits["seconds"]),
+        "memory": (peak or None, limits["memory_bytes"]),
+        "dataset": (file_bytes, limits["dataset_bytes"]),
     }
     return {name: value / limit for name, (value, limit) in used.items() if value and limit}
 
 
-def near_limits(document: dict[str, Any]) -> dict[str, float]:
-    """The limits a point came within 20% of (its `warn_at`), with the share it used."""
-    warn_at = (document["runtime"].get("limits") or {}).get("warn_at", 0.8)
-    return {
-        name: round(share, 3) for name, share in runner_usage(document).items() if share >= warn_at
-    }
+def near_limits(runtime: dict[str, Any], file_bytes: int | None) -> list[dict[str, Any]]:
+    """The limits a run came within 20% of (its `warn_at`), with the share it used.
+
+    Computed here once and stored in the point as `runtime.near_limits`; the
+    TypeScript finalize reads it from there for the manifest and the run summary.
+    """
+    warn_at = runtime["limits"]["warn_at"]
+    return [
+        {"limit": name, "share": round(share, 3)}
+        for name, share in sorted(runner_usage(runtime, file_bytes).items())
+        if share >= warn_at
+    ]
 
 
 def _error(record: dict[str, Any] | None) -> dict[str, Any] | None:

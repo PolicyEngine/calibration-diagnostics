@@ -631,7 +631,8 @@
         "seconds",
         "runner",
         "simulations",
-        "limits"
+        "limits",
+        "near_limits"
       ],
       "properties": {
         "started_at": {
@@ -712,6 +713,31 @@
             },
             "warn_at": {
               "type": "number"
+            }
+          }
+        },
+        "near_limits": {
+          "type": "array",
+          "description": "The limits the run came within 20% of (a share of at least limits.warn_at), by limit name, with the share of the limit it used, rounded to 3 places. Computed once by the producer; the TypeScript finalize reads it for the manifest's nearLimits.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "limit",
+              "share"
+            ],
+            "properties": {
+              "limit": {
+                "enum": [
+                  "dataset",
+                  "memory",
+                  "seconds"
+                ]
+              },
+              "share": {
+                "type": "number",
+                "minimum": 0
+              }
             }
           }
         }

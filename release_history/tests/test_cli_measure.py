@@ -18,6 +18,7 @@ from release_history.releases import ReleaseRefused, TransientError
 from release_history.spec import parse_spec
 
 from .fakes import FAKE_COMMIT, FakeBackend, fake_spec_dict, release_repo
+from .schema_check import errors
 
 LINE = "zz-national"
 BUILD = f"{LINE}/zz-build-1"
@@ -85,6 +86,8 @@ def world(monkeypatch, tmp_path):
         state["reports"] = {
             p.stem: json.loads(p.read_text()) for p in files if p.parent.name == "attempts"
         }
+        for report in state["reports"].values():
+            assert errors("attempt", report) == []
         return code, printed, stored
 
     state["run"] = run
@@ -183,8 +186,9 @@ def test_a_run_near_a_runner_limit_is_flagged(world, capsys):
     world["spec"] = parse_spec(fake_spec_dict(runner={"max_dataset_bytes": 24}))
     code, printed, stored = world["run"](capsys)
     assert (code, printed["status"]) == (0, "ok")
-    assert printed["near_limits"] == {"dataset": 0.833}
+    assert printed["near_limits"] == [{"limit": "dataset", "share": 0.833}]
     document = json.loads(stored[0].read_text())
+    assert document["runtime"]["near_limits"] == printed["near_limits"]
     assert document["runtime"]["limits"] == {
         "seconds": None,
         "memory_bytes": None,

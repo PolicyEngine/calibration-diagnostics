@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/PolicyEngine/calibration-diagnostics/release_history/schemas/attempt.schema.json",
+  "title": "Release history attempt report",
+  "description": "A file's `<panel>/attempts/<digest>.json` (`release_history/cli.py`, `AttemptReport`): how the latest attempt at a file ended when it stored nothing. Replaced at each attempt, removed once the point or a stored gap is written; finalize reads it into the manifest's state for the file. Version 1: every key listed here is required and no other key is allowed. A key added later is declared here with the version that added it, and is not required, so the documents already written stay valid and no format version moves.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "kind",
+    "country",
+    "panel_id",
+    "digest",
+    "build_id",
+    "attempt",
+    "last_attempt",
+    "status",
+    "stage",
+    "reason",
+    "error_class",
+    "at",
+    "producer"
+  ],
+  "properties": {
+    "format_version": {
+      "const": 1
+    },
+    "kind": {
+      "const": "release_history.attempt"
+    },
+    "country": {
+      "type": "string"
+    },
+    "panel_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "The file's sha256, as the series listed it."
+    },
+    "build_id": {
+      "type": "string"
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "last_attempt": {
+      "type": "boolean"
+    },
+    "status": {
+      "enum": [
+        "interrupted",
+        "failed"
+      ],
+      "description": "`interrupted`: written before each stage and never replaced, so the run died there; `failed`: rewritten after a handled failure."
+    },
+    "stage": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "error_class": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "at": {
+      "type": "string"
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "commit"
+      ],
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -51,6 +51,12 @@ RUNTIME = {
     "seconds": 600.0,
     "runner": "synthetic",
 }
+# A run within 20% of the spec's time limit (5,400 of 6,600 seconds), so a point records it.
+NEAR_LIMIT_RUNTIME = {
+    **RUNTIME,
+    "finished_at": "2026-11-12T01:30:00Z",
+    "seconds": 5400.0,
+}
 
 
 def countries() -> list[str]:
@@ -134,7 +140,10 @@ def country_fixture(country: str, workdir: Path) -> dict[str, Any]:
     world = SyntheticWorld(spec)
     reads_source_ids = spec.disclosure_policy != "none"
     points = []
-    for name in ("synthetic-build-1", "synthetic-build-3"):
+    for name, runtime in (
+        ("synthetic-build-1", RUNTIME),
+        ("synthetic-build-3", NEAR_LIMIT_RUNTIME),
+    ):
         sha256 = builds[name]["sha256"]
         result = measure(spec, SyntheticBackend(world, seed=sha256))
         for simulation in result.simulations:
@@ -148,7 +157,7 @@ def country_fixture(country: str, workdir: Path) -> dict[str, Any]:
             columns=[spec.household_id_variable, spec.weight_variable(spec.household_entity)],
             env=ENV,
             producer_commit="0" * 40,
-            runtime=RUNTIME,
+            runtime=runtime,
         )
         points.append(document)
     if reads_source_ids:

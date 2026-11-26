@@ -77,11 +77,16 @@ class Point:
 
     @classmethod
     def from_json(cls, value: Mapping[str, Any]) -> Point:
+        """A point as the plan names it (`schemas/planned-point.schema.json`)."""
+        commit = value["hf_commit"]
+        if not isinstance(commit, str) or not commit:
+            # Only a build folder read before publishing has no commit, and it is never planned.
+            raise ValueError("A planned point names the release repository commit it reads.")
         return cls(
             build_id=str(value["build_id"]),
             release_directory=str(value["release_directory"]),
             hf_repo=str(value["hf_repo"]),
-            hf_commit=str(value["hf_commit"]),
+            hf_commit=commit,
             digest=value.get("digest"),
             attempt=int(value.get("attempt", 1)),
             last_attempt=bool(value.get("last_attempt", True)),

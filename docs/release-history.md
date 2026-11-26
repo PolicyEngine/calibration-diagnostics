@@ -43,7 +43,8 @@ release_history/
   pyproject.toml, uv.lock          the shared producer; pins no engine
   src/release_history/             spec, series, references, engine, releases, simulate,
                                    measure, disclosure, document, local_store, export, cli
-  schemas/                         JSON Schemas of the point, panel, series record, timeline
+  schemas/                         JSON Schemas of the point, panel, series record, labels,
+                                   timeline, attempt report and planned point
   tests/                           run on fake and synthetic models; no data, no engine
   tests/fixtures/<code>/           each country's documents, from its spec on a synthetic world
   countries/<code>/
@@ -283,7 +284,8 @@ point's is part of the panel id. An added field never moves a version: the
 schemas in `release_history/schemas/` require version 1's keys, allow no
 other, and declare a later key without requiring it. Maps copied from
 upstream manifests, or keyed by reform ids, stay open. The tests check every
-document of each country's fixtures against its schema, and the TypeScript
+document of each country's fixtures against its schema, and every attempt
+report and planned point the producer's tests write or read; the TypeScript
 tests build each country's timeline fixture from the producer's.
 
 ## Regeneration
@@ -344,9 +346,11 @@ A file that uses 80% of a runner limit (20% short of it) is flagged: the
 measure step's time (`runner.max_seconds`), the peak memory of its largest
 simulation (`runner.max_memory_bytes`) or the file's size
 (`runner.max_dataset_bytes`). The flag is a warning on the run's page, a
-column in finalize's summary, and `nearLimits` on the file's manifest entry;
-each point records the limits it ran under. A plan of 160 files or more (80%
-of the cap) is flagged the same way.
+column in finalize's summary, and `nearLimits` on the file's manifest entry.
+Each point records the limits it ran under (`runtime.limits`) and the ones it
+came near, with the share used (`runtime.near_limits`): the producer computes
+them once and finalize reads them. A plan of 160 files or more (80% of the
+cap) is flagged the same way.
 
 Measured on 2026-11-09, for one UK point (the national cut of 7 November,
 78,181 households) on a laptop. The baseline took 43 seconds and each of the

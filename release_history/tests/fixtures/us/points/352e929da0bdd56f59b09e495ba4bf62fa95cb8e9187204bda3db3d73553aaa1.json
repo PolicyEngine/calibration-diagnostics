@@ -194,15 +194,21 @@
     }
   },
   "runtime": {
-    "finished_at": "2026-11-12T00:10:00Z",
+    "finished_at": "2026-11-12T01:30:00Z",
     "limits": {
       "dataset_bytes": 3000000000,
       "memory_bytes": 16000000000,
       "seconds": 6600,
       "warn_at": 0.8
     },
+    "near_limits": [
+      {
+        "limit": "seconds",
+        "share": 0.818
+      }
+    ],
     "runner": "synthetic",
-    "seconds": 600.0,
+    "seconds": 5400.0,
     "simulations": [
       {
         "label": "baseline",
