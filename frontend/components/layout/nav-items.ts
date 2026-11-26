@@ -45,6 +45,11 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: "Releases",
     items: [
       { href: "/microcosm/staging", label: "Staging candidates", capability: "staging" },
+      // The country registry has no capability for the release history itself
+      // yet, so the entry goes with `calibration`: every country that publishes
+      // a release holds it, and the page says so when a country has nothing
+      // measured (calibration-diagnostics#224).
+      { href: "/microcosm/release-history", label: "Release history", capability: "calibration" },
     ],
   },
   {

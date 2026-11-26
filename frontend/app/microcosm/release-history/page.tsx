@@ -7,9 +7,9 @@ import { LoadingBlock } from "@/components/shared/LoadingBlock";
 
 export const metadata: Metadata = { title: "Release history" };
 
-// Reachable by URL (?country=<code>); the navigation gains an entry once a country registers the
-// capability in @policyengine/calibration-tree. A country the dashboard does not serve gets the
-// shell's not-configured state, and one with no measured file an empty state.
+// Listed in the sidebar under Releases for every country with the `calibration` capability
+// (components/layout/nav-items.ts). A country the dashboard does not serve gets the shell's
+// not-configured state, and one with no measured file an empty state.
 export default function ReleaseHistoryPage() {
   return (
     <AppShell>

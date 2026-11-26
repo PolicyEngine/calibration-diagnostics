@@ -288,11 +288,14 @@ floors) belong to the page.
 ## The page
 
 `/microcosm/release-history?country=<code>` draws one panel's `timeline.json`.
-It is reachable by URL and has no navigation entry yet: that needs a
-capability in `@policyengine/calibration-tree`'s `countries.ts`, a change in
-PolicyEngine/microcosm-collector. Nothing in the page or its routes branches
-on a country code. A country the dashboard does not serve gets the
-not-configured state, and one with no measured file an empty state.
+The sidebar lists it under Releases for every country with the `calibration`
+capability, which is every country the dashboard serves. The country registry
+has no capability for the release history itself: adding one is a change to
+`@policyengine/calibration-tree`'s `countries.ts` in
+PolicyEngine/microcosm-collector. Nothing in the page, its routes or its
+sidebar entry branches on a country code. A country the dashboard does not
+serve gets the not-configured state, and one with no measured file an empty
+state.
 
 Three routes read the store on the server, so the browser never receives a
 Blob URL or a token. Each requires `?country=`. They read Blob as the
