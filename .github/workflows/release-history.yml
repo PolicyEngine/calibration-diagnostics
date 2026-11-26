@@ -28,6 +28,12 @@ name: Release history
 # statuses and timings only, library output goes to a private file that is
 # never printed or uploaded, and nothing is stored as an Actions artifact or
 # cache. Points go straight to private Blob.
+#
+# Two repository secrets: HF_RELEASE_READ_TOKEN, the fine-grained read-only
+# token for the private release repositories that the deploy workflow also
+# reads (the US release repository is public), and
+# RELEASE_HISTORY_BLOB_READ_WRITE_TOKEN, a read-write token for the Blob store
+# the dashboard reads.
 
 on:
   workflow_dispatch:
@@ -101,8 +107,8 @@ jobs:
       BUILD_ID: ${{ inputs.build_id }}
       # Only the default branch's engine pins.
       PIN: ${{ github.ref_name == github.event.repository.default_branch && '--pin' || '' }}
-      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.RELEASE_HISTORY_BLOB_READ_WRITE_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_RELEASE_READ_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -141,8 +147,8 @@ jobs:
       matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
     env:
       COUNTRY: ${{ inputs.country }}
-      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.RELEASE_HISTORY_BLOB_READ_WRITE_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_RELEASE_READ_TOKEN }}
       HF_HUB_DISABLE_XET: "1"
       HDF5_USE_FILE_LOCKING: "FALSE"
     steps:
@@ -178,8 +184,8 @@ jobs:
     timeout-minutes: 15
     env:
       COUNTRY: ${{ inputs.country }}
-      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.RELEASE_HISTORY_BLOB_READ_WRITE_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_RELEASE_READ_TOKEN }}
       PLAN: ${{ needs.plan.outputs.plan }}
       PANEL_ID: ${{ needs.plan.outputs.panel_id }}
       # cancelled: a planned file whose leg left no report never ran, so no attempt is charged.

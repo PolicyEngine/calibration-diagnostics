@@ -523,3 +523,10 @@ it without a pull request: `RELEASE_HISTORY_WEEKLY` lists the countries whose
 weekly top-ups run (space- or comma-separated codes, for example `uk us`;
 unset runs none), and `RELEASE_HISTORY_ENABLED=FALSE` stops every run, manual
 ones included.
+
+It reads two repository secrets. `HF_RELEASE_READ_TOKEN` is the fine-grained
+read-only token for the private release repositories that the deploy workflow
+also reads; the US release repository is public. `RELEASE_HISTORY_BLOB_READ_WRITE_TOKEN`
+is a read-write token for the Blob store the dashboard reads, and has to be
+added before the first run. The workflow reads neither of the former tree
+publisher's secrets, `HF_TOKEN` and `BLOB_READ_WRITE_TOKEN`.
