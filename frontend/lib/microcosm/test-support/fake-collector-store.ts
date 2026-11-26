@@ -42,6 +42,7 @@ import {
 import {
   summaryFromManifest,
   summaryFromProgress,
+  type StagingRunSummary,
 } from "@policyengine/calibration-tree/staging-artifact";
 
 const MANIFEST_PATH = "calibration-trees/manifest.json";
@@ -109,6 +110,8 @@ export interface FakeStagingRun {
   files: Partial<Record<FakeStagingRunFileName, Document>>;
   removed?: boolean;
   problem?: string | null;
+  /** Fields of the index's summary of the run that differ from its documents'. */
+  summary?: Partial<StagingRunSummary>;
 }
 
 export class FakeCollectorStore {
@@ -229,7 +232,7 @@ export class FakeCollectorStore {
       hfCommitSha: fakeCommit(run.runId),
       copiedAt: "2026-10-20T00:00:00.000Z",
       folderFingerprint: sha256(`folder:${run.runId}`),
-      summary,
+      summary: { ...summary, ...run.summary },
       problem: run.problem ?? null,
       files,
       treeCheck: null,

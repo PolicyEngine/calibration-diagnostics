@@ -263,6 +263,28 @@ test("a version 2 run without a copied run manifest shows no reform validation",
   expect(store.huggingFaceRequests).toEqual([]);
 });
 
+test("a version 3 run whose index summary records no version shows no top-level reform validation", async () => {
+  // The collector records a run whose run manifest copy isn't a JSON object
+  // as a problem, with no version in its summary; its progress and events are
+  // still version 3.
+  const { "artifacts/reform_validation.json": declared, ...files } = usV2RunFiles();
+  const store = new FakeCollectorStore();
+  store.addStagingRun({
+    country: "us",
+    runId: US_V2_RUN,
+    files: { ...files, "run_manifest.json": "not a JSON object", "reform_validation.json": declared },
+    problem: "The run manifest is not a JSON object.",
+    summary: { schema_version: null },
+  });
+  serve(store);
+
+  const body = await runDetail();
+
+  expect(body.progress).toMatchObject({ schema_version: 3, run_id: US_V2_RUN });
+  expect(body.reform_validation).toBeNull();
+  expect(store.huggingFaceRequests).toEqual([]);
+});
+
 test("the calibration and Build progress readers don't read a version 2 run's reform validation", async () => {
   const store = serve(usV2Store());
   const copiedFiles = store.stagingIndex("us").runs[US_V2_RUN].files as Record<
