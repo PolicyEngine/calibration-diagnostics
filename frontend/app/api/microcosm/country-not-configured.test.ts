@@ -18,6 +18,9 @@ const COUNTRY_ROUTES: Record<string, () => Promise<RouteModule>> = {
   "microcosm/comparison-tree/target-detail": () =>
     import("./comparison-tree/target-detail/route"),
   "microcosm/cross-dataset": () => import("./cross-dataset/route"),
+  "microcosm/release-history": () => import("./release-history/route"),
+  "microcosm/release-history/export": () => import("./release-history/export/route"),
+  "microcosm/release-history/timeline": () => import("./release-history/timeline/route"),
   "microcosm/releases": () => import("./releases/route"),
   "microcosm/staging/compare": () => import("./staging/compare/route"),
   "microcosm/staging/run": () => import("./staging/run/route"),
@@ -40,6 +43,7 @@ const OTHER_PARAMETERS = {
   a: "a".repeat(64),
   b: "b".repeat(64),
   build: "c".repeat(64),
+  panel: "d".repeat(64),
   release: "microcosm-us-2024",
   part: "index",
   mode: "reported",

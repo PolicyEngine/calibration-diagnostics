@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import { calibrationTreeBlobText } from "@policyengine/calibration-tree/calibration-tree-blob";
 
-function acceptsGzip(request: Request): boolean {
+export function acceptsGzip(request: Request): boolean {
   return (request.headers.get("accept-encoding") ?? "")
     .split(",")
     .map((item) => item.trim().toLowerCase())
