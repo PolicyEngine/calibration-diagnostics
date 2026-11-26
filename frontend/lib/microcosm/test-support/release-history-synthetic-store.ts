@@ -77,7 +77,7 @@ interface SyntheticBuild {
   current?: boolean;
   /** The release repository lists it with no file to measure. */
   refused?: boolean;
-  /** Its file carries no survey household ids: a stored refusal, a gap on every engine. */
+  /** Its file carries no survey household ids: a stored refusal, the store's "gap". */
   gap?: boolean;
 }
 

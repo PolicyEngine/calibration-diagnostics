@@ -3,8 +3,8 @@
 Release history measures every published national Microcosm data file of a
 country on one fixed reference model, so a move between two releases comes
 from the data, not the model (calibration-diagnostics#224). This document
-covers the backend: what is measured, where it is stored, when it is
-regenerated, and how to add a country. The dashboard page is a later PR.
+covers the backend (what is measured, where it is stored, when it is
+regenerated, and how to add a country) and the dashboard page that reads it.
 For a short overview, and the discussion points for what comes next, see
 [release-history-roadmap.md](release-history-roadmap.md).
 
@@ -55,6 +55,11 @@ release_history/
 frontend/lib/microcosm/release-history-store.ts   Blob layout, manifest, plan, finalize, timeline
 frontend/scripts/release-history.ts               plan | upload | finalize | pull | timeline
 .github/workflows/release-history.yml             weekly top-ups and manual runs
+frontend/app/api/microcosm/release-history/       the page's read routes: summary, timeline, export
+frontend/app/microcosm/release-history/           the page
+frontend/lib/microcosm/release-history-*.ts       the page's logic: summary, outputs, chart, moved, builds, url
+frontend/components/microcosm/release-history-*   the page's view, chart and step card
+frontend/scripts/release-history-dev-store.ts     a synthetic store for local development
 ```
 
 Python does everything that touches PolicyEngine, an H5, the release
@@ -279,6 +284,99 @@ The timeline is rebuilt from the stored points and the series record on every
 run, with no simulation, so a corrected publish time or a definition change
 never re-measures. Pooled summaries (typical and 1-in-10 revisions, windows,
 floors) belong to the page.
+
+## The page
+
+`/microcosm/release-history?country=<code>` draws one panel's `timeline.json`.
+It is reachable by URL and has no navigation entry yet: that needs a
+capability in `@policyengine/calibration-tree`'s `countries.ts`, a change in
+PolicyEngine/microcosm-collector. Nothing in the page or its routes branches
+on a country code. A country the dashboard does not serve gets the
+not-configured state, and one with no measured file an empty state.
+
+Three routes read the store on the server, so the browser never receives a
+Blob URL or a token. Each requires `?country=`.
+
+- `GET /api/microcosm/release-history`: the country's panels from the
+  manifest, one per reference engine that holds a measured file, with engine,
+  coverage and whether the definition equals the default panel's, and the
+  panel the page opens. It leaves the per-file entries out.
+- `GET /api/microcosm/release-history/timeline?panel=<id>`: one panel's
+  summary, its whole `timeline.json`, and what its `panel.json` says about
+  presenting its outputs (currency, period labels, the baseline items and
+  reforms in spec order, the disclosure policy). Without `panel` it serves the
+  panel the page opens. Only a panel the country's manifest entry lists is
+  read.
+- `GET /api/microcosm/release-history/export?panel=<id>`: the same timeline
+  as a CSV download, with the columns of `release-history export`.
+
+A timeline grows with every build and a function's response is capped at
+4.5 MB, which an uncompressed UK timeline reaches at about 70 builds, so the
+timeline and the CSV are sent gzipped to a client that accepts it. A compact
+encoding is the next step if a compressed timeline nears the cap.
+
+**Which panel opens.** The served panel: the last pinned one that was
+complete. After an engine bump the pinned panel fills first, a notice links
+to it, and the page moves to it once it is complete. The engine toggle lists
+every panel that holds a measured file, including one a run from another ref
+filled, and says when a panel's definition differs from the default one's.
+
+**State in the URL.** `panel` (the engine's panel), `output`, `period` (when
+the panel measures more than one), `scale=absolute`, `step` (the build whose
+step card is open) and `moved=all`. A default is never written, and a value
+the page cannot use (a panel of another country, an output the panel does not
+hold) falls back to its default.
+
+**What it shows**, in order: notices about the engine on screen and the
+builds it has no value for; the series facts; what moved at the latest build;
+the builds of the series; and the outputs, with the selected output's chart,
+official reference, step card and table. Its words are neutral: an output
+"moved", and is "nearer to" or "further from" its official figure. It labels
+every output and never prints an output's id.
+
+- The chart has one column per build in publish order. Relative, the default,
+  places each value as a percentage above or below the output's official
+  figure (the timeline's `reference.modelSignValue`); Absolute places the
+  values. An output with no official figure is drawn in values under both,
+  with a note. A line joins two builds only where the timeline has a step.
+- A build with no value keeps its column, shaded and labelled with why: not
+  measured on this engine, retrying, out of attempts (the store's `failed`),
+  file refused (the store's `gap`), withheld, or withdrawn. The builds an
+  engine has no value for are also named in a notice.
+- A withdrawn build is listed and marked. A value measured before the
+  withdrawal is a hollow marker that no line joins.
+- Marks under the axis: a new build engine (the file was built with another
+  model version than the build before it), the same file published again, and
+  a withdrawn build.
+- What moved ranks outputs by their step beside their own typical step, the
+  median of their earlier steps on the panel. A build that republishes a file
+  is left out of that median, and an output with fewer than three earlier
+  steps is ranked after the others by the size of its step.
+- The step card sets what a step's two builds declare side by side (from the
+  timeline's `declared` block), with links to their Microcosm commits and to
+  each build's Calibration fit page.
+
+**Withheld cells.** The page shows a withheld cell as "Withheld" and never as
+a number. It removes every number from a cell or a step that is not `ok`
+before anything is drawn, ranked or exported, and it computes nothing across
+outputs: no sum of deciles, no total less its parts. What it does compute is
+per output: the distance from the official figure, which is public, and the
+typical step, from that output's published steps.
+
+**Local development.** No production data is needed. `bun run
+scripts/release-history-dev-store.ts --out <folder>` writes a synthetic store
+(each country's committed fixtures and a seeded generator, through the real
+finalize and timeline code), and the routes read a local folder in the
+store's layout when `RELEASE_HISTORY_LOCAL_DIR` names it, in place of Blob:
+
+```bash
+cd frontend
+bun run scripts/release-history-dev-store.ts --out ../.tmp/release-history-store
+RELEASE_HISTORY_LOCAL_DIR=../.tmp/release-history-store bun run dev
+```
+
+The same variable opens a panel fetched with `pull`. It is unset on a hosted
+deployment, which never reads its own filesystem.
 
 ## Document formats
 

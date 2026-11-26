@@ -46,14 +46,22 @@ export interface StepSummary {
   rankedByTypical: boolean;
 }
 
-/** An output's step to a build, in the measure its unit is told in; null when it has none. */
+/**
+ * An output's step to a build, in the measure its unit is told in; null when it has none. Money
+ * and counts are told in percent of the value before: a step of nothing is 0 whatever that value
+ * was, and a step away from a value of zero is infinite, for no percentage can tell it.
+ */
 export function stepOf(entry: OutputEntry, buildIndex: number): { signed: number; measure: StepMove["measure"] } | null {
   const value = entry.values[buildIndex];
-  if (!value || value.changeStatus !== "ok") return null;
+  if (!value || value.changeStatus !== "ok" || value.change === null) return null;
   if (stepsInPoints(entry.unit)) {
     return value.changePoints === null ? null : { signed: value.changePoints, measure: "points" };
   }
-  return value.relativeChange === null ? null : { signed: value.relativeChange * 100, measure: "percent" };
+  if (value.change === 0) return { signed: 0, measure: "percent" };
+  return {
+    signed: value.relativeChange === null ? Math.sign(value.change) * Number.POSITIVE_INFINITY : value.relativeChange * 100,
+    measure: "percent",
+  };
 }
 
 function median(sorted: number[]): number {
@@ -74,7 +82,7 @@ export function typicalStep(
   for (let index = 0; index < buildIndex; index += 1) {
     if (builds[index].sameFileAs !== null) continue;
     const step = stepOf(entry, index);
-    if (step) sizes.push(Math.abs(step.signed));
+    if (step && Number.isFinite(step.signed)) sizes.push(Math.abs(step.signed));
   }
   return sizes.length < MIN_STEPS_FOR_TYPICAL ? null : median(sizes.sort((left, right) => left - right));
 }

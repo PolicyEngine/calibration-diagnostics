@@ -67,7 +67,7 @@ export function buildMarks(builds: readonly TimelineBuild[]): BuildMark[][] {
 /**
  * The builds on the axis this panel holds no value for, by why: never run on this engine, a run
  * that failed and will be tried again, one that ran out of attempts, or a file the producer
- * refused (a gap on every engine). A withdrawn build is never measured, so it is not listed.
+ * refused (the store's "gap"). A withdrawn build is never measured, so it is not listed.
  */
 export interface BuildsWithoutRun {
   neverRun: TimelineBuild[];
@@ -97,7 +97,9 @@ export function withoutRunCount(without: BuildsWithoutRun): number {
 /** One build's state on the panel, in the page's words. */
 export function buildStateLabel(build: Pick<TimelineBuild, "state" | "status">): string {
   if (build.state === "measured") return build.status === "partial" ? "Partial" : "Measured";
-  return { gap: "Gap", retrying: "Retrying", failed: "Failed", missing: "Not measured" }[build.state];
+  // The store's states `gap` and `failed` are named for what happened: the producer refused the
+  // file, or the runs that tried to measure it ran out of attempts. Neither is a verdict on the build.
+  return { gap: "File refused", retrying: "Retrying", failed: "Out of attempts", missing: "Not measured" }[build.state];
 }
 
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;

@@ -12,6 +12,7 @@
 import type { BuildMark } from "./release-history-builds";
 import {
   dateShort,
+  formatAxisValue,
   formatPercent,
   formatValue,
   versusOfficial,
@@ -25,9 +26,9 @@ export type ColumnBand =
   | "withdrawn"
   | "withheld"
   | "not measured"
-  | "gap"
+  | "file refused"
   | "retrying"
-  | "failed"
+  | "out of attempts"
   | "no value";
 
 export interface ChartColumn {
@@ -68,11 +69,17 @@ export interface ChartLayout {
 }
 
 export const CHART_HEIGHT = 330;
-const MARGIN = { top: 18, right: 18, bottom: 64, left: 72 };
+// The top margin leaves room for the latest value's label above a point at the top of the plot.
+const MARGIN = { top: 26, right: 18, bottom: 64, left: 72 };
 /** The least room a publish date needs under the axis. */
 const DATE_LABEL_WIDTH = 46;
 /** Below this column width a band's label is turned on its side. */
 const HORIZONTAL_BAND_LABEL_WIDTH = 78;
+
+/** A position to a hundredth of a pixel: enough to draw with, and short in the markup. */
+function px(value: number): number {
+  return Math.round(value * 100) / 100;
+}
 
 /** Round axis values that cover the range, and the range they span. */
 export function niceTicks(low: number, high: number, count = 4): { ticks: number[]; min: number; max: number } {
@@ -100,14 +107,36 @@ function tickDecimals(ticks: number[]): number {
   return [0, 1, 2, 3].find(exact) ?? 3;
 }
 
+/**
+ * The ticks' labels: percentages in the relative view, values otherwise, with as few decimals as
+ * keep every label different from its neighbours.
+ */
+function axisLabels(
+  ticks: number[],
+  relative: boolean,
+  unit: OutputEntry["unit"],
+  currency: string | null,
+): string[] {
+  if (relative) {
+    const decimals = tickDecimals(ticks);
+    return ticks.map((tick) => formatPercent(tick, decimals));
+  }
+  let labels: string[] = [];
+  for (const decimals of [1, 2, 3, 4]) {
+    labels = ticks.map((tick) => formatAxisValue(tick, unit, currency, decimals));
+    if (new Set(labels).size === labels.length) break;
+  }
+  return labels;
+}
+
 /** Why a build's column holds no point for this output; null when it holds one. */
 export function columnBand(build: TimelineBuild, status: OutputEntry["values"][number]["status"]): ColumnBand | null {
   if (build.withdrawn) return "withdrawn";
   if (status === "withheld") return "withheld";
   if (status === "ok") return null;
-  if (build.state === "gap") return "gap";
+  if (build.state === "gap") return "file refused";
   if (build.state === "retrying") return "retrying";
-  if (build.state === "failed") return "failed";
+  if (build.state === "failed") return "out of attempts";
   return build.state === "missing" ? "not measured" : "no value";
 }
 
@@ -145,7 +174,7 @@ export function chartLayout(options: {
   // What the chart places for a stored value: the value, or its % above or below the official figure.
   const placed = (value: number) => (relative && official !== null ? versusOfficial(value, official) : value);
   const step = (plot.right - plot.left) / Math.max(builds.length, 1);
-  const xs = builds.map((_, index) => plot.left + step * (index + 0.5));
+  const xs = builds.map((_, index) => px(plot.left + step * (index + 0.5)));
   const values = builds.map((_, index) => entry.values[index]?.value ?? null);
   const known = values.filter((value): value is number => value !== null).map(placed);
   const empty = known.length === 0;
@@ -156,10 +185,8 @@ export function chartLayout(options: {
   const yOf = (value: number) =>
     range === null
       ? plot.bottom
-      : plot.bottom - ((value - range.min) / (range.max - range.min)) * (plot.bottom - plot.top);
-  const decimals = range ? tickDecimals(range.ticks) : 0;
-  const tickLabel = (tick: number) =>
-    relative ? formatPercent(tick, decimals) : formatValue(tick, entry.unit, currency, 1);
+      : px(plot.bottom - ((value - range.min) / (range.max - range.min)) * (plot.bottom - plot.top));
+  const tickLabels = range === null ? [] : axisLabels(range.ticks, relative, entry.unit, currency);
 
   const dates = dateLabels(builds, xs, step);
   const columns = builds.map((build, index): ChartColumn => {
@@ -168,8 +195,8 @@ export function chartLayout(options: {
       index,
       buildId: build.buildId,
       x: xs[index],
-      left: xs[index] - step / 2,
-      width: step,
+      left: px(plot.left + step * index),
+      width: px(step),
       band: columnBand(build, entry.values[index]?.status ?? "unmeasured"),
       point: value === null || range === null ? null : { y: yOf(placed(value)), hollow: build.withdrawn },
       current: build.current,
@@ -195,13 +222,19 @@ export function chartLayout(options: {
     const point = columns[index].point;
     // A withdrawn build's value is drawn, hollow, and never labelled as the latest.
     if (value === null || point === null || point.hollow) continue;
+    // Above the point, unless the line comes down into it: then below, clear of the line.
+    const incoming = segments.find((segment) => segment.to === index);
+    const below = point.y + 20;
+    const comesDown = incoming !== undefined && incoming.y1 < incoming.y2;
+    // Beside a shaded column the label ends at its own column's edge, clear of that column's label.
+    const besideBand = columns[index + 1]?.band != null;
     latestLabel = {
-      x: columns[index].x,
-      y: point.y - 12,
+      x: besideBand ? px(columns[index].left + columns[index].width - 2) : columns[index].x,
+      y: comesDown && below <= plot.bottom - 4 ? below : point.y - 12,
       text: relative && official !== null
         ? formatPercent(versusOfficial(value, official), 2)
         : formatValue(value, entry.unit, currency),
-      anchor: index === columns.length - 1 ? "end" : "middle",
+      anchor: index === columns.length - 1 || besideBand ? "end" : "middle",
     };
   }
 
@@ -211,7 +244,7 @@ export function chartLayout(options: {
     plot,
     relative,
     blocked: options.scale === "relative" && official === null,
-    ticks: range ? range.ticks.map((tick) => ({ y: yOf(tick), label: tickLabel(tick) })) : [],
+    ticks: range ? range.ticks.map((tick, index) => ({ y: yOf(tick), label: tickLabels[index] })) : [],
     official:
       official === null || range === null
         ? null

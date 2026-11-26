@@ -52,6 +52,21 @@ export function formatValue(
   return value < 0 ? `${MINUS}${text}` : text;
 }
 
+/**
+ * A value on an axis, with the decimals the axis needs: unlike `formatValue`, a rate and a ratio
+ * take them too, so two ticks close together never read the same.
+ */
+export function formatAxisValue(
+  value: number,
+  unit: OutputUnit,
+  currency: string | null,
+  decimals: number,
+): string {
+  if (unit === "currency" || unit === "count") return formatValue(value, unit, currency, decimals);
+  const abs = Math.abs(unit === "rate" ? value * 100 : value);
+  return `${value < 0 ? MINUS : ""}${abs.toFixed(decimals)}%`;
+}
+
 function signed(text: string, value: number): string {
   if (value < 0) return `${MINUS}${text}`;
   return value > 0 ? `+${text}` : text;

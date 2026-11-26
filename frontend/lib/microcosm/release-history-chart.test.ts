@@ -49,7 +49,10 @@ test("the relative view places each value as a percentage of the official figure
   expect(Math.sign(first.versus - second.versus)).toBe(Math.sign(second.y - first.y));
   // The latest value is the one labelled, as a percentage; the two newest builds have no run here.
   const latest = at(timeline, "10 Nov");
-  expect(layout.latestLabel).toMatchObject({ x: layout.columns[latest].x, anchor: "middle" });
+  // The next column is shaded, so the label ends at its own column's edge.
+  expect(layout.latestLabel).toMatchObject({ anchor: "end" });
+  expect(layout.latestLabel!.x).toBeLessThanOrEqual(layout.columns[latest + 1].left);
+  expect(layout.latestLabel!.x).toBeGreaterThan(layout.columns[latest].x);
   expect(layout.latestLabel!.text).toMatch(/^[+−]\d+\.\d\d%$/);
 });
 
@@ -77,7 +80,7 @@ test("every build keeps its column: a build with no value is shaded and labelled
   const served = await ukChart("baseline/income_tax", "relative");
   const band = (date: string) => served.layout.columns[at(served.timeline, date)];
   expect(served.layout.columns).toHaveLength(served.timeline.builds.length);
-  expect(band("24 Oct")).toMatchObject({ band: "gap", point: null });
+  expect(band("24 Oct")).toMatchObject({ band: "file refused", point: null });
   expect(band("17 Nov")).toMatchObject({ band: "not measured", point: null });
   expect(band("24 Nov")).toMatchObject({ band: "not measured", point: null, current: true });
   expect(band("19 Oct")).toMatchObject({ band: null });
@@ -88,7 +91,7 @@ test("every build keeps its column: a build with no value is shaded and labelled
   const pinnedBand = (date: string) => pinned.layout.columns[at(pinned.timeline, date)];
   // Never measured on the newer engine, which was pinned after the withdrawal.
   expect(pinnedBand("29 Oct")).toMatchObject({ band: "withdrawn", point: null });
-  expect(pinnedBand("5 Nov")).toMatchObject({ band: "failed", point: null });
+  expect(pinnedBand("5 Nov")).toMatchObject({ band: "out of attempts", point: null });
   expect(pinnedBand("24 Nov")).toMatchObject({ band: "retrying", point: null });
   expect(pinnedBand("17 Nov")).toMatchObject({ band: null });
   // The axis is the same on both engines.
@@ -148,7 +151,9 @@ test("why a column is empty follows the build's state and the cell's status", ()
   // A measured build whose point has no such cell, as after a reform that failed.
   expect(columnBand(build, "missing")).toBe("no value");
   expect(columnBand({ ...build, state: "missing" }, "unmeasured")).toBe("not measured");
-  expect(columnBand({ ...build, state: "gap" }, "unmeasured")).toBe("gap");
+  expect(columnBand({ ...build, state: "gap" }, "unmeasured")).toBe("file refused");
+  expect(columnBand({ ...build, state: "failed" }, "unmeasured")).toBe("out of attempts");
+  expect(columnBand({ ...build, state: "retrying" }, "unmeasured")).toBe("retrying");
   expect(columnBand({ ...build, withdrawn: true }, "ok")).toBe("withdrawn");
 });
 
@@ -186,6 +191,33 @@ test("one value still gets a scale around it", () => {
   expect(layout.columns[0].point!.y).toBeGreaterThan(layout.plot.top);
   expect(layout.columns[0].point!.y).toBeLessThan(layout.plot.bottom);
   expect(layout.latestLabel).toMatchObject({ text: "£100", anchor: "end" });
+});
+
+test("the latest value's label sits clear of the line that reaches it", () => {
+  const rising = small(smallTimeline({ builds: [{}, {}], outputs: { "baseline/tax": ["currency", [100, 104]] } }), "absolute");
+  const falling = small(smallTimeline({ builds: [{}, {}], outputs: { "baseline/tax": ["currency", [104, 100.5]] } }), "absolute");
+  const point = (chart: typeof rising) => chart.layout.columns[1].point!.y;
+  // A line that climbs to the point leaves the room above it; one that comes down leaves the room below.
+  expect(rising.layout.latestLabel!.y).toBeLessThan(point(rising));
+  expect(falling.layout.latestLabel!.y).toBeGreaterThan(point(falling));
+  expect(falling.layout.latestLabel!.y).toBeLessThan(falling.layout.plot.bottom);
+});
+
+test("ticks close together are written with the decimals that tell them apart", () => {
+  const timeline = smallTimeline({
+    builds: [{}, {}, {}],
+    outputs: { "baseline/tax": ["currency", [25_600_000_000, 25_640_000_000, 25_680_000_000]] },
+  });
+  const labels = small(timeline, "absolute").layout.ticks.map((tick) => tick.label);
+  expect(new Set(labels).size).toBe(labels.length);
+  expect(labels).toContain("£25.62bn");
+  const rates = smallTimeline({
+    builds: [{}, {}],
+    outputs: { "baseline/share": ["rate", [0.1801, 0.1803]] },
+  });
+  const rateLabels = small(rates, "absolute").layout.ticks.map((tick) => tick.label);
+  expect(new Set(rateLabels).size).toBe(rateLabels.length);
+  expect(rateLabels.every((label) => label.endsWith("%"))).toBe(true);
 });
 
 test("axis values are round and cover the range", () => {

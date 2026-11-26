@@ -67,9 +67,9 @@ test("the builds an engine has no run for are named by why, and a withdrawn buil
 test("a build's state reads in the page's words", () => {
   expect(buildStateLabel({ state: "measured", status: "ok" })).toBe("Measured");
   expect(buildStateLabel({ state: "measured", status: "partial" })).toBe("Partial");
-  expect(buildStateLabel({ state: "gap", status: "refused" })).toBe("Gap");
+  expect(buildStateLabel({ state: "gap", status: "refused" })).toBe("File refused");
   expect(buildStateLabel({ state: "retrying", status: null })).toBe("Retrying");
-  expect(buildStateLabel({ state: "failed", status: null })).toBe("Failed");
+  expect(buildStateLabel({ state: "failed", status: null })).toBe("Out of attempts");
   expect(buildStateLabel({ state: "missing", status: null })).toBe("Not measured");
 });
 

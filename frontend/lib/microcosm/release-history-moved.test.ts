@@ -111,6 +111,28 @@ test("a build that republishes a file moves nothing, and is left out of every ty
   expect(typicalStep(entries[0], timeline.builds, 5)).toBeCloseTo(4);
 });
 
+test("a step of nothing is no move even from zero, and a step away from zero ranks first with no percentage", () => {
+  const timeline = smallTimeline({
+    builds: [{}, {}, {}, {}, {}],
+    outputs: {
+      "baseline/nothing": ["currency", [0, 0, 0, 0, 0]],
+      "baseline/appears": ["currency", [0, 0, 0, 0, 12]],
+      "baseline/ordinary": ["currency", [100, 101, 102, 103, 104]],
+    },
+  });
+  const entries = outputEntries(timeline, PRESENTATION);
+  const summary = stepSummary(entries, timeline.builds, 4);
+  expect(summary).toMatchObject({ unchanged: 1, noStep: 0, withheld: 0 });
+  expect(summary.moved.map((move) => move.entry.id)).toEqual(["baseline/appears", "baseline/ordinary"]);
+  expect(summary.moved[0]).toMatchObject({ signed: Number.POSITIVE_INFINITY, typical: 0, ratio: Number.POSITIVE_INFINITY });
+  // An infinite step never enters a typical step.
+  const later = smallTimeline({
+    builds: [{}, {}, {}, {}, {}, {}],
+    outputs: { "baseline/appears": ["currency", [0, 5, 5.05, 5.1, 5.151, 6]] },
+  });
+  expect(typicalStep(outputEntries(later, PRESENTATION)[0], later.builds, 5)).toBeCloseTo(1, 1);
+});
+
 test("what moved speaks of the newest measured build on the axis", () => {
   const timeline = smallTimeline({
     builds: [{}, {}, { withdrawn: true }, { unmeasured: true }],
