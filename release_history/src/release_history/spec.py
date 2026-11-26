@@ -221,7 +221,7 @@ def _names(value: Any, where: str) -> tuple[str, ...]:
         return ()
     if isinstance(value, str):
         value = [value]
-    if not isinstance(value, list) or not all(isinstance(v, str) and v for v in value):
+    if not isinstance(value, list) or not all(isinstance(name, str) and name for name in value):
         raise SpecError(f"{where}: must be a name or a list of names.")
     return tuple(value)
 
@@ -329,11 +329,69 @@ def parse_spec(raw: Mapping[str, Any], *, expected_country: str | None = None) -
     country = _identifier(_require(raw, "country", "spec"), "spec.country")
     if expected_country is not None and country != expected_country:
         raise SpecError(f"spec.country '{country}' does not match its folder '{expected_country}'.")
+    series_releases, since = _series_rule(raw)
+    if "schedule" in raw:
+        raise SpecError(
+            "schedule: weekly top-ups are switched on per country by the repository variable "
+            "RELEASE_HISTORY_WEEKLY, not by the spec; remove the key."
+        )
+    engine = _require(raw, "engine", "spec")
+    periods, period_label = _periods(raw)
+    variables = raw.get("variables") or {}
+    budget = variables.get("budget") or {}
+    groups = _groups(variables)
+    outputs = _output_levels(raw)
+    baseline = tuple(
+        _baseline_item(item, index) for index, item in enumerate(raw.get("baseline") or [])
+    )
+    reforms = tuple(
+        _reform(item, index, outputs) for index, item in enumerate(raw.get("reforms") or [])
+    )
+    _check_items(baseline, reforms, variables)
+    policy, floor, source_id_columns = _disclosure(raw)
+    limits = _runner_limits(raw)
+    return Spec(
+        raw=raw,
+        country=country,
+        release_repo=str(_require(raw, "release_repo", "spec")),
+        series_releases=series_releases,
+        series_since=since,
+        engine_module=_identifier(_require(engine, "module", "engine"), "engine.module"),
+        model_package=str(_require(engine, "model_package", "engine")),
+        simulation_options=dict(engine.get("simulation_options") or {}),
+        periods=periods,
+        period_label=period_label,
+        currency=str(_require(raw, "currency", "spec")),
+        household_entity=str(raw.get("household_entity", "household")),
+        weights=dict(raw.get("weights") or {}),
+        household_net_income=variables.get("household_net_income"),
+        budget_plus=_names(budget.get("plus"), "variables.budget.plus"),
+        budget_minus=_names(budget.get("minus"), "variables.budget.minus"),
+        income_decile=variables.get("income_decile"),
+        poverty=dict(variables.get("poverty") or {}),
+        groups=groups,
+        behaviour=dict(variables.get("behaviour") or {}),
+        baseline=baseline,
+        reforms=reforms,
+        outputs=outputs,
+        disclosure_policy=policy,
+        min_source_households=floor,
+        source_id_columns=source_id_columns,
+        max_dataset_bytes=limits["max_dataset_bytes"],
+        max_seconds=limits["max_seconds"],
+        max_memory_bytes=limits["max_memory_bytes"],
+        digest=json_sha256(measurement_definition(raw)),
+    )
+
+
+def _series_rule(raw: Mapping[str, Any]) -> tuple[tuple[str, ...], str | None]:
+    """The series' release lines, named as releases.json names them, and the date from which
+    their builds count, if one is set."""
     series = raw.get("series") or {}
-    series_releases = _names(series.get("releases"), "series.releases")
-    if not series_releases:
+    releases = _names(series.get("releases"), "series.releases")
+    if not releases:
         raise SpecError("series.releases must name at least one release line.")
-    if any(name.startswith("^") for name in series_releases):
+    if any(name.startswith("^") for name in releases):
         raise SpecError(
             "series.releases names release lines as releases.json does; patterns are gone."
         )
@@ -345,39 +403,55 @@ def parse_spec(raw: Mapping[str, Any], *, expected_country: str | None = None) -
     since = series.get("since")
     if since is not None and not (isinstance(since, str) and _DATE.match(since)):
         raise SpecError("series.since must be a date, YYYY-MM-DD.")
-    if "schedule" in raw:
-        raise SpecError(
-            "schedule: weekly top-ups are switched on per country by the repository variable "
-            "RELEASE_HISTORY_WEEKLY, not by the spec; remove the key."
-        )
-    engine = _require(raw, "engine", "spec")
+    return releases, since
+
+
+def _periods(raw: Mapping[str, Any]) -> tuple[tuple[int, ...], str]:
+    """The years measured, and how the page labels them."""
     periods = raw.get("periods")
     if (
         not isinstance(periods, list)
         or not periods
-        or not all(isinstance(p, int) and not isinstance(p, bool) for p in periods)
+        or not all(isinstance(period, int) and not isinstance(period, bool) for period in periods)
     ):
         raise SpecError("periods must be a non-empty list of years.")
     period_label = raw.get("period_label", "calendar_year")
     if period_label not in PERIOD_LABELS:
         raise SpecError(f"period_label '{period_label}' must be one of {PERIOD_LABELS}.")
-    variables = raw.get("variables") or {}
-    budget = variables.get("budget") or {}
-    poverty = variables.get("poverty") or {}
+    return tuple(periods), period_label
+
+
+def _groups(variables: Mapping[str, Any]) -> dict[str, str | None]:
+    """The poverty groups by name: `all` (no variable) and any group a person flag defines."""
     groups = variables.get("groups") or {"all": None}
     if "all" not in groups or groups["all"] is not None:
         raise SpecError("variables.groups must include 'all: null'.")
+    return dict(groups)
+
+
+def _output_levels(raw: Mapping[str, Any]) -> tuple[str, ...]:
+    """The output levels a reform gets when it names none."""
     outputs = tuple(raw.get("outputs", OUTPUT_LEVELS))
     unknown_levels = set(outputs) - set(OUTPUT_LEVELS)
     if unknown_levels:
         raise SpecError(f"outputs {sorted(unknown_levels)} must come from {OUTPUT_LEVELS}.")
-    baseline = tuple(_baseline_item(item, i) for i, item in enumerate(raw.get("baseline") or []))
-    reforms = tuple(_reform(item, i, outputs) for i, item in enumerate(raw.get("reforms") or []))
-    for kind, ids in (("baseline", [b.id for b in baseline]), ("reform", [r.id for r in reforms])):
+    return outputs
+
+
+def _check_items(
+    baseline: tuple[BaselineItem, ...],
+    reforms: tuple[ReformSpec, ...],
+    variables: Mapping[str, Any],
+) -> None:
+    """Ids are unique, and every output level asked for has the variables it needs."""
+    for kind, ids in (
+        ("baseline", [item.id for item in baseline]),
+        ("reform", [reform.id for reform in reforms]),
+    ):
         if len(ids) != len(set(ids)):
             raise SpecError(f"Duplicate {kind} ids.")
     used_levels = {level for reform in reforms for level in reform.outputs}
-    if "budget" in used_levels and not budget.get("plus"):
+    if "budget" in used_levels and not (variables.get("budget") or {}).get("plus"):
         raise SpecError("The 'budget' output level needs variables.budget.plus.")
     if "distribution" in used_levels and not (
         variables.get("household_net_income") and variables.get("income_decile")
@@ -386,10 +460,15 @@ def parse_spec(raw: Mapping[str, Any], *, expected_country: str | None = None) -
             "The 'distribution' output level needs variables.household_net_income and "
             "variables.income_decile."
         )
-    if "poverty" in used_levels and not poverty:
+    if "poverty" in used_levels and not variables.get("poverty"):
         raise SpecError("The 'poverty' output level needs variables.poverty.")
     if any(item.by == "income_decile" for item in baseline) and not variables.get("income_decile"):
         raise SpecError("A baseline item 'by: income_decile' needs variables.income_decile.")
+
+
+def _disclosure(raw: Mapping[str, Any]) -> tuple[str, int, tuple[str, ...]]:
+    """The disclosure policy, its floor of source households (raised, never lowered), and
+    the columns that hold each household's source id."""
     disclosure = raw.get("disclosure") or {"policy": "none"}
     policy = disclosure.get("policy", "none")
     if policy not in DISCLOSURE_POLICIES:
@@ -403,8 +482,12 @@ def parse_spec(raw: Mapping[str, Any], *, expected_country: str | None = None) -
     source_id_columns = _names(disclosure.get("source_id_columns"), "disclosure.source_id_columns")
     if policy == "source_household_small_cells" and not source_id_columns:
         raise SpecError("source_household_small_cells needs disclosure.source_id_columns.")
+    return policy, floor, source_id_columns
+
+
+def _runner_limits(raw: Mapping[str, Any]) -> dict[str, int | None]:
+    """The runner block's limits: each a positive whole number, or absent."""
     runner = raw.get("runner") or {}
-    max_bytes = runner.get("max_dataset_bytes")
     limits = {
         key: runner.get(key) for key in ("max_dataset_bytes", "max_seconds", "max_memory_bytes")
     }
@@ -413,39 +496,7 @@ def parse_spec(raw: Mapping[str, Any], *, expected_country: str | None = None) -
             isinstance(value, bool) or not isinstance(value, int) or value <= 0
         ):
             raise SpecError(f"runner.{key} must be a positive whole number.")
-    spec = Spec(
-        raw=raw,
-        country=country,
-        release_repo=str(_require(raw, "release_repo", "spec")),
-        series_releases=series_releases,
-        series_since=since,
-        engine_module=_identifier(_require(engine, "module", "engine"), "engine.module"),
-        model_package=str(_require(engine, "model_package", "engine")),
-        simulation_options=dict(engine.get("simulation_options") or {}),
-        periods=tuple(periods),
-        period_label=period_label,
-        currency=str(_require(raw, "currency", "spec")),
-        household_entity=str(raw.get("household_entity", "household")),
-        weights=dict(raw.get("weights") or {}),
-        household_net_income=variables.get("household_net_income"),
-        budget_plus=_names(budget.get("plus"), "variables.budget.plus"),
-        budget_minus=_names(budget.get("minus"), "variables.budget.minus"),
-        income_decile=variables.get("income_decile"),
-        poverty=dict(poverty),
-        groups=dict(groups),
-        behaviour=dict(variables.get("behaviour") or {}),
-        baseline=baseline,
-        reforms=reforms,
-        outputs=outputs,
-        disclosure_policy=policy,
-        min_source_households=floor,
-        source_id_columns=source_id_columns,
-        max_dataset_bytes=int(max_bytes) if max_bytes is not None else None,
-        max_seconds=limits["max_seconds"],
-        max_memory_bytes=limits["max_memory_bytes"],
-        digest=json_sha256(measurement_definition(raw)),
-    )
-    return spec
+    return limits
 
 
 def countries_dir() -> Path:

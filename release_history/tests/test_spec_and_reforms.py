@@ -24,7 +24,7 @@ def test_the_uk_spec_holds_the_seven_reckoner_reforms_for_2026_27():
     assert spec.periods == (2026,)
     assert spec.label_period(2026) == "2026-27"
     assert len(spec.reforms) == 7
-    assert all(r.add and not r.scale and not r.parameters for r in spec.reforms)
+    assert all(reform.add and not reform.scale and not reform.parameters for reform in spec.reforms)
     assert spec.disclosure_policy == "source_household_small_cells"
     assert spec.min_source_households == 3
 

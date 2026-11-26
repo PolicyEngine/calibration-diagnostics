@@ -8,7 +8,7 @@ from .fakes import FakeBackend, FakeSim, baseline_world, fake_spec_dict
 
 
 def cells_by_output(result):
-    return {(c.output, c.period): c for c in result.cells}
+    return {(cell.output, cell.period): cell for cell in result.cells}
 
 
 def test_baseline_items_are_weighted_on_their_own_entity():
@@ -51,7 +51,7 @@ def test_one_baseline_simulation_and_one_per_reform():
     spec = parse_spec(fake_spec_dict())
     result = measure(spec, backend)
     assert len(backend.builds) == 1 + len(spec.reforms)
-    assert [s["label"] for s in result.simulations] == [
+    assert [simulation["label"] for simulation in result.simulations] == [
         "baseline",
         "reform:tax_up",
         "reform:benefit_up",
@@ -67,7 +67,7 @@ def test_a_crashing_reform_is_a_gap_never_a_zero():
     assert result.status == "partial"
     assert result.reforms["tax_up"]["status"] == "error"
     assert result.reforms["tax_up"]["error"]["class"] == "RuntimeError"
-    assert not [c for c in result.cells if c.output.startswith("reform/tax_up/")]
+    assert not [cell for cell in result.cells if cell.output.startswith("reform/tax_up/")]
     assert result.reforms["benefit_up"]["status"] == "ok"
 
 
@@ -126,9 +126,9 @@ def test_targets_only_runs_compute_no_net_income():
     result = measure(spec, Backend())
     assert result.status == "ok"
     assert "net_income" not in calls and "gov_balance" not in calls
-    outputs = {c.output for c in result.cells}
+    outputs = {cell.output for cell in result.cells}
     assert "reform/tax_up/target/income_tax" in outputs
-    assert not any("budgetary_impact" in o for o in outputs)
+    assert not any("budgetary_impact" in output for output in outputs)
 
 
 def test_cells_carry_household_level_support_masks():

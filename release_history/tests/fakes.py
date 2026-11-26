@@ -42,7 +42,7 @@ class FakeParameter:
 
 class FakeBrackets:
     def __init__(self, rates: list[float]) -> None:
-        self.brackets = [type("Bracket", (), {"rate": FakeParameter(r)})() for r in rates]
+        self.brackets = [type("Bracket", (), {"rate": FakeParameter(rate)})() for rate in rates]
 
 
 def fake_parameters() -> Any:

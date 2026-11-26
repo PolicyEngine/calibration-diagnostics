@@ -49,7 +49,7 @@ def installed(monkeypatch):
 
 def test_each_country_panel_id_moves_only_with_its_own_inputs(installed):
     uk, us = load_spec("uk"), load_spec("us")
-    uk_id, us_id = (panel_id(s, engine_identity(s, BUNDLE)) for s in (uk, us))
+    uk_id, us_id = (panel_id(spec, engine_identity(spec, BUNDLE)) for spec in (uk, us))
     # The UK's model moves (a UK-only bump): the US panel stays put.
     bumped = json.loads(json.dumps(BUNDLE))
     bumped["packages"]["policyengine-uk"]["version"] = "2.180.0"
@@ -352,7 +352,7 @@ def test_export_reads_the_timeline_the_typescript_side_writes(tmp_path, country)
     rows = timeline_rows(timeline)
     builds = timeline["builds"]
     assert len(rows) == len(timeline["outputs"]) * len(builds)
-    assert {row["build_id"] for row in rows} == {b["buildId"] for b in builds}
+    assert {row["build_id"] for row in rows} == {build["buildId"] for build in builds}
     current = [row for row in rows if row["current"]]
     assert current and {row["change_status"] for row in current} <= {"ok", "withheld", "none"}
     assert any(row["change"] not in (None, 0) for row in current)

@@ -36,7 +36,7 @@ def fixture_series(tmp_path: Path) -> dict:
 def test_the_series_is_the_named_lines_from_since(tmp_path):
     series = fixture_series(tmp_path)
     first, second, third = FIXTURE_FILES
-    builds = {b["build"]: b for b in series["builds"]}
+    builds = {build["build"]: build for build in series["builds"]}
     # The other line and the build before `since` are not in the series.
     assert list(builds) == [
         "zz-build-20261101",
@@ -93,12 +93,15 @@ def test_builds_without_a_file_to_measure_carry_their_reason(tmp_path):
     )
     spec = parse_spec(fixture_series_spec_dict(series={"releases": [FIXTURE_LINE]}))
     series = build_series(spec, hub, listed_at=LISTED_AT, workdir=tmp_path)
-    assert [(b["build"], b["listing_status"], b["listing_reason"]) for b in series["builds"]] == [
+    assert [
+        (build["build"], build["listing_status"], build["listing_reason"])
+        for build in series["builds"]
+    ] == [
         ("local", "refused", "not_default_national"),
         ("unpinned", "refused", "national_artifact_unpinned"),
         ("missing", "refused", "release_manifest_missing"),
     ]
-    assert all(b["digest"] is None for b in series["builds"])
+    assert all(build["digest"] is None for build in series["builds"])
 
 
 def test_since_compares_utc_dates(tmp_path):
@@ -114,7 +117,7 @@ def test_since_compares_utc_dates(tmp_path):
     series = build_series(
         parse_spec(fixture_series_spec_dict()), hub, listed_at=LISTED_AT, workdir=tmp_path
     )
-    assert [b["build"] for b in series["builds"]] == ["on_time"]
+    assert [build["build"] for build in series["builds"]] == ["on_time"]
 
 
 def test_a_repository_without_releases_json_has_no_record(tmp_path):
@@ -152,19 +155,19 @@ def test_a_record_the_release_writer_writes_is_read():
 @pytest.mark.parametrize(
     "change",
     [
-        lambda r: r.update(schema_version=2),
-        lambda r: r.update(schema_version=True),
-        lambda r: r.pop("default"),
-        lambda r: r.update(extra=1),
-        lambda r: r.update(default="elsewhere"),
-        lambda r: r["releases"].update({"../up": r["releases"]["line"]}),
-        lambda r: r["releases"]["line"].update(role="Not A Role"),
-        lambda r: r["releases"]["line"].update(current="missing"),
-        lambda r: r["releases"]["line"]["builds"]["b"].update(withdrawn=True),
-        lambda r: r["releases"]["line"]["builds"]["b"].update(withdrawn="no"),
-        lambda r: r["releases"]["line"]["builds"]["b"].update(published_at="soon"),
-        lambda r: r["releases"]["line"]["builds"]["b"].pop("withdrawn"),
-        lambda r: r["releases"]["line"]["builds"].update({"bad name": {}}),
+        lambda record: record.update(schema_version=2),
+        lambda record: record.update(schema_version=True),
+        lambda record: record.pop("default"),
+        lambda record: record.update(extra=1),
+        lambda record: record.update(default="elsewhere"),
+        lambda record: record["releases"].update({"../up": record["releases"]["line"]}),
+        lambda record: record["releases"]["line"].update(role="Not A Role"),
+        lambda record: record["releases"]["line"].update(current="missing"),
+        lambda record: record["releases"]["line"]["builds"]["b"].update(withdrawn=True),
+        lambda record: record["releases"]["line"]["builds"]["b"].update(withdrawn="no"),
+        lambda record: record["releases"]["line"]["builds"]["b"].update(published_at="soon"),
+        lambda record: record["releases"]["line"]["builds"]["b"].pop("withdrawn"),
+        lambda record: record["releases"]["line"]["builds"].update({"bad name": {}}),
     ],
 )
 def test_a_record_the_release_writer_would_not_write_is_refused(change):

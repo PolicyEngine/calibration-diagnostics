@@ -84,7 +84,7 @@ def point_rows(
         for point in points
         for build in sorted(
             builds.get(point["file"]["sha256"]) or [None],
-            key=lambda b: (_published(b), (b or {}).get("build_id") or ""),
+            key=lambda build: (_published(build), (build or {}).get("build_id") or ""),
         )
     ]
     pairs.sort(key=lambda pair: (_published(pair[0]), pair[1]["measurement_id"]))

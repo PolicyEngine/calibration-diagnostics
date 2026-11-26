@@ -99,13 +99,17 @@ def apply_source_household_small_cells(
         total = by_key.get((table.total, table.period)) if table.total else None
         if total is None or total.status != "ok":
             continue
-        parts = [by_key[(p, table.period)] for p in table.parts if (p, table.period) in by_key]
+        parts = [
+            by_key[(part, table.period)] for part in table.parts if (part, table.period) in by_key
+        ]
         while True:
             derivable = [*table.hidden]
-            derivable += [m for part in parts if part.status != "ok" for m in part.supports[:1]]
+            derivable += [
+                support for part in parts if part.status != "ok" for support in part.supports[:1]
+            ]
             if not derivable:
                 break
-            union = np.logical_or.reduce([m.astype(bool) for m in derivable])
+            union = np.logical_or.reduce([mask.astype(bool) for mask in derivable])
             if not _small(support(union, source_ids), floor):
                 break
             candidates = [

@@ -80,4 +80,4 @@ def panels(root: Path, country: str) -> list[str]:
     folder = country_dir(root, country)
     if not folder.is_dir():
         return []
-    return sorted(p.name for p in folder.iterdir() if (p / "panel.json").is_file())
+    return sorted(panel.name for panel in folder.iterdir() if (panel / "panel.json").is_file())

@@ -81,10 +81,12 @@ def world(monkeypatch, tmp_path):
             ]
         )
         printed = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
-        files = [p for p in out.rglob("*.json") if POINT_NAME.match(p.name)]
-        stored = sorted(p for p in files if p.parent.name != "attempts")
+        files = [path for path in out.rglob("*.json") if POINT_NAME.match(path.name)]
+        stored = sorted(path for path in files if path.parent.name != "attempts")
         state["reports"] = {
-            p.stem: json.loads(p.read_text()) for p in files if p.parent.name == "attempts"
+            path.stem: json.loads(path.read_text())
+            for path in files
+            if path.parent.name == "attempts"
         }
         for report in state["reports"].values():
             assert errors("attempt", report) == []
@@ -248,7 +250,7 @@ def test_a_build_folder_is_measured_before_it_is_published(world, capsys, tmp_pa
     )
     printed = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert (code, printed["status"]) == (0, "ok")
-    points = [p for p in out.rglob("*.json") if POINT_NAME.match(p.name)]
+    points = [path for path in out.rglob("*.json") if POINT_NAME.match(path.name)]
     document = json.loads(points[0].read_text())
     assert document["fetched_from"]["hf_commit"] is None
     assert document["fetched_from"]["build_id"] == BUILD
@@ -351,7 +353,7 @@ def test_stdout_carries_no_figure(world, capsys):
 def test_points_never_land_outside_the_panel_folder(world, capsys, tmp_path):
     world["run"](capsys)
     root = tmp_path / "out"
-    stored = [p.relative_to(root) for p in root.rglob("*") if p.is_file()]
-    stored = [p for p in stored if p.parts[0] != ".logs"]
-    assert {p.parts[:2] for p in stored} == {("release-history", "zz")}
-    assert sorted(p.name for p in stored if len(p.parts) == 4)[-1] == "panel.json"
+    stored = [path.relative_to(root) for path in root.rglob("*") if path.is_file()]
+    stored = [path for path in stored if path.parts[0] != ".logs"]
+    assert {path.parts[:2] for path in stored} == {("release-history", "zz")}
+    assert sorted(path.name for path in stored if len(path.parts) == 4)[-1] == "panel.json"

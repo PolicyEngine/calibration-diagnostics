@@ -59,15 +59,21 @@ def reform_dict(
     """The absolute value of every changed parameter in every measured period."""
     out: dict[str, dict[str, Any]] = {}
     for path, delta in reform.add.items():
-        out[path] = {period_key(p): baseline_value(parameters, path, p) + delta for p in periods}
+        out[path] = {
+            period_key(period): baseline_value(parameters, path, period) + delta
+            for period in periods
+        }
     for path, factor in reform.scale.items():
-        out[path] = {period_key(p): baseline_value(parameters, path, p) * factor for p in periods}
+        out[path] = {
+            period_key(period): baseline_value(parameters, path, period) * factor
+            for period in periods
+        }
     for path, value in reform.parameters.items():
         parameter_node(parameters, path)  # refuse unknown paths early
         if isinstance(value, Mapping):
             out[path] = dict(value)
         else:
-            out[path] = {period_key(p): value for p in periods}
+            out[path] = {period_key(period): value for period in periods}
     return out
 
 
@@ -78,7 +84,7 @@ def behaviour_dict(
     out: dict[str, dict[str, Any]] = {}
     for path, value in behaviour.items():
         parameter_node(parameters, path)
-        out[path] = {period_key(p): value for p in periods}
+        out[path] = {period_key(period): value for period in periods}
     return out
 
 

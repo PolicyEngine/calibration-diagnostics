@@ -115,8 +115,8 @@ class SyntheticWorld:
             # One or two units per household, people split in order.
             units = np.zeros(self.persons, dtype=int)
             next_unit = 0
-            for h in range(self.households):
-                members = np.flatnonzero(person_household == h)
+            for household_index in range(self.households):
+                members = np.flatnonzero(person_household == household_index)
                 split = members.size > 1 and rng.random() < 0.4
                 cut = members.size // 2 if split else members.size
                 units[members[:cut]] = next_unit
@@ -125,7 +125,7 @@ class SyntheticWorld:
             self.index[entity] = units
             self.counts[entity] = next_unit
         # Deciles 1-10, every decile populated; decile 10 rests on two households.
-        decile = np.array([1 + (h % 9) for h in range(self.households)])
+        decile = np.array([1 + (household_index % 9) for household_index in range(self.households)])
         decile[[0, 1]] = 10
         self.decile = decile
         # Clones share a source household: mostly two households to a source.
@@ -208,7 +208,9 @@ class SyntheticSim:
         world, spec = self.world, self.world.spec
         entity = world.entity_of(variable)
         size = world.counts[entity]
-        flags = set(spec.poverty.values()) | {v for v in spec.groups.values() if v}
+        flags = set(spec.poverty.values()) | {
+            variable for variable in spec.groups.values() if variable
+        }
         flags |= {item.where for item in spec.baseline if item.where}
         if variable == f"{entity}_id":
             values = world.ids[entity]

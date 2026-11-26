@@ -50,7 +50,7 @@ def references_digest(references: Mapping[str, Any]) -> str:
 
 
 def _entry_kind(entry: Mapping[str, Any], where: str) -> str:
-    kinds = [k for k in ("chronicle_records", "citation", "none") if k in entry]
+    kinds = [kind for kind in ("chronicle_records", "citation", "none") if kind in entry]
     if len(kinds) != 1:
         raise ReferencesError(f"{where}: needs exactly one of chronicle_records, citation, none.")
     if entry.get("basis") is not None and entry["basis"] not in BASES:
@@ -183,7 +183,10 @@ def resolve(
                         )
                     facts.append(_fact_summary(matches[0]))
                 values = [fact["value"] for fact in facts]
-                if not all(isinstance(v, int | float) and not isinstance(v, bool) for v in values):
+                if not all(
+                    isinstance(value, int | float) and not isinstance(value, bool)
+                    for value in values
+                ):
                     raise ReferencesError(f"{section}.{key}: a referenced fact is not numeric")
                 out.update(
                     status="resolved", value=float(sum(values)), facts=facts, note=entry.get("note")

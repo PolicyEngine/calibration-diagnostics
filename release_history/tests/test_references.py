@@ -61,7 +61,7 @@ def references_for(spec, **overrides):
 @pytest.fixture
 def facts_file(tmp_path):
     path = tmp_path / "consumer_facts.jsonl"
-    path.write_text("".join(json.dumps(f) + "\n" for f in FACTS))
+    path.write_text("".join(json.dumps(fact) + "\n" for fact in FACTS))
     return path
 
 
@@ -78,7 +78,7 @@ def test_resolution_sums_records_and_keeps_their_provenance(facts_file):
     assert lock["baseline"]["income_tax"]["status"] == "resolved"
     assert lock["baseline"]["income_tax"]["value"] == 1000.0
     assert lock["baseline"]["benefit"]["value"] == 42.0
-    assert [f["semantic_fact_key"] for f in lock["baseline"]["benefit"]["facts"]] == [
+    assert [fact["semantic_fact_key"] for fact in lock["baseline"]["benefit"]["facts"]] == [
         "ledger.semantic_fact.v2:bbb",
         "ledger.semantic_fact.v2:ccc",
     ]
@@ -106,9 +106,9 @@ def test_every_item_and_reform_needs_exactly_one_entry():
     references["reforms"]["extra"] = {"none": "x"}
     references["baseline"]["benefit"] = {"none": "x", "citation": {}}
     problems = validate_references(spec, references)
-    assert any("income_tax: no reference entry" in p for p in problems)
-    assert any("extra: not in the spec" in p for p in problems)
-    assert any("exactly one of" in p for p in problems)
+    assert any("income_tax: no reference entry" in problem for problem in problems)
+    assert any("extra: not in the spec" in problem for problem in problems)
+    assert any("exactly one of" in problem for problem in problems)
 
 
 def test_committed_references_cover_their_specs_and_their_locks_are_current():

@@ -76,11 +76,15 @@ def test_a_missing_key_fails_the_schema(kind):
     documents = committed("uk")
     # The fullest document of the kind: a measured point, not the gap.
     name, document = max(
-        ((n, d) for n, d in documents.items() if kind_of(n) == kind),
+        (
+            (entry_name, entry)
+            for entry_name, entry in documents.items()
+            if kind_of(entry_name) == kind
+        ),
         key=lambda item: len(json.dumps(item[1])),
     )
     for key in document:
-        broken = {k: v for k, v in document.items() if k != key}
+        broken = {other: value for other, value in document.items() if other != key}
         assert errors(kind, broken), f"{name} still valid without {key}"
     # And one key down: an object inside a list.
     nested = copy.deepcopy(document)
@@ -94,7 +98,12 @@ def test_a_missing_key_fails_the_schema(kind):
 
 def test_a_withheld_cell_in_a_timeline_carries_no_reason():
     timeline = committed("uk")["timeline.json"]
-    withheld = [v for o in timeline["outputs"] for v in o["values"] if v["status"] == "withheld"]
+    withheld = [
+        value
+        for output in timeline["outputs"]
+        for value in output["values"]
+        if value["status"] == "withheld"
+    ]
     assert withheld and not any("reason" in value for value in withheld)
     broken = copy.deepcopy(timeline)
     for output in broken["outputs"]:
@@ -119,14 +128,16 @@ def test_the_uk_fixture_withholds_small_and_complementary_cells():
 def test_each_fixture_series_has_every_listing_case(country):
     documents = committed(country)
     builds = documents["series.json"]["builds"]
-    digests = [b["digest"] for b in builds if b["digest"]]
+    digests = [build["digest"] for build in builds if build["digest"]]
     assert len(digests) > len(set(digests)), "one file under two builds"
-    assert any(b["withdrawn"] for b in builds)
-    assert any(b["current"] for b in builds)
-    assert any(b["listing_status"] == "refused" for b in builds)
+    assert any(build["withdrawn"] for build in builds)
+    assert any(build["current"] for build in builds)
+    assert any(build["listing_status"] == "refused" for build in builds)
     timeline = documents["timeline.json"]
-    states = {b["state"] for b in timeline["builds"]}
+    states = {build["state"] for build in timeline["builds"]}
     assert {"measured", "missing"} <= states
     assert any(
-        v["changeStatus"] == "ok" and v["change"] for o in timeline["outputs"] for v in o["values"]
+        value["changeStatus"] == "ok" and value["change"]
+        for output in timeline["outputs"]
+        for value in output["values"]
     )

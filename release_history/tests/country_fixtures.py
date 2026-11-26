@@ -60,7 +60,9 @@ NEAR_LIMIT_RUNTIME = {
 
 
 def countries() -> list[str]:
-    return sorted(p.name for p in countries_dir().iterdir() if (p / "spec.yaml").is_file())
+    return sorted(
+        folder.name for folder in countries_dir().iterdir() if (folder / "spec.yaml").is_file()
+    )
 
 
 def synthetic_digest(country: str, name: str) -> str:

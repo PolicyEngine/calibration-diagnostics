@@ -56,7 +56,9 @@ def _point(
         "fetched_from": provenance["fetched_from"],
         "file": provenance["file"],
         "data": None,
-        "periods": [{"period": p, "label": spec.label_period(p)} for p in spec.periods],
+        "periods": [
+            {"period": period, "label": spec.label_period(period)} for period in spec.periods
+        ],
         "baseline": None,
         "reforms": None,
         "cells": [],
@@ -201,7 +203,9 @@ def measurement_document(
             "data": {
                 "columns_sha256": json_sha256(columns),
                 "column_count": len(columns),
-                "unknown_columns": sorted(c for c in columns if known and c not in known),
+                "unknown_columns": sorted(
+                    column for column in columns if known and column not in known
+                ),
                 "warnings": sorted(result.warnings),
             },
             "baseline": {"status": result.baseline_status["status"]},

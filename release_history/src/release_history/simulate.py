@@ -69,7 +69,9 @@ class PolicyEngineSimulation:
         """The engine facts worth keeping: the bundle id and the capital gains
         response assumption policyengine.py applied. Runtime paths are left out."""
         bundle = dict(getattr(self.microsimulation, "policyengine_bundle", {}) or {})
-        return {k: bundle[k] for k in ("bundle_id", "capital_gains_responses") if k in bundle}
+        return {
+            key: bundle[key] for key in ("bundle_id", "capital_gains_responses") if key in bundle
+        }
 
     def close(self) -> None:
         self.microsimulation = None

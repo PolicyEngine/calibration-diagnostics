@@ -106,7 +106,7 @@ def test_no_published_cell_rests_on_one_or_two_sources_after_a_measurement():
         if cell.status == "ok":
             for support_mask in cell.supports:
                 assert support(support_mask, sources) == 0 or support(support_mask, sources) >= 3
-    by_output = {c.output: c for c in result.cells}
+    by_output = {cell.output: cell for cell in result.cells}
     # Decile 1 is one household, so its mean is withheld.
     assert by_output["baseline/net_income_mean/decile_1"].status == "withheld"
     # The tax rise touches all four households: its budget line stays.
