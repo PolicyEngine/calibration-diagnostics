@@ -1,0 +1,2507 @@
+{
+  "baseline": {
+    "status": "ok"
+  },
+  "cells": [
+    {
+      "output": "baseline/income_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 26475876.1589521
+    },
+    {
+      "output": "baseline/national_insurance",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 74148282.0618168
+    },
+    {
+      "output": "baseline/vat",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 36486505.434602275
+    },
+    {
+      "output": "baseline/council_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 39930566.56026611
+    },
+    {
+      "output": "baseline/capital_gains_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 20818907.471257117
+    },
+    {
+      "output": "baseline/universal_credit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 28811867.748785123
+    },
+    {
+      "output": "baseline/child_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 45135152.97511012
+    },
+    {
+      "output": "baseline/state_pension",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 32778834.23087431
+    },
+    {
+      "output": "baseline/pension_credit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 35872299.95218776
+    },
+    {
+      "output": "baseline/housing_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 37181981.92760993
+    },
+    {
+      "output": "baseline/universal_credit_caseload",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 5674.2924464311345
+    },
+    {
+      "output": "baseline/state_pension_caseload",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 10767.242652211016
+    },
+    {
+      "output": "baseline/pension_credit_caseload",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 5191.467755554906
+    },
+    {
+      "output": "baseline/housing_benefit_caseload",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 5233.143327803732
+    },
+    {
+      "output": "baseline/households",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 5627.939342060706
+    },
+    {
+      "output": "baseline/people",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 15672.6652088511
+    },
+    {
+      "output": "baseline/children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 5368.244105612793
+    },
+    {
+      "output": "baseline/employment_income",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 35046974.34664936
+    },
+    {
+      "output": "baseline/self_employment_income",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 46691888.715238936
+    },
+    {
+      "output": "baseline/private_pension_income",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 26744847.928615592
+    },
+    {
+      "output": "baseline/property_income",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 24041743.703796897
+    },
+    {
+      "output": "baseline/savings_interest_income",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 37077966.502869815
+    },
+    {
+      "output": "baseline/dividend_income",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 41164140.87787842
+    },
+    {
+      "output": "baseline/household_net_income_total",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 34047618.80039948
+    },
+    {
+      "output": "baseline/absolute_poverty_bhc_all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "rate",
+      "value": 0.32764668824246584
+    },
+    {
+      "output": "baseline/absolute_poverty_ahc_all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "rate",
+      "value": 0.22970595204853764
+    },
+    {
+      "output": "baseline/relative_poverty_bhc_all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "rate",
+      "value": 0.2933601955596548
+    },
+    {
+      "output": "baseline/relative_poverty_ahc_all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "rate",
+      "value": 0.21954512358913655
+    },
+    {
+      "output": "baseline/absolute_poverty_bhc_children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "rate",
+      "value": 0.3168205816844312
+    },
+    {
+      "output": "baseline/absolute_poverty_ahc_children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "rate",
+      "value": 0.3030155555561459
+    },
+    {
+      "output": "baseline/relative_poverty_bhc_children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "rate",
+      "value": 0.35407718620460227
+    },
+    {
+      "output": "baseline/relative_poverty_ahc_children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "rate",
+      "value": 0.22938949284634796
+    },
+    {
+      "output": "baseline/household_net_income_mean/decile_1",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "currency",
+      "value": null
+    },
+    {
+      "output": "baseline/household_net_income_mean/decile_2",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 3561.727209825302
+    },
+    {
+      "output": "baseline/household_net_income_mean/decile_3",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 8011.404962634296
+    },
+    {
+      "output": "baseline/household_net_income_mean/decile_4",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 8533.193676923613
+    },
+    {
+      "output": "baseline/household_net_income_mean/decile_5",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 11816.101030602373
+    },
+    {
+      "output": "baseline/household_net_income_mean/decile_6",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 1902.2070107686877
+    },
+    {
+      "output": "baseline/household_net_income_mean/decile_7",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 6218.89293023084
+    },
+    {
+      "output": "baseline/household_net_income_mean/decile_8",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 8280.262253813014
+    },
+    {
+      "output": "baseline/household_net_income_mean/decile_9",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 3305.836437856361
+    },
+    {
+      "output": "baseline/household_net_income_mean/decile_10",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "currency",
+      "value": null
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/target/income_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 230196.23696760467
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/budgetary_impact",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 362018.9498693066
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/programme/income_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 230196.23696760467
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/programme/national_insurance",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 721671.3942994693
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/programme/vat",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 311120.05512358266
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/programme/council_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 537295.2091635218
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/programme/capital_gains_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 381375.10822002566
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/programme/universal_credit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 315829.36633605463
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/programme/child_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 456726.756092557
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/programme/state_pension",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 435478.64617131
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/programme/pension_credit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 245233.30702543622
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/programme/housing_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 674308.3730504237
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/households_gaining",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 1222.2407125163747
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/people_gaining",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 3747.4485262440076
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/households_losing",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 0.0
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/people_losing",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 0.0
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/net_income_change_pct",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 1.173551073784641
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/decile_relative_change/decile_1",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/decile_relative_change/decile_2",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/decile_relative_change/decile_3",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/decile_relative_change/decile_4",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 3.7094900706415457
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/decile_relative_change/decile_5",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/decile_relative_change/decile_6",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/decile_relative_change/decile_7",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/decile_relative_change/decile_8",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/decile_relative_change/decile_9",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/decile_relative_change/decile_10",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/poverty/absolute_bhc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 924.1427195181944
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/poverty/absolute_bhc/children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 683.7695746479701
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/poverty/absolute_ahc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 1303.6364152811675
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/poverty/absolute_ahc/children",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/poverty/relative_bhc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 1341.9530372636139
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/poverty/relative_bhc/children",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/poverty/relative_ahc/all",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/basic_rate_plus_1p/poverty/relative_ahc/children",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/target/income_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 270885.32470210415
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/budgetary_impact",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 346942.72802454047
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/programme/income_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 270885.32470210415
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/programme/national_insurance",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 658510.7870676436
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/programme/vat",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 270413.680086585
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/programme/council_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 583163.8741700926
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/programme/capital_gains_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 206996.1846320869
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/programme/universal_credit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 223314.4535596386
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/programme/child_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 410083.41977208486
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/programme/state_pension",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 327786.7085293456
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/programme/pension_credit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 362946.80069019244
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/programme/housing_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 675332.2599800649
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/households_gaining",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 1207.4407568707886
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/people_gaining",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 3022.8924099114042
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/households_losing",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 0.0
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/people_losing",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 0.0
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/net_income_change_pct",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 1.3007703776110964
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/decile_relative_change/decile_1",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/decile_relative_change/decile_2",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/decile_relative_change/decile_3",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/decile_relative_change/decile_4",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/decile_relative_change/decile_5",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/decile_relative_change/decile_6",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/decile_relative_change/decile_7",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/decile_relative_change/decile_8",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/decile_relative_change/decile_9",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/decile_relative_change/decile_10",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/poverty/absolute_bhc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 980.4834627001394
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/poverty/absolute_bhc/children",
+      "period": 2026,
+      "reason": "complementary",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/poverty/absolute_ahc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 356.56507156147933
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/poverty/absolute_ahc/children",
+      "period": 2026,
+      "reason": "complementary",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/poverty/relative_bhc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 1213.8109044380058
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/poverty/relative_bhc/children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 267.46220975885217
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/poverty/relative_ahc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 617.8242857585416
+    },
+    {
+      "output": "reform/higher_rate_plus_1p/poverty/relative_ahc/children",
+      "period": 2026,
+      "reason": "complementary",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/target/income_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 232622.7134370265
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/budgetary_impact",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 589534.3668941243
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/programme/income_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 232622.7134370265
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/programme/national_insurance",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 1188453.248268721
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/programme/vat",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 309320.3249926525
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/programme/council_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 578396.7721687694
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/programme/capital_gains_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 123698.1310300345
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/programme/universal_credit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 255671.01685999535
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/programme/child_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 575703.5530174406
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/programme/state_pension",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 377914.0954959739
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/programme/pension_credit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 687793.6069200315
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/programme/housing_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 526250.4447100994
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/households_gaining",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 1585.815270905265
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/people_gaining",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 4151.190773697446
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/households_losing",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 0.0
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/people_losing",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 0.0
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/net_income_change_pct",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 1.735676878644393
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/decile_relative_change/decile_1",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 4.890767876837241
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/decile_relative_change/decile_2",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 2.5068631879339525
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/decile_relative_change/decile_3",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/decile_relative_change/decile_4",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 3.783597304919061
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/decile_relative_change/decile_5",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/decile_relative_change/decile_6",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/decile_relative_change/decile_7",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/decile_relative_change/decile_8",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/decile_relative_change/decile_9",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/decile_relative_change/decile_10",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/poverty/absolute_bhc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 257.82515211164844
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/poverty/absolute_bhc/children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 368.12690947706164
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/poverty/absolute_ahc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 1611.9415217260482
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/poverty/absolute_ahc/children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 533.076476047607
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/poverty/relative_bhc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 201.97134998956403
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/poverty/relative_bhc/children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 203.9803235826132
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/poverty/relative_ahc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 1064.9215816806104
+    },
+    {
+      "output": "reform/additional_rate_plus_1p/poverty/relative_ahc/children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 420.27295052433317
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/target/income_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 211705.25877719262
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/budgetary_impact",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 257259.70328895675
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/programme/income_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 211705.25877719262
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/programme/national_insurance",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 491881.44054020045
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/programme/vat",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 202409.27903383682
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/programme/council_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 282733.5519923459
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/programme/capital_gains_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 86946.14788501812
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/programme/universal_credit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 135731.4905356668
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/programme/child_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 365147.45847073256
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/programme/state_pension",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 158144.2776882337
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/programme/pension_credit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 89873.10564551316
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/programme/housing_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 364351.3921127628
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/households_gaining",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 711.3557804709607
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/people_gaining",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 2017.1622840754553
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/households_losing",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 0.0
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/people_losing",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 0.0
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/net_income_change_pct",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.45226560771719915
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/decile_relative_change/decile_1",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/decile_relative_change/decile_2",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/decile_relative_change/decile_3",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/decile_relative_change/decile_4",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/decile_relative_change/decile_5",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/decile_relative_change/decile_6",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/decile_relative_change/decile_7",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/decile_relative_change/decile_8",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/decile_relative_change/decile_9",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/decile_relative_change/decile_10",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/poverty/absolute_bhc/all",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/poverty/absolute_bhc/children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 0.0
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/poverty/absolute_ahc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": -908.9752651692482
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/poverty/absolute_ahc/children",
+      "period": 2026,
+      "reason": "complementary",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/poverty/relative_bhc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 639.3591435554288
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/poverty/relative_bhc/children",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/poverty/relative_ahc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 1597.422984478721
+    },
+    {
+      "output": "reform/personal_allowance_plus_100/poverty/relative_ahc/children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 788.9762730647948
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/target/national_insurance",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 465280.7861236562
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/budgetary_impact",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 111862.07696518087
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/programme/income_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 232229.91556749723
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/programme/national_insurance",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 547214.1589385429
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/programme/vat",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 286931.2306052426
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/programme/council_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 248100.69092300563
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/programme/capital_gains_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 152703.625805146
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/programme/universal_credit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 308257.66560563433
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/programme/child_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 210365.2662020354
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/programme/state_pension",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 292439.0708980954
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/programme/pension_credit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 333529.39207801933
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/programme/housing_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 279105.515824109
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/households_gaining",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 792.9289195635456
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/people_gaining",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 2304.4928341258997
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/households_losing",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 0.0
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/people_losing",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 0.0
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/net_income_change_pct",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.6849598287368461
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/decile_relative_change/decile_1",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/decile_relative_change/decile_2",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/decile_relative_change/decile_3",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/decile_relative_change/decile_4",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 2.6410067487791165
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/decile_relative_change/decile_5",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/decile_relative_change/decile_6",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/decile_relative_change/decile_7",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/decile_relative_change/decile_8",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/decile_relative_change/decile_9",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/decile_relative_change/decile_10",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/poverty/absolute_bhc/all",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/poverty/absolute_bhc/children",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/poverty/absolute_ahc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": -247.6525952607514
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/poverty/absolute_ahc/children",
+      "period": 2026,
+      "reason": "complementary",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/poverty/relative_bhc/all",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/poverty/relative_bhc/children",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/poverty/relative_ahc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 1167.7982943725387
+    },
+    {
+      "output": "reform/employee_nics_main_rate_plus_1pp/poverty/relative_ahc/children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 620.6112504063635
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/target/child_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 232704.9644930681
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/budgetary_impact",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 121555.71097561758
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/programme/income_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 124536.1006146612
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/programme/national_insurance",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 431989.137974462
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/programme/vat",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 187762.23212647985
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/programme/council_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 286891.51358340174
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/programme/capital_gains_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 65658.31094294119
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/programme/universal_credit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 122876.72020898396
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/programme/child_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 232704.9644930681
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/programme/state_pension",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 212296.0937404138
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/programme/pension_credit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 191205.3083926124
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/programme/housing_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 110134.69551376574
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/households_gaining",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 682.6199873467158
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/people_gaining",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 2381.043941368779
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/households_losing",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 0.0
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/people_losing",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 0.0
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/net_income_change_pct",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 1.1157601623387299
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/decile_relative_change/decile_1",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/decile_relative_change/decile_2",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/decile_relative_change/decile_3",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/decile_relative_change/decile_4",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/decile_relative_change/decile_5",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/decile_relative_change/decile_6",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/decile_relative_change/decile_7",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/decile_relative_change/decile_8",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/decile_relative_change/decile_9",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/decile_relative_change/decile_10",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/poverty/absolute_bhc/all",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/poverty/absolute_bhc/children",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/poverty/absolute_ahc/all",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/poverty/absolute_ahc/children",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/poverty/relative_bhc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 1621.4623939719886
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/poverty/relative_bhc/children",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/poverty/relative_ahc/all",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/child_benefit_subsequent_child_plus_1/poverty/relative_ahc/children",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/target/vat",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 465111.9824721455
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/budgetary_impact",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 507279.39524087997
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/programme/income_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 382178.51612899464
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/programme/national_insurance",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 873357.2003896299
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/programme/vat",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 465111.9824721455
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/programme/council_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 384554.1797762791
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/programme/capital_gains_tax",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 251536.93737111223
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/programme/universal_credit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 431607.564672993
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/programme/child_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 561962.13519031
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/programme/state_pension",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 280351.6109590851
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/programme/pension_credit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 510662.0835603176
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/programme/housing_benefit",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "currency",
+      "value": 609435.1196449345
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/households_gaining",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 1429.2264248836543
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/people_gaining",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 3801.814214233341
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/households_losing",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 0.0
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/people_losing",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 0.0
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/net_income_change_pct",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 1.703528676156796
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/decile_relative_change/decile_1",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/decile_relative_change/decile_2",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 2.773899470486783
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/decile_relative_change/decile_3",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 4.569085061245984
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/decile_relative_change/decile_4",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/decile_relative_change/decile_5",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/decile_relative_change/decile_6",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/decile_relative_change/decile_7",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/decile_relative_change/decile_8",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 2.3254224256781675
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/decile_relative_change/decile_9",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/decile_relative_change/decile_10",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "ratio",
+      "value": 0.0
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/poverty/absolute_bhc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 799.1770294273842
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/poverty/absolute_bhc/children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 64.80326774374637
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/poverty/absolute_ahc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 1294.071370610021
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/poverty/absolute_ahc/children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 359.4449402650237
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/poverty/relative_bhc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 1134.4583498257816
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/poverty/relative_bhc/children",
+      "period": 2026,
+      "reason": "small_cell",
+      "status": "withheld",
+      "unit": "count",
+      "value": null
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/poverty/relative_ahc/all",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 1231.7586180771316
+    },
+    {
+      "output": "reform/vat_standard_rate_plus_1pp/poverty/relative_ahc/children",
+      "period": 2026,
+      "reason": null,
+      "status": "ok",
+      "unit": "count",
+      "value": 413.692681248088
+    }
+  ],
+  "country": "uk",
+  "data": {
+    "column_count": 2,
+    "columns_sha256": "ec081f4b6929a82c7a86808bcdbf80e29aaababffa04b5e95945a31f4d43bee2",
+    "unknown_columns": [],
+    "warnings": []
+  },
+  "disclosure": {
+    "min_source_households": 3,
+    "policy": "source_household_small_cells",
+    "withheld_cells": 69
+  },
+  "engine_bundle": {
+    "bundle_id": "synthetic",
+    "capital_gains_responses": null
+  },
+  "environment": {
+    "packages": [
+      "policyengine-core==3.33.3"
+    ],
+    "packages_sha256": "3851dfa142e329c2e312e29de8924d71aa5d19f9a7453e7a834625db057da915",
+    "platform": "synthetic",
+    "python": "3.12.0",
+    "uv_lock_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "fetched_from": {
+    "build_id": "microcosm-uk-2024-25-national/synthetic-build-1",
+    "build_manifest": null,
+    "dataset": {
+      "key": "national",
+      "path": "releases/microcosm-uk-2024-25-national/synthetic-build-1/national.h5"
+    },
+    "declared": {
+      "build": null,
+      "build_provenance": null,
+      "built_at": "2026-11-01T00:00:00+00:00",
+      "built_with_core": null,
+      "built_with_model": null,
+      "compatible_models": [
+        {
+          "name": "policyengine-uk",
+          "specifier": ">=1"
+        }
+      ],
+      "cut_tag": null,
+      "description": null,
+      "migrated_from": null,
+      "reference_model_compatibility": "inside"
+    },
+    "hf_commit": "cccccccccccccccccccccccccccccccccccccccc",
+    "hf_repo": "policyengine/populace-uk-private",
+    "release_manifest": {
+      "json_sha256": "44abf42249f46335dcf6dd8b9edd66d3e7dcd9987f51b2ab892ee3152c63c68f",
+      "path": "releases/microcosm-uk-2024-25-national/synthetic-build-1/release_manifest.json",
+      "sha256": "7549bb9874de123ca9546a9b6443ca98b8b04022291c48c2b11d3f4ee5eba91c"
+    }
+  },
+  "file": {
+    "bytes": 25,
+    "sha256": "02ac5d90214519b59775271630005d94563c71388aad2d6ee9cf1ee16dde207a"
+  },
+  "format_version": 1,
+  "kind": "release_history.measurement",
+  "measurement_id": "686a0a7314e9713cab8d5a78101134cea0d707a320931970951711b4836b54cf",
+  "panel_id": "af35ceddec5f1c3724605fdf2c5301f8c1e0953d4a166a1436cced4f787e4a65",
+  "periods": [
+    {
+      "label": "2026-27",
+      "period": 2026
+    }
+  ],
+  "producer": {
+    "commit": "0000000000000000000000000000000000000000",
+    "version": "1"
+  },
+  "reason": null,
+  "reforms": {
+    "additional_rate_plus_1p": {
+      "applied": {
+        "gov.hmrc.income_tax.rates.uk[2].rate": {
+          "2026-01-01.2026-12-31": 0.708
+        }
+      },
+      "definition_sha256": "9dbe1799502b490beaabe24f8ab60abd38b274b3b820f24e743f9868bfa8f2e0",
+      "error": null,
+      "status": "ok"
+    },
+    "basic_rate_plus_1p": {
+      "applied": {
+        "gov.hmrc.income_tax.rates.uk[0].rate": {
+          "2026-01-01.2026-12-31": 0.942
+        }
+      },
+      "definition_sha256": "457783ef95056575e845888bac06c3722cc1e345fb9d16de3cd95954f98d8220",
+      "error": null,
+      "status": "ok"
+    },
+    "child_benefit_subsequent_child_plus_1": {
+      "applied": {
+        "gov.hmrc.child_benefit.amount.additional": {
+          "2026-01-01.2026-12-31": 1.589
+        }
+      },
+      "definition_sha256": "bcc44b053197fa319f92a13721dbb7c59596a21b71a0fb80dee6acb46da13b2d",
+      "error": null,
+      "status": "ok"
+    },
+    "employee_nics_main_rate_plus_1pp": {
+      "applied": {
+        "gov.hmrc.national_insurance.class_1.rates.employee.main": {
+          "2026-01-01.2026-12-31": 0.996
+        }
+      },
+      "definition_sha256": "0c70d2d4a8666075d23fd22ba7a75f19edb2758bbc65f9037e03ec94c5ad6887",
+      "error": null,
+      "status": "ok"
+    },
+    "higher_rate_plus_1p": {
+      "applied": {
+        "gov.hmrc.income_tax.rates.uk[1].rate": {
+          "2026-01-01.2026-12-31": 0.864
+        }
+      },
+      "definition_sha256": "8999c319692e9747b4ebadec2623a77056e26208def770eb7a94a498dc0ae400",
+      "error": null,
+      "status": "ok"
+    },
+    "personal_allowance_plus_100": {
+      "applied": {
+        "gov.hmrc.income_tax.allowances.personal_allowance.amount": {
+          "2026-01-01.2026-12-31": 100.403
+        }
+      },
+      "definition_sha256": "79ac10607513ee1e3ba25416d67d87edc3805c2acd2f582202b93571ea7ebc97",
+      "error": null,
+      "status": "ok"
+    },
+    "vat_standard_rate_plus_1pp": {
+      "applied": {
+        "gov.hmrc.vat.standard_rate": {
+          "2026-01-01.2026-12-31": 0.7979999999999999
+        }
+      },
+      "definition_sha256": "159de7efaecc81f6573780c9a13d4c0a81e7050b99e6974c53b7caf88c701129",
+      "error": null,
+      "status": "ok"
+    }
+  },
+  "runtime": {
+    "finished_at": "2026-11-12T00:10:00Z",
+    "limits": {
+      "dataset_bytes": 2000000000,
+      "memory_bytes": 16000000000,
+      "seconds": 6600,
+      "warn_at": 0.8
+    },
+    "near_limits": [],
+    "runner": "synthetic",
+    "seconds": 600.0,
+    "simulations": [
+      {
+        "label": "baseline",
+        "peak_rss_bytes": 1000000000,
+        "seconds": 300.0
+      },
+      {
+        "label": "reform:basic_rate_plus_1p",
+        "peak_rss_bytes": 1000000000,
+        "seconds": 300.0
+      },
+      {
+        "label": "reform:higher_rate_plus_1p",
+        "peak_rss_bytes": 1000000000,
+        "seconds": 300.0
+      },
+      {
+        "label": "reform:additional_rate_plus_1p",
+        "peak_rss_bytes": 1000000000,
+        "seconds": 300.0
+      },
+      {
+        "label": "reform:personal_allowance_plus_100",
+        "peak_rss_bytes": 1000000000,
+        "seconds": 300.0
+      },
+      {
+        "label": "reform:employee_nics_main_rate_plus_1pp",
+        "peak_rss_bytes": 1000000000,
+        "seconds": 300.0
+      },
+      {
+        "label": "reform:child_benefit_subsequent_child_plus_1",
+        "peak_rss_bytes": 1000000000,
+        "seconds": 300.0
+      },
+      {
+        "label": "reform:vat_standard_rate_plus_1pp",
+        "peak_rss_bytes": 1000000000,
+        "seconds": 300.0
+      }
+    ],
+    "started_at": "2026-11-12T00:00:00Z"
+  },
+  "status": "ok"
+}

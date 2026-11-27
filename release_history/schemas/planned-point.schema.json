@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/PolicyEngine/calibration-diagnostics/release_history/schemas/planned-point.schema.json",
+  "title": "Release history planned point",
+  "description": "One file to measure, as the plan names it: written by `frontend/scripts/release-history.ts` (`plan`), read by `release_history/releases.py` (`Point.from_json`) in each measure job. A recorded build at one commit of the release repository. Version 1: every key listed here is required and no other key is allowed. A key added later is declared here with the version that added it, and is not required, so the documents already written stay valid and no format version moves.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "build_id",
+    "release_directory",
+    "hf_repo",
+    "hf_commit",
+    "digest",
+    "attempt",
+    "last_attempt"
+  ],
+  "properties": {
+    "build_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "release_directory": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hf_repo": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hf_commit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "The file the series listed; the producer refuses a different one."
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "last_attempt": {
+      "type": "boolean",
+      "description": "A partial result (a reform failed) is stored only on the last attempt."
+    }
+  }
+}

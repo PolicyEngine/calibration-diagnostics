@@ -1,0 +1,127 @@
+# Official references for the UK spec's baseline items and reforms. Not part of
+# the panel id: editing this file never forces a re-measurement. After an edit,
+# run `release-history resolve-references --country uk --facts <consumer_facts.jsonl>
+# --manifest <manifest.json>` to rewrite references.lock.json from Chronicle.
+#
+# chronicle_records: Chronicle source-record (or record-set) ids; a list is summed.
+# citation: a source Chronicle does not hold yet; it gains a value once ingested.
+# none: why there is no official figure.
+# sign: how an official figure maps onto PolicyEngine's sign (a cost is negative).
+# basis: forecast | outturn | post_behavioural | partial | approximation | mechanical.
+schema_version: 1
+country: uk
+chronicle:
+  # The same pin as Microcosm's UK calibration feed
+  # (packages/microcosm-build/src/microcosm/build/uk/chronicle_feed.json).
+  source_repo: PolicyEngine/chronicle
+  source_commit: 64753803f9b22944a3ee8b24ba6d1fa6c26fef50
+  build: build-bundle --suite uk -> build-consumer-artifact
+  facts_sha256: bcb226fd07a1eba8970a69b13e87ab20c3bd90e96e02509894a65799dbd9482a
+  manifest_sha256: 801d3e5e9d7039f877a12fc45afdd2d6b52ddbb46eecc91d7bd5ff843ea5efb8
+
+baseline:
+  income_tax:
+    chronicle_records: [obr.efo_2026_10.receipts.income_tax.fy2026]
+    basis: forecast
+    note: OBR EFO October 2026, table 4.4, income tax gross of tax credits.
+  national_insurance:
+    chronicle_records: [obr.efo_2026_10.receipts.income_tax_and_nics.national_insurance_contributions.fy2026]
+    basis: forecast
+    note: All NICs; the item sums employee and self-employed (national_insurance) and employer NICs.
+  vat:
+    chronicle_records: [obr.efo_2026_10.receipts.vat.fy2026]
+    basis: partial
+    note: PolicyEngine models VAT on household consumption only.
+  council_tax:
+    chronicle_records: [obr.efo_2026_10.receipts.cash_receipts.council_tax.fy2026]
+    basis: forecast
+  capital_gains_tax:
+    chronicle_records: [obr.efo_2026_10.receipts.capital_gains_tax.fy2026]
+    basis: forecast
+  universal_credit:
+    chronicle_records:
+      - obr.efo_2026_10.expenditure.universal_credit_in_cap.fy2026
+      - obr.efo_2026_10.expenditure.universal_credit_outside_cap.fy2026
+    basis: forecast
+  child_benefit:
+    chronicle_records: [obr.efo_2026_10.expenditure.child_benefit.fy2026]
+    basis: forecast
+  state_pension:
+    chronicle_records: [obr.efo_2026_10.expenditure.state_pension.fy2026]
+    basis: forecast
+  pension_credit:
+    chronicle_records: [obr.efo_2026_10.expenditure.pension_credit.fy2026]
+    basis: forecast
+  housing_benefit:
+    chronicle_records: [obr.efo_2026_10.expenditure.housing_benefit.fy2026]
+    basis: forecast
+  universal_credit_caseload:
+    chronicle_records: [dwp.spring_forecast_2026.universal_credit_and_equivalent.caseload.fy2026.universal_credit_and_equivalent__universal_credit.caseload_2026]
+    basis: partial
+    note: DWP spring 2026 forecast, Universal Credit line; Great Britain only, where the model covers the UK.
+  state_pension_caseload:
+    chronicle_records: [dwp.spring_forecast_2026.state_pension.caseload.fy2026.state_pension__total_state_pension_caseload.caseload_2026]
+    basis: partial
+    note: DWP spring 2026 forecast; Great Britain, including pensions paid abroad, which the model leaves out.
+  pension_credit_caseload:
+    chronicle_records: [dwp.spring_forecast_2026.pension_credit.caseload.fy2026.pension_credit__pension_credit.caseload_2026]
+    basis: partial
+    note: DWP spring 2026 forecast; Great Britain only.
+  housing_benefit_caseload:
+    none: DWP's housing lines mix legacy Housing Benefit and the UC housing element; no single line matches the model's housing_benefit yet.
+  households: {none: No official household count is selected yet.}
+  people: {none: No official population figure is selected yet.}
+  children: {none: No official count of HBAI dependent children is selected yet.}
+  employment_income: {none: An input; no official 2026-27 total is selected yet.}
+  self_employment_income: {none: An input; no official 2026-27 total is selected yet.}
+  private_pension_income: {none: An input; no official 2026-27 total is selected yet.}
+  property_income: {none: An input; no official 2026-27 total is selected yet.}
+  savings_interest_income: {none: An input; no official 2026-27 total is selected yet.}
+  dividend_income: {none: An input; no official 2026-27 total is selected yet.}
+  household_net_income_total: {none: No official total of household net income.}
+  absolute_poverty_bhc_all: {none: HBAI has no 2026-27 figure yet.}
+  absolute_poverty_ahc_all: {none: HBAI has no 2026-27 figure yet.}
+  relative_poverty_bhc_all: {none: HBAI has no 2026-27 figure yet.}
+  relative_poverty_ahc_all: {none: HBAI has no 2026-27 figure yet.}
+  absolute_poverty_bhc_children: {none: HBAI has no 2026-27 figure yet.}
+  absolute_poverty_ahc_children: {none: HBAI has no 2026-27 figure yet.}
+  relative_poverty_bhc_children: {none: HBAI has no 2026-27 figure yet.}
+  relative_poverty_ahc_children: {none: HBAI has no 2026-27 figure yet.}
+  household_net_income_mean: {none: HBAI has no 2026-27 figure yet.}
+
+# HMRC's ready reckoner is not in Chronicle yet, so the reforms carry citations.
+# The scorecard's registry row (registry.id) is the same mapping its UK reckoner
+# lane compares against.
+reforms:
+  basic_rate_plus_1p:
+    sign: 1
+    basis: post_behavioural
+    citation: &reckoner {publisher: HM Revenue & Customs, document: "Direct effects of illustrative tax changes (tax ready reckoner)", edition: June 2025, row: Change basic rate by 1p, period: 2026-27}
+    registry: {repo: PolicyEngine/policyengine-scorecard, path: data/uk/hmrc_reckoner_reforms.json, commit: 1a93ec236736, id: reckoner_202506__income_tax__change_basic_rate_by_1p}
+  higher_rate_plus_1p:
+    sign: 1
+    basis: post_behavioural
+    citation: {<<: *reckoner, row: Change higher rate by 1p}
+    registry: {repo: PolicyEngine/policyengine-scorecard, path: data/uk/hmrc_reckoner_reforms.json, commit: 1a93ec236736, id: reckoner_202506__income_tax__change_higher_rate_by_1p}
+  additional_rate_plus_1p:
+    sign: 1
+    basis: post_behavioural
+    citation: {<<: *reckoner, row: Increase additional rate by 1p (yield)}
+    registry: {repo: PolicyEngine/policyengine-scorecard, path: data/uk/hmrc_reckoner_reforms.json, commit: 1a93ec236736, id: reckoner_202506__income_tax__increase_additional_rate_by_1p_yield}
+  personal_allowance_plus_100:
+    sign: -1
+    citation: {<<: *reckoner, row: Change personal allowance by £100}
+    registry: {repo: PolicyEngine/policyengine-scorecard, path: data/uk/hmrc_reckoner_reforms.json, commit: 1a93ec236736, id: reckoner_202506__income_tax__change_personal_allowance_by_100}
+  employee_nics_main_rate_plus_1pp:
+    sign: 1
+    citation: {<<: *reckoner, row: Change Class 1 employee main rate by 1 percentage point}
+    registry: {repo: PolicyEngine/policyengine-scorecard, path: data/uk/hmrc_reckoner_reforms.json, commit: 1a93ec236736, id: reckoner_202506__national_insurance__change_class_1_employee_main_rate_by_1_percentage_point}
+  child_benefit_subsequent_child_plus_1:
+    sign: -1
+    citation: {<<: *reckoner, row: Increase subsequent child rate by £1 per week (cost)}
+    registry: {repo: PolicyEngine/policyengine-scorecard, path: data/uk/hmrc_reckoner_reforms.json, commit: 1a93ec236736, id: reckoner_202506__child_benefit__increase_subsequent_child_rate_by_1_per_week_cost}
+  vat_standard_rate_plus_1pp:
+    sign: 1
+    basis: partial
+    citation: {<<: *reckoner, row: Change standard rate by 1 percentage point (VAT)}
+    registry: {repo: PolicyEngine/policyengine-scorecard, path: data/uk/hmrc_reckoner_reforms.json, commit: 1a93ec236736, id: reckoner_202506__vat__change_standard_rate_by_1_percentage_point}

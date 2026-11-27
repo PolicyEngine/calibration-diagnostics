@@ -1,0 +1,93 @@
+{
+  "baseline": {
+    "eitc": {
+      "basis": null,
+      "output": null,
+      "reason": "US baseline references are for the US data owners to choose (trial spec).",
+      "sign": 1,
+      "status": "none"
+    },
+    "households": {
+      "basis": null,
+      "output": null,
+      "reason": "US baseline references are for the US data owners to choose (trial spec).",
+      "sign": 1,
+      "status": "none"
+    },
+    "income_tax": {
+      "basis": null,
+      "output": null,
+      "reason": "US baseline references are for the US data owners to choose (trial spec).",
+      "sign": 1,
+      "status": "none"
+    },
+    "refundable_ctc": {
+      "basis": null,
+      "output": null,
+      "reason": "US baseline references are for the US data owners to choose (trial spec).",
+      "sign": 1,
+      "status": "none"
+    },
+    "snap": {
+      "basis": null,
+      "output": null,
+      "reason": "US baseline references are for the US data owners to choose (trial spec).",
+      "sign": 1,
+      "status": "none"
+    },
+    "ssi": {
+      "basis": null,
+      "output": null,
+      "reason": "US baseline references are for the US data owners to choose (trial spec).",
+      "sign": 1,
+      "status": "none"
+    }
+  },
+  "chronicle": {},
+  "country": "us",
+  "kind": "release_history.references_lock",
+  "references_sha256": "e2c2230ae190d02282a257a7ae7d25abdad98625f492dc19fa7f35e0c71c37f5",
+  "reforms": {
+    "arpa_ctc_2021": {
+      "basis": "approximation",
+      "citation": {
+        "document": "JCX-14-21, H.R. 1319 as amended",
+        "edition": "9 March 2021",
+        "period": "FY2021 and FY2022 (tax year 2021)",
+        "publisher": "Joint Committee on Taxation",
+        "row": "Child Tax Credit improvements for 2021"
+      },
+      "output": "target/income_tax",
+      "registry": {
+        "commit": "1d174fc7c9",
+        "id": "federal.arpa_ctc_2021",
+        "path": "packages/microcosm-build/src/microcosm/build/us/state_reforms.json",
+        "repo": "PolicyEngine/microcosm"
+      },
+      "sign": 1,
+      "status": "citation"
+    },
+    "cbo_rates_plus_1pt": {
+      "basis": "approximation",
+      "citation": {
+        "document": "Options for Reducing the Deficit: 2025 to 2034",
+        "edition": "December 2024",
+        "note": "Scored on a pre-OBBBA baseline with TCJA rates in effect.",
+        "period": "FY2026",
+        "publisher": "Congressional Budget Office (Joint Committee on Taxation staff estimate)",
+        "row": "Increase Individual Income Tax Rates on Ordinary Income, alternative 1"
+      },
+      "output": "target/income_tax",
+      "registry": {
+        "commit": "1d174fc7c9",
+        "id": "federal.cbo_rates_plus_1pt",
+        "path": "packages/microcosm-build/src/microcosm/build/us/state_reforms.json",
+        "repo": "PolicyEngine/microcosm"
+      },
+      "sign": 1,
+      "status": "citation"
+    }
+  },
+  "resolved_at": "2026-11-09T18:57:45Z",
+  "schema_version": 1
+}
