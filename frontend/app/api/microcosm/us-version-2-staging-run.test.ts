@@ -5,6 +5,11 @@
 // version 1 run's top-level reform validation is still read.
 import { afterEach, beforeEach, expect, test } from "bun:test";
 
+import {
+  isStagingRunFileName,
+  STAGING_RUN_FILE_NAMES,
+} from "@policyengine/calibration-tree/staging-run-files";
+
 import diagnosticsFixture from "@/lib/microcosm/fixtures/zz-release/calibration_diagnostics.json";
 import { clearBuildRunCaches, loadBuildRuns } from "@/lib/microcosm/build-runs";
 import {
@@ -102,6 +107,11 @@ async function runDetail(runId = US_V2_RUN) {
   expect(response.status).toBe(200);
   return response.json();
 }
+
+test("the pinned package names a version 2 run's reform validation among a run's copied files", () => {
+  expect(STAGING_RUN_FILE_NAMES).toContain("artifacts/reform_validation.json");
+  expect(isStagingRunFileName("artifacts/reform_validation.json")).toBe(true);
+});
 
 test("the Candidate tab lists a US version 2 run with its version 2 identity", async () => {
   const store = serve(usV2Store());
@@ -287,11 +297,8 @@ test("a version 3 run whose index summary records no version shows no top-level 
 
 test("the calibration and Build progress readers don't read a version 2 run's reform validation", async () => {
   const store = serve(usV2Store());
-  const copiedFiles = store.stagingIndex("us").runs[US_V2_RUN].files as Record<
-    string,
-    { path: string } | undefined
-  >;
-  const reformValidationCopy = copiedFiles["artifacts/reform_validation.json"]?.path;
+  const reformValidationCopy =
+    store.stagingIndex("us").runs[US_V2_RUN].files["artifacts/reform_validation.json"]?.path;
 
   const tree = await stagingTargetTree(request(`/staging/target-tree?country=us&run=${US_V2_RUN}`));
   const builds = await loadBuildRuns("staging", "us");

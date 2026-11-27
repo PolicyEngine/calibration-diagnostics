@@ -4,9 +4,7 @@
 // Each gives the answer the package's Hugging Face reader of the same name
 // gives for the same files (`loadStagingRuns`, `loadStagingRun`,
 // `loadStagingCalibration` and the rest), and none reads Hugging Face. The
-// one difference: a version 2 or 3 run's reform validation is the copy its
-// run manifest declares under `artifacts/`, which the package's 0.1.5 Hugging
-// Face reader does not read. The copies hold what a run's files said when the collector last copied them;
+// copies hold what a run's files said when the collector last copied them;
 // an unfinished run's current state comes from the collector's telemetry
 // when a page is requested (`staging-run-state.ts`).
 import { getCalibrationTreeBlob } from "@policyengine/calibration-tree/calibration-tree-blob";
@@ -145,14 +143,8 @@ function declaredArtifactPath<Name extends string>(logicalName: Name) {
 
 const DECLARED_REFORM_VALIDATION = declaredArtifactPath(REFORM_VALIDATION_ARTIFACT);
 
-type CopiedFileName = StagingRunFileName | typeof DECLARED_REFORM_VALIDATION;
-
-function copiedFile(record: StagingRunRecord, name: CopiedFileName) {
-  return (record.files as Partial<Record<CopiedFileName, StagingRunFileRecord>>)[name];
-}
-
-async function readCopiedJson(record: StagingRunRecord, name: CopiedFileName) {
-  const file = copiedFile(record, name);
+async function readCopiedJson(record: StagingRunRecord, name: StagingRunFileName) {
+  const file = record.files[name];
   return file
     ? readStagingRunFile({ record: file, client: collectorStoreBlob })
     : null;
@@ -202,8 +194,7 @@ const CALIBRATION_DOCUMENTS: readonly StagingRunFileName[] = [
  * One run's copied documents, parsed and checked as the Hugging Face reader
  * parses and checks them. `names` limits what is read; the rest is absent.
  * A version 2 or 3 run's reform validation is the copy its run manifest
- * declares under `artifacts/`, which the package's 0.1.5 Hugging Face reader
- * does not read.
+ * declares under `artifacts/`, as the Hugging Face reader reads it.
  */
 export async function copiedRunDocuments(
   record: StagingRunRecord,
@@ -213,7 +204,7 @@ export async function copiedRunDocuments(
   // A version 2 or 3 run's copied documents say so in the index's summary,
   // so its reform validation is read from where version 2 writes it.
   const structured = (record.summary.schema_version ?? 1) >= 2;
-  const reformValidationName: CopiedFileName = structured
+  const reformValidationName: StagingRunFileName = structured
     ? DECLARED_REFORM_VALIDATION
     : "reform_validation.json";
   const read = (name: StagingRunFileName) =>
@@ -249,7 +240,7 @@ export async function copiedRunDocuments(
     events,
     reformValidation: (
       structured
-        ? declaresCopy(runManifest, REFORM_VALIDATION_ARTIFACT, copiedFile(record, reformValidationName))
+        ? declaresCopy(runManifest, REFORM_VALIDATION_ARTIFACT, record.files[reformValidationName])
         : !structuredDocuments
     )
       ? stagingJsonObjectOrNull(reformBytes)
