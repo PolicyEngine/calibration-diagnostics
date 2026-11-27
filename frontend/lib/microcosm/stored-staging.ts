@@ -4,7 +4,9 @@
 // Each gives the answer the package's Hugging Face reader of the same name
 // gives for the same files (`loadStagingRuns`, `loadStagingRun`,
 // `loadStagingCalibration` and the rest), and none reads Hugging Face. The
-// copies hold what a run's files said when the collector last copied them;
+// one difference: a version 2 or 3 run's reform validation is the copy its
+// run manifest declares under `artifacts/`, which the package's 0.1.5 Hugging
+// Face reader does not read. The copies hold what a run's files said when the collector last copied them;
 // an unfinished run's current state comes from the collector's telemetry
 // when a page is requested (`staging-run-state.ts`).
 import { getCalibrationTreeBlob } from "@policyengine/calibration-tree/calibration-tree-blob";
@@ -52,6 +54,7 @@ import {
   readStagingRunFilesIndex,
   stagingJsonObjectOrNull,
   type StagingRunFileName,
+  type StagingRunFileRecord,
   type StagingRunFilesIndex,
   type StagingRunRecord,
 } from "@policyengine/calibration-tree/staging-run-files";
@@ -131,8 +134,25 @@ export interface CopiedRunDocuments {
   stagedDatasetReceipt: JsonObject | null;
 }
 
-async function readCopiedJson(record: StagingRunRecord, name: StagingRunFileName) {
-  const file = record.files[name];
+// Where a version 2 or 3 run's reform validation is copied: under the path in
+// the run folder its run manifest declares for the artifact. Version 1 runs
+// write `reform_validation.json` at the folder's top level.
+const REFORM_VALIDATION_ARTIFACT = "reform_validation";
+
+function declaredArtifactPath<Name extends string>(logicalName: Name) {
+  return `artifacts/${logicalName}.json` as const;
+}
+
+const DECLARED_REFORM_VALIDATION = declaredArtifactPath(REFORM_VALIDATION_ARTIFACT);
+
+type CopiedFileName = StagingRunFileName | typeof DECLARED_REFORM_VALIDATION;
+
+function copiedFile(record: StagingRunRecord, name: CopiedFileName) {
+  return (record.files as Partial<Record<CopiedFileName, StagingRunFileRecord>>)[name];
+}
+
+async function readCopiedJson(record: StagingRunRecord, name: CopiedFileName) {
+  const file = copiedFile(record, name);
   return file
     ? readStagingRunFile({ record: file, client: collectorStoreBlob })
     : null;
@@ -159,6 +179,8 @@ async function copiedRunRecords(country: MicrocosmCountry): Promise<Map<string, 
   );
 }
 
+// `reform_validation.json` stands for the run's reform validation, wherever
+// the run's version keeps it.
 const ALL_DOCUMENTS: readonly StagingRunFileName[] = [
   "progress.json",
   "run_manifest.json",
@@ -179,14 +201,25 @@ const CALIBRATION_DOCUMENTS: readonly StagingRunFileName[] = [
 /**
  * One run's copied documents, parsed and checked as the Hugging Face reader
  * parses and checks them. `names` limits what is read; the rest is absent.
+ * A version 2 or 3 run's reform validation is the copy its run manifest
+ * declares under `artifacts/`, which the package's 0.1.5 Hugging Face reader
+ * does not read.
  */
 export async function copiedRunDocuments(
   record: StagingRunRecord,
   names: readonly StagingRunFileName[] = ALL_DOCUMENTS,
 ): Promise<CopiedRunDocuments> {
   const wanted = new Set(names);
+  // A version 2 or 3 run's copied documents say so in the index's summary,
+  // so its reform validation is read from where version 2 writes it.
+  const structured = (record.summary.schema_version ?? 1) >= 2;
+  const reformValidationName: CopiedFileName = structured
+    ? DECLARED_REFORM_VALIDATION
+    : "reform_validation.json";
   const read = (name: StagingRunFileName) =>
-    wanted.has(name) ? readCopiedJson(record, name) : Promise.resolve(null);
+    wanted.has(name)
+      ? readCopiedJson(record, name === "reform_validation.json" ? reformValidationName : name)
+      : Promise.resolve(null);
   const [progressBytes, manifestBytes, calibrationBytes, eventBytes, reformBytes, receiptBytes] =
     await Promise.all(ALL_DOCUMENTS.map(read));
   const progressDocument = stagingJsonObjectOrNull(progressBytes);
@@ -197,6 +230,11 @@ export async function copiedRunDocuments(
   const calibrationProgress =
     calibrationDocument && parseStagingCalibrationProgress(calibrationDocument);
   const events = parseStagingEvents(eventBytes && new TextDecoder().decode(eventBytes));
+  // The documents' own version: a run whose summary records none may still
+  // hold version 2 or 3 documents, which never hold a top-level copy.
+  const structuredDocuments = [progress, runManifest, calibrationProgress, ...events].some(
+    (document) => isStructuredStagingDocument(document),
+  );
   validateStagingRunConsistency(record.runId, {
     progress,
     runManifest,
@@ -209,9 +247,33 @@ export async function copiedRunDocuments(
     runManifest,
     calibrationProgress,
     events,
-    reformValidation: stagingJsonObjectOrNull(reformBytes),
+    reformValidation: (
+      structured
+        ? declaresCopy(runManifest, REFORM_VALIDATION_ARTIFACT, copiedFile(record, reformValidationName))
+        : !structuredDocuments
+    )
+      ? stagingJsonObjectOrNull(reformBytes)
+      : null,
     stagedDatasetReceipt: stagingJsonObjectOrNull(receiptBytes),
   };
+}
+
+/**
+ * Whether a structured run manifest declares the artifact `logicalName` with
+ * the digest of the copy: a version 2 run shows only the result files its
+ * run manifest declares, as they were when it declared them.
+ */
+function declaresCopy(
+  runManifest: JsonObject | null,
+  logicalName: string,
+  copy: StagingRunFileRecord | undefined,
+): boolean {
+  if (!copy || !isStructuredStagingDocument(runManifest)) return false;
+  const artifact = objectOrNull(objectOrNull(runManifest?.artifacts)?.[logicalName]);
+  return (
+    stringValue(artifact?.path) === declaredArtifactPath(logicalName) &&
+    stringValue(artifact?.sha256) === copy.sha256
+  );
 }
 
 async function readRunDocuments(

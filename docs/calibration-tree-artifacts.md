@@ -367,7 +367,10 @@ files of the run's stored tree, whether its diagnostics came from the run folder
 or its staged bundle. A run with diagnostics shows them once the collector has
 built its tree and, when the run's files declare the diagnostics' digest (in
 a structured run manifest or a staged bundle's receipt), only while the tree
-holds those diagnostics. While a run's copy records no end and the page's
+holds those diagnostics. A version 1 run's reform validation is the copy of
+its top-level `reform_validation.json`; a version 2 or 3 run's is the copy of
+`artifacts/reform_validation.json`, shown only when its run manifest declares
+a `reform_validation` artifact with that copy's digest. While a run's copy records no end and the page's
 state for it comes from the collector's record, its Stage timeline and
 calibration progress come from that record too. The Stage timeline lists the
 record's stage changes, including the stage ends the emitter adds, and its
