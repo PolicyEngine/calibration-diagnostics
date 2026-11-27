@@ -97,17 +97,10 @@ export interface FakeBuild {
   files: Partial<Record<CalibrationTreeSourceFile, Document>>;
 }
 
-/**
- * A file a run's index record may hold a copy of: the package's names, and a
- * version 2 run's reform validation, which the collector copies under its
- * path in the run folder.
- */
-export type FakeStagingRunFileName = StagingRunFileName | "artifacts/reform_validation.json";
-
 export interface FakeStagingRun {
   country: MicrocosmCountry;
   runId: string;
-  files: Partial<Record<FakeStagingRunFileName, Document>>;
+  files: Partial<Record<StagingRunFileName, Document>>;
   removed?: boolean;
   problem?: string | null;
   /** Fields of the index's summary of the run that differ from its documents'. */
@@ -198,14 +191,14 @@ export class FakeCollectorStore {
   /** Copies a staging run's files into its country's index. */
   addStagingRun(run: FakeStagingRun): void {
     const index = this.stagingIndex(run.country);
-    const files: Partial<Record<FakeStagingRunFileName, StagingRunFileRecord>> = {};
+    const files: Partial<Record<StagingRunFileName, StagingRunFileRecord>> = {};
     for (const [name, document] of Object.entries(run.files)) {
       const bytes = bytesOf(document!);
       const digest = sha256(bytes);
       const compressed = gzipSync(bytes);
       const path = stagingRunFilePath(run.country, run.runId, digest);
       this.objects.set(path, compressed);
-      files[name as FakeStagingRunFileName] = {
+      files[name as StagingRunFileName] = {
         path,
         sha256: digest,
         rawBytes: bytes.byteLength,
